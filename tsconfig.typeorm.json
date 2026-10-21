@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "incremental": false
+  },
+  "include": ["server/database/**/*.ts", "lib/permissions.ts"],
+  "exclude": ["node_modules"]
+}
