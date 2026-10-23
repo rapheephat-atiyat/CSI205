@@ -35,7 +35,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${kanit.variable} ${inter.variable} ${audiowide.variable} h-full antialiased`}
     >
 
-      <body className="min-h-full flex flex-col"><Navabr />{children}<Footer /></body>
+      <body className="[--navbar-height:4.5rem] lg:[--navbar-height:5rem] min-h-full flex flex-col"><Navabr />{children}<Footer /></body>
 
     </html>
   );

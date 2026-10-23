@@ -4,6 +4,10 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@utility debug {
+  @apply outline outline-1 outline-red-500;
+}
+
 @theme inline {
   --color-brand: #dc2626;
   --color-brand-hover: #b91c1c;
