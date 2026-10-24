@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Audiowide, Geist, Geist_Mono, Inter, Kanit } from "next/font/google";
 import "./globals.css";
-import Navabr from "@/components/layout/Navabr";
-import Footer from "@/components/layout/Footer";
 
 const audiowide = Audiowide({
   variable: "--audiowide",
@@ -34,9 +32,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${kanit.variable} ${inter.variable} ${audiowide.variable} h-full antialiased`}
     >
-
-      <body className="[--navbar-height:4.5rem] lg:[--navbar-height:5rem] min-h-full flex flex-col"><Navabr />{children}<Footer /></body>
-
+      <body className="[--navbar-height:4.5rem] lg:[--navbar-height:5rem] min-h-full flex flex-col">
+        {children}
+      </body>
     </html>
   );
 }
