@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter, Kanit } from "next/font/google";
+import { Audiowide, Geist, Geist_Mono, Inter, Kanit } from "next/font/google";
 import "./globals.css";
+
+const audiowide = Audiowide({
+  variable: "--audiowide",
+  subsets: ["latin"],
+  weight: ["400"]
+})
 
 const kanit = Kanit({
   variable: "--font-kanit",
@@ -24,9 +30,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${kanit.variable} ${inter.variable} h-full antialiased`}
+      className={`${kanit.variable} ${inter.variable} ${audiowide.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="[--navbar-height:4.5rem] lg:[--navbar-height:5rem] min-h-full flex flex-col">
+        {children}
+      </body>
     </html>
   );
 }
