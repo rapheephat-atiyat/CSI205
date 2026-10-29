@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -19,19 +18,18 @@ import {
 } from "@/components/ui/sidebar";
 
 import {
-  CircleDollarSign,
+  CalendarDays,
+  FileText,
   FolderUsers,
-  GraphStar,
-  HouseCog,
   LayoutDashboard,
   ListClock,
   LucideIcon,
-  SquareKanban,
   Store,
   TicketPercent,
-  UserShield,
+  Users,
 } from "lucide-react";
 import { cn } from "cn";
+import Brand from "@/components/core/Brand";
 
 type NavItem = {
   icon: LucideIcon;
@@ -46,57 +44,37 @@ type NAV_GROUPS = {
 
 const NAV_GROUPS = [
   {
-    icon: LayoutDashboard,
-    label: "ภาพรวม",
-    items: [{ icon: LayoutDashboard, href: "/admin", label: "Dashboard" }],
-  },
-  {
-    label: "ตั้งค่า",
+    label: "พื้นที่ผู้ดูแลส่วนกลาง",
     items: [
       {
-        icon: HouseCog,
+        icon: LayoutDashboard,
+        href: "/admin",
+        label: "ภาพรวม",
+      },
+      {
+        icon: CalendarDays,
         href: "/admin/settings/event",
         label: "ตั้งค่างาน",
       },
       {
         icon: TicketPercent,
         href: "/admin/settings/pricing",
-        label: "ราคาบัตร/เสื้อ",
+        label: "บัตรและเสื้อ",
       },
       {
-        icon: CircleDollarSign,
-        href: "/admin/settings/token-rate",
-        label: "เรท Token",
-      },
-    ],
-  },
-  {
-    label: "จัดการข้อมูล",
-    items: [
-      {
-        icon: FolderUsers,
+        icon: Users,
         href: "/admin/manage/users",
-        label: "รายชื่อผู้ลงทะเบียน",
+        label: "ผู้ใช้และสิทธิ์",
       },
       {
         icon: Store,
         href: "/admin/manage/vendors",
-        label: "รายการร้านค้า",
+        label: "ร้านค้า",
       },
       {
-        icon: UserShield,
-        href: "/admin/manage/permissions",
-        label: "สิทธิ์ผู้ดูแล",
-      },
-    ],
-  },
-  {
-    label: "รายงาย",
-    items: [
-      {
-        icon: SquareKanban,
+        icon: FileText,
         href: "/admin/reports/overview",
-        label: "รายงานภาพรวม",
+        label: "รายงานและส่งออก",
       },
       {
         icon: ListClock,
@@ -115,15 +93,14 @@ export default function AdminNav() {
 
   return (
     <Sidebar collapsible="icon" className="flex items-center justify-center">
-      <SidebarHeader className="text-xl font-bold text-brand flex flex-row items-center justify-center">
-        {sidebarState && <span>Admin panel</span>}
-        <GraphStar size={30} />
+      <SidebarHeader className="flex items-start justify-center">
+        {sidebarState && <Brand />}
       </SidebarHeader>
       <SidebarContent>
         {NAV_GROUPS.map((group) => {
           return (
             <SidebarGroup key={group.label}>
-              <SidebarGroupLabel className="group-data-[collapsible=icon]:pointer-events-none">
+              <SidebarGroupLabel className="text-sm md:text-xs group-data-[collapsible=icon]:pointer-events-none">
                 {sidebarState && <span>{group.label}</span>}
               </SidebarGroupLabel>
               <SidebarGroupContent>
@@ -136,7 +113,7 @@ export default function AdminNav() {
                         : pathname.startsWith(item.href);
 
                     return (
-                      <SidebarMenuItem key={item.href}>
+                      <SidebarMenuItem key={item.href} className="mt-2">
                         <SidebarMenuButton
                           asChild
                           onClick={() => setOpenMobile(false)}
@@ -148,7 +125,7 @@ export default function AdminNav() {
                           )}
                         >
                           <Link href={item.href}>
-                            <Icon size={sidebarState ? 50 : 15} />
+                            <Icon />
                             <span>{item.label}</span>
                           </Link>
                         </SidebarMenuButton>

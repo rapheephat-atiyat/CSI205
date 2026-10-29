@@ -1,36 +1,90 @@
+import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 
 export default function AdminDashboardPage() {
+  const styles = {
+    btn: "p-4 bg-on-brand rounded-[10px] flex flex-col  w-43 h-33.5 gap-2 lg:p-5  lg:w-57 lg:h-37",
+    text: "text-muted-foreground text-[14px] font-light",
+  };
   return (
-    <div className="p-4 w-full">
-      <div className="grid grid-cols-2 gap-4 justify-center lg:grid-cols-4 lg:gap-2">
-        <Badge variant={"outline"} className="p-4 rounded-[10px] flex flex-col  w-43 h-33.5 gap-2 lg:p-5  lg:w-57 lg:h-37">
-          <div className="text-muted-foreground text-[14px] font-light">ผู้ลงทะเบียน</div>
-          <div className="text-3xl lg:text-[32px] text-black font-bold">1,248</div>
-          <div className="text-muted-foreground text-[12px] font-light">
-            คน · ลงทะเบียนสำเร็จ
+    <div className="p-4 mt-4 flex flex-col justify-start lg:scrollbar-none">
+      {/* header */}
+      <div className={cn(styles.text, "text-black text-2xl font-semibold")}>
+        ภาพรวมงาน
+        <div className={cn(styles.text)}>
+          ติดตามการลงทะเบียน การเข้างาน และยอดขายของ
+          {/* event title */}
+          <span>คืนสู่เหย้า 2569</span>
+        </div>
+      </div>
+
+      {/* detail */}
+      <div className="p-4 grid grid-cols-2 gap-2 md:flex md:justify-around">
+        {/* register */}
+        <Badge
+          variant={"outline"}
+          className="p-4 lg:py-6 lg:pr-55 w-40 flex flex-col gap-2 justify-between rounded-[10px]"
+        >
+          <div className={cn(styles.text, "text-sm")}>ลงทะเบียน</div>
+          <div
+            className={cn(
+              styles.text,
+              "font-semibold text-2xl md:text-4xl text-black",
+            )}
+          >
+            1,248
           </div>
+          <div className={cn(styles.text, "text-sm text-black")}>คน</div>
         </Badge>
-        <Badge variant={"outline"} className="p-4 rounded-[10px] flex flex-col  w-43 h-33.5 gap-2 lg:p-5  lg:w-57 lg:h-37">
-          <div className="text-muted-foreground text-[14px] font-light">ผู้เข้างาน</div>
-          <div className="text-2xl text-black font-bold">936</div>
-          <div className="text-muted-foreground text-[12px] font-light">
-            คน · 75% ของผู้ลงทะเบียน
+        {/* check-in */}
+        <Badge
+          variant={"outline"}
+          className="p-4 lg:py-6 lg:pr-55 w-40 flex flex-col gap-2 justify-between rounded-[10px]"
+        >
+          <div className={cn(styles.text, "text-sm")}>ลงทะเบียน</div>
+          <div
+            className={cn(
+              styles.text,
+              "font-semibold text-2xl md:text-4xl text-black",
+            )}
+          >
+            1,248
           </div>
+          <div className={cn(styles.text, "text-sm text-black")}>คน</div>
         </Badge>
-        <Badge variant={"outline"} className="p-4 rounded-[10px] flex flex-col  w-43 h-33.5 gap-2 lg:p-5  lg:w-57 lg:h-37">
-          <div className="text-muted-foreground text-[14px] font-light">ยอด Token รวม</div>
-          <div className="text-2xl text-black font-bold">147,840</div>
-          <div className="text-muted-foreground text-[12px] font-light">
-            Token · รวมที่ได้รับและเติม
+        {/* ticket */}
+        <Badge
+          variant={"outline"}
+          className="p-4 lg:py-6 lg:pr-55 w-40 flex flex-col gap-2 justify-between rounded-[10px]"
+        >
+          <div className={cn(styles.text, "text-sm")}>
+            ยอดบัตรที่อนุมัติแล้ว
           </div>
+          <div
+            className={cn(
+              styles.text,
+              "font-semibold text-2xl md:text-4xl text-black",
+            )}
+          >
+            1,248
+          </div>
+          <div className={cn(styles.text, "text-sm text-black")}>คน</div>
         </Badge>
-        <Badge variant={"outline"} className="p-4 rounded-[10px] flex flex-col  w-43 h-33.5 gap-2 lg:p-5  lg:w-57 lg:h-37">
-          <div className="text-muted-foreground text-[14px] font-light">จำนวนร้าน</div>
-          <div className="text-2xl text-black font-bold">6</div>
-          <div className="text-muted-foreground text-[12px] font-light">
-            ร้าน · ในงานนี้
+        {/* token */}
+        <Badge
+          variant={"outline"}
+          className="p-4 lg:py-6 lg:pr-55 w-40 flex flex-col gap-2 justify-between rounded-[10px]"
+        >
+          <div className={cn(styles.text, "text-sm")}>เติม Token หน้างาน</div>
+          <div
+            className={cn(
+              styles.text,
+              "font-semibold text-2xl md:text-4xl text-black",
+            )}
+          >
+            1,248
           </div>
+          <div className={cn(styles.text, "text-sm text-black")}>คน</div>
         </Badge>
       </div>
     </div>
