@@ -5,8 +5,8 @@ import "./globals.css";
 const audiowide = Audiowide({
   variable: "--audiowide",
   subsets: ["latin"],
-  weight: ["400"]
-})
+  weight: ["400"],
+});
 
 const kanit = Kanit({
   variable: "--font-kanit",
@@ -19,7 +19,6 @@ const inter = Inter({
   subsets: ["latin"],
   weight: ["100", "200", "300", "400", "500", "600", "700", "800", "900"],
 });
-
 
 export const metadata: Metadata = {
   title: "Create Next App",
