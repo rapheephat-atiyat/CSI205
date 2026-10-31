@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import Image from "next/image"
-import Link from "next/link"
 import {
   Upload,
   X,
@@ -604,19 +603,6 @@ export default function ProfilePage() {
           )}
         </div>
       </main>
-
-      <footer className="w-full border-t border-[#f0e8e6] bg-white/60 py-4 px-6 sm:px-10 mt-12 text-xs text-zinc-500 flex flex-col sm:flex-row justify-between items-center gap-2">
-        <div>© 2569 สมาคมศิษย์เก่ามหาวิทยาลัยศรีปทุม</div>
-        <div className="flex items-center gap-2">
-          <Link href="/contact" className="hover:text-zinc-800 transition-colors">
-            ติดต่อเรา
-          </Link>
-          <span>·</span>
-          <Link href="/privacy" className="hover:text-zinc-800 transition-colors">
-            นโยบายความเป็นส่วนตัว
-          </Link>
-        </div>
-      </footer>
     </div>
   )
 }
