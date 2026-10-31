@@ -1,6 +1,14 @@
 import type { Metadata } from "next";
 import { Audiowide, Geist, Geist_Mono, Inter, Kanit } from "next/font/google";
 import "./globals.css";
+import Navabr from "@/components/layout/Navabr";
+import Footer from "@/components/layout/Footer";
+
+const audiowide = Audiowide({
+  variable: "--audiowide",
+  subsets: ["latin"],
+  weight: ["400"]
+})
 
 const audiowide = Audiowide({
   variable: "--audiowide",
