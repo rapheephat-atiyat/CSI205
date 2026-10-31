@@ -93,7 +93,7 @@ export default function AdminNav() {
 
   return (
     <Sidebar collapsible="icon" className="flex items-center justify-center">
-      <SidebarHeader className="flex items-start justify-center">
+      <SidebarHeader className="flex items-center justify-center">
         {sidebarState && <Brand />}
       </SidebarHeader>
       <SidebarContent>
