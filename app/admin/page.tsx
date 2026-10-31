@@ -8,7 +8,19 @@ import {
   Ticket,
   Coins,
   SquareArrowOutUpRight,
+  ClipboardCheck,
+  ArrowBigRight,
 } from "lucide-react";
+
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 type stats = {
   icon: LucideIcon;
@@ -24,38 +36,57 @@ const stats: stats[] = [
   { icon: Coins, label: "เติม Token หน้างาน", value: "1,248", unit: "คน" },
 ];
 
-const vendors = [
+type Vendor = {
+  id: number;
+  name: string;
+  food: string;
+  price: number;
+  quantity: number;
+  qtyUnit: string;
+  incomeTk: number;
+  incomeMn: number;
+};
+
+const vendors: Vendor[] = [
   {
+    id: 1,
     name: "ครัวศิษย์เก่า",
     food: "ข้าวกะเพรา",
-    token: "6",
-    unit: "Token",
-    incomeTk: "2,520",
-    incomeMn: "25,200",
+    price: 6,
+    quantity: 420,
+    qtyUnit: "จาน",
+    incomeTk: 2520,
+    incomeMn: 25200,
   },
   {
+    id: 2,
     name: "กาแฟสนาม",
     food: "กาแฟเย็น",
-    token: "4",
-    unit: "Token",
-    incomeTk: "1,240",
-    incomeMn: "12,400",
+    price: 4,
+    quantity: 310,
+    qtyUnit: "แก้ว",
+    incomeTk: 1240,
+    incomeMn: 12400,
   },
   {
+    id: 3,
     name: "น้ำใจรุ่นพี่",
     food: "น้ำสมุนไพร",
-    token: "2",
-    unit: "Token",
-    incomeTk: "560",
-    incomeMn: "5,600",
+    price: 2,
+    quantity: 280,
+    qtyUnit: "แก้ว",
+    incomeTk: 560,
+    incomeMn: 5600,
   },
   {
+    id: 4,
     name: "ขนมบ้านเรา",
     food: "ขนมไทย",
-    token: "3",
-    unit: "Token",
-    incomeTk: "540",
-    incomeMn: "5,400",
+    price: 3,
+    quantity: 180,
+    qtyUnit: "ชุด",
+    incomeTk: 540,
+    incomeMn: 5400,
   },
 ];
 
@@ -180,7 +211,8 @@ export default function AdminDashboardPage() {
           <div className={cn(styles.text)}>
             ตรวจสลิปด้วยตนเองก่อนส่ง QR ให้ผู้ซื้อ
           </div>
-          <Badge className="p-3 bg-brand h-auto w-full rounded-[10px] text-md font-semibold lg:text-xl hover:bg-brand-hover">
+          <Badge className="p-3 flex items-center justify-center [&>svg]:size-4! bg-brand h-auto w-full rounded-[10px] text-[14px] lg:text-[18px] hover:bg-brand-hover hover:cursor-pointer">
+            <ClipboardCheck />
             เปิดคิวตรวจสอบ
           </Badge>
         </Badge>
@@ -192,32 +224,45 @@ export default function AdminDashboardPage() {
           variant={"outline"}
           className="p-4 w-full flex flex-col items-start justify-center gap-4 rounded-[10px]"
         >
+          <div
+            className={cn(
+              styles.text,
+              "text-lg text-black font-semibold md:text-xl",
+            )}
+          >
+            ยอดขายรายร้าน
+          </div>
           {vendors.map((vendor) => {
             return (
               <div
                 key={vendor.name}
-                className="w-full flex flex-col items-start justify-center gap-2"
+                className="w-full flex flex-col items-start justify-center gap-2 md:hidden"
               >
-                <div className={cn(styles.text, "text-lg font-semibold")}>
+                <div
+                  className={cn(
+                    styles.text,
+                    "text-[14px] font-medium text-black md:text-lg",
+                  )}
+                >
                   {vendor.name}
                 </div>
                 <div
                   className={cn(
                     styles.text,
-                    "flex items-center justify-center gap-1",
+                    "flex items-center justify-center gap-1 md:text-[14px]",
                   )}
                 >
                   {vendor.food}
                   <div className="flex gap-1 font-semibold">
-                    {vendor.token}
-                    <span>{vendor.unit}</span>
+                    {vendor.incomeTk}
+                    <span>Token</span>
                   </div>
                 </div>
 
                 <div
                   className={cn(
                     styles.text,
-                    "w-full flex items-center justify-between text-lg font-semibold text-black",
+                    "w-full flex items-center justify-between text-[16px] font-semibold text-black md:text-lg",
                   )}
                 >
                   <div>{vendor.incomeTk} Token</div>
@@ -228,21 +273,86 @@ export default function AdminDashboardPage() {
             );
           })}
 
+          <div className="hidden w-full md:flex flex-col">
+            <Table>
+              <TableHeader className="bg-[#FAFAFA]">
+                <TableRow className="text-[15px]">
+                  <TableHead className="text-muted-foreground font-normal">
+                    ร้านค้า / สินค้า
+                  </TableHead>
+                  <TableHead className="text-muted-foreground font-normal">
+                    ราคา / หน่วย
+                  </TableHead>
+                  <TableHead className="text-muted-foreground font-normal">
+                    จำนวนขาย
+                  </TableHead>
+                  <TableHead className="text-muted-foreground font-normal">
+                    ยอด Token
+                  </TableHead>
+                  <TableHead className="text-muted-foreground font-normal">
+                    เทียบเป็นบาท
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {vendors.map((vendor) => {
+                  return (
+                    <TableRow key={vendor.id}>
+                      <TableCell className="text-[16px]">
+                        {vendor.name} / {vendor.food}
+                      </TableCell>
+                      <TableCell className="text-[16px]">
+                        {vendor.price} Token
+                      </TableCell>
+                      <TableCell className="text-[16px]">
+                        {vendor.quantity} {vendor.qtyUnit}
+                      </TableCell>
+                      <TableCell className="text-[16px]">
+                        {vendor.incomeTk} Token
+                      </TableCell>
+                      <TableCell className="text-[16px]">
+                        {vendor.incomeMn} Token
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+            <div className="w-full border-t"></div>
+            <div className="my-4 flex items-center justify-between">
+              <div className="flex items-center justify-center">
+                <div className="flex items-center justify-center font-semibold text-[18px] gap-2">
+                  <div>รวม {vendors.length} ร้าน</div>
+                  <div className="font-semibold text-[18px]">1,190 หน่วย</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between font-semibold text-[18px] gap-2">
+                <div>4,860 Token</div>
+                <ArrowBigRight className="text-brand"/>
+                <div>48,600 Bath</div>
+              </div>
+            </div>
+          </div>
+
           <div
             className={cn(
               styles.text,
-              "w-full flex flex-col items-start justify-between text-lg font-semibold text-black",
+              "w-full flex flex-col items-start justify-between text-lg font-semibold text-black md:hidden",
             )}
           >
-            <div>รวม 4,860 Token</div>
+            <div className="md:text-2xl md:font-semibold">รวม 4,860 Token</div>
             <div className={cn("w-full flex items-center justify-between p-2")}>
-              <div className={cn(styles.text)}>แปลงเป็น</div>
-              <div>48,600 บาท</div>
+              <div className={cn(styles.text, "md:text-[16px] text-brand-ho")}>
+                แปลงเป็น
+              </div>
+              <div className="md:text-2xl md:font-semibol text-brand">
+                48,600 บาท
+              </div>
             </div>
           </div>
           <Badge
             variant={"outline"}
-            className="w-full rounded-[10px] p-3 text-md flex items-center justify-center"
+            className="w-full flex items-center justify-center [&>svg]:size-4! rounded-[10px] p-3 text-[14px] md:text-[18px] gap-2 outline outline-brand hover:cursor-pointer hover:bg-brand-hover hover:text-on-brand"
           >
             <SquareArrowOutUpRight />
             ดูรายงานทั้งหมด

@@ -10,16 +10,14 @@ export default function AdminLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 overflow-auto bg-background">
-      <TooltipProvider>
-        <SidebarProvider>
-          <AdminNav />
-          <main className="bg-[#F5F5F5] w-full">
-            <TopBar />
-            {children}
-          </main>
-        </SidebarProvider>
-      </TooltipProvider>
-    </div>
+    <TooltipProvider>
+      <SidebarProvider>
+        <AdminNav />
+        <main className="bg-[#F5F5F5] w-full">
+          <TopBar />
+          {children}
+        </main>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }
