@@ -30,6 +30,7 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 import Brand from "@/components/core/Brand";
+import { useEffect } from "react";
 
 type NavItem = {
   icon: LucideIcon;
@@ -37,12 +38,12 @@ type NavItem = {
   label: string;
 };
 
-type NAV_GROUPS = {
+type NavGroup = {
   label: string;
   items: NavItem[];
 };
 
-const NAV_GROUPS = [
+const NAV_GROUPS: NavGroup[] = [
   {
     label: "พื้นที่ผู้ดูแลส่วนกลาง",
     items: [
@@ -86,10 +87,14 @@ const NAV_GROUPS = [
 ];
 
 export default function AdminNav() {
-  const { state, setOpenMobile } = useSidebar();
+  const { open, setOpen, state, toggleSidebar, setOpenMobile } = useSidebar();
   const pathname = usePathname();
 
   const sidebarState = state === "expanded";
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
 
   return (
     <Sidebar collapsible="icon" className="flex items-center justify-center">
