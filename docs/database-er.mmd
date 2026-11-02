@@ -1,0 +1,66 @@
+erDiagram
+    users {
+        uuid id PK
+        varchar name
+        varchar email UK
+        boolean emailVerified
+        text image "nullable"
+        varchar username UK "nullable"
+        varchar firstName "nullable"
+        varchar lastName "nullable"
+        varchar phone "nullable"
+        date graduationDate "nullable"
+        text graduationInstitution "nullable"
+        varchar status
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    sessions {
+        uuid id PK
+        uuid user_id FK
+        text token UK
+        timestamptz expiresAt
+        varchar ipAddress "nullable"
+        text userAgent "nullable"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    accounts {
+        uuid id PK
+        uuid user_id FK
+        text accountId
+        text providerId
+        text password "nullable"
+        text accessToken "nullable"
+        text refreshToken "nullable"
+        text idToken "nullable"
+        timestamptz accessTokenExpiresAt "nullable"
+        timestamptz refreshTokenExpiresAt "nullable"
+        text scope "nullable"
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    verifications {
+        uuid id PK
+        text identifier
+        text value
+        timestamptz expiresAt
+        timestamptz created_at
+        timestamptz updated_at
+    }
+    user_roles {
+        uuid id PK
+        uuid user_id FK
+        enum role
+        timestamptz created_at
+    }
+    user_role_permissions {
+        uuid id PK
+        uuid user_role_id FK
+        enum permission
+        timestamptz created_at
+    }
+    users ||..o{ sessions : "user_id"
+    users ||..o{ accounts : "user_id"
+    users ||..o{ user_roles : "user_id"
+    user_roles ||..o{ user_role_permissions : "user_role_id"
