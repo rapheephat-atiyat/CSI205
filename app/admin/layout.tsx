@@ -1,4 +1,4 @@
-import AdminNav from "@/components/admin/admin-nav";
+import AdminNav from "@/components/admin/AdminNav";
 import TopBar from "@/components/admin/TopBar";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -11,7 +11,7 @@ export default function AdminLayout({
 }) {
   return (
     <TooltipProvider>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={false}>
         <AdminNav />
         <main className="bg-[#F5F5F5] w-full">
           <TopBar />
