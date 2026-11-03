@@ -46,7 +46,7 @@ export class Store {
     banner!: string | null;
 
     @Column({ type: "text", nullable: true })
-    thumnail!: string | null;
+    thumbnail!: string | null;
 
     @OneToOne(() => Wallet, (wallet) => wallet.store)
     wallet!: Relation<Wallet> | null;
