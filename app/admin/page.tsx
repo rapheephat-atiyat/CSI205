@@ -242,7 +242,10 @@ export default function AdminDashboardPage() {
             <div className={"w-full flex items-start justify-between"}>
               <div className={cn(styles.text, "md:text-lg")}>บัตรรออนุมัติ</div>
               <div
-                className={cn(styles.text, "font-bold text-black flex gap-1 md:text-lg")}
+                className={cn(
+                  styles.text,
+                  "font-bold text-black flex gap-1 md:text-lg",
+                )}
               >
                 44
                 <span className="font-normal md:text-lg">ใบ</span>
@@ -251,7 +254,10 @@ export default function AdminDashboardPage() {
             <div className={"w-full flex items-start justify-between"}>
               <div className={cn(styles.text, "md:text-lg")}>ยอดรอตรวจ</div>
               <div
-                className={cn(styles.text, "font-bold text-black flex gap-1 md:text-lg")}
+                className={cn(
+                  styles.text,
+                  "font-bold text-black flex gap-1 md:text-lg",
+                )}
               >
                 38,200
                 <span className="font-normal">บาท</span>
@@ -349,8 +355,12 @@ export default function AdminDashboardPage() {
                 {vendors.map((vendor) => {
                   return (
                     <TableRow key={vendor.id}>
-                      <TableCell className="text-[16px]">
+                      <TableCell className="text-[16px] flex items-center justify-start">
                         {vendor.name} / {vendor.food}
+                        <Badge
+                          variant={"ghost"}
+                          className="h-full my-5 bg-amber-100"
+                        ></Badge>
                       </TableCell>
                       <TableCell className="text-[16px]">
                         {vendor.price} Token
