@@ -1,9 +1,14 @@
-import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from "typeorm";
+import { Store } from "@/server/database/entities/Store";
+import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn, type Relation, UpdateDateColumn } from "typeorm";
 
 @Entity({ name: "products", schema: "public" })
 export class Product {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
+
+    @OneToOne(() => Store, (s) => s.product, { onDelete: "CASCADE", nullable: false })
+    @JoinColumn({ name: "store_id", referencedColumnName: "id" })
+    store!: Relation<Store>
 
     @Column({ type: "varchar", length: 255 })
     title!: string;

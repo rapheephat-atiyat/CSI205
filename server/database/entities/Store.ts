@@ -1,4 +1,5 @@
 import { Events } from "@/server/database/entities/event";
+import { Product } from "@/server/database/entities/Product";
 import { UserRole } from "@/server/database/entities/UserRole";
 import {
     Column,
@@ -7,6 +8,7 @@ import {
     JoinColumn,
     ManyToOne,
     OneToMany,
+    OneToOne,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
     type Relation,
@@ -29,6 +31,15 @@ export class Store {
     })
     @JoinColumn({ name: "event_id", referencedColumnName: "id" })
     event!: Relation<Events>;
+
+    @Column({
+        name: "product_id",
+        type: "uuid",
+    })
+    productId!: string;
+
+    @OneToOne(() => Product, (p) => p.store)
+    product!: Relation<Product> | null;
 
     @Column({ type: "varchar", length: 255 })
     name!: string;
