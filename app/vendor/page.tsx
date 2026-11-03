@@ -7,7 +7,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { ChartNoAxesCombined, Coins, Receipt } from "lucide-react";
+import { ChartNoAxesCombined, Coffee, Coins, Receipt } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, Cell, LabelList, XAxis, YAxis } from "recharts";
 
 const chartData = [
@@ -148,7 +148,27 @@ function page() {
         </div>
 
         <div className="border border-black/10 w-full rounded-xl p-6 text-2xl ">
-            <div className="text-gray-500  text-xs"></div>
+          <div className="text-xl font-bold"> ยอดขายสินค้า</div>
+          <div className="text-gray-500  text-xs">ลาเต้เย็น · 70 T ต่อแก้ว</div>
+          <div className="w-full flex flex-col gap-2">
+
+            {/* ชื่อสินค้า */}
+            <div className="flex justify-between items-center text-sm">
+              <span className="font-medium flex items-center gap-2">
+                <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-brand">
+                  <Coffee size={18} strokeWidth={2} />
+                </span >
+                อเมริกาโน่เย็น
+              </span>
+              <span className="text-sm text-gray-500">70 T</span>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-full w-[60%] bg-[#e0313f] rounded-full" />
+            </div>
+
+          </div>
         </div>
       </div>
     </div>
