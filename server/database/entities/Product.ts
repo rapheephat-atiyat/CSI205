@@ -6,9 +6,12 @@ export class Product {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
+    @Column({ name: "store_id", type: "uuid" })
+    storedId!: string;
+
     @OneToOne(() => Store, (s) => s.product, { onDelete: "CASCADE", nullable: false })
     @JoinColumn({ name: "store_id", referencedColumnName: "id" })
-    store!: Relation<Store>
+    store!: Relation<Store>;
 
     @Column({ type: "varchar", length: 255 })
     title!: string;

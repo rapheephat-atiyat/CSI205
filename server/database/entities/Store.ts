@@ -1,6 +1,7 @@
-import { Events } from "@/server/database/entities/event";
+import { Events } from "@/server/database/entities/Event";
 import { Product } from "@/server/database/entities/Product";
 import { UserRole } from "@/server/database/entities/UserRole";
+import { Wallet } from "@/server/database/entities/Wallet";
 import {
     Column,
     CreateDateColumn,
@@ -32,12 +33,6 @@ export class Store {
     @JoinColumn({ name: "event_id", referencedColumnName: "id" })
     event!: Relation<Events>;
 
-    @Column({
-        name: "product_id",
-        type: "uuid",
-    })
-    productId!: string;
-
     @OneToOne(() => Product, (p) => p.store)
     product!: Relation<Product> | null;
 
@@ -52,6 +47,9 @@ export class Store {
 
     @Column({ type: "text", nullable: true })
     thumnail!: string | null;
+
+    @OneToOne(() => Wallet, (wallet) => wallet.store)
+    wallet!: Relation<Wallet> | null;
 
     @OneToMany(() => UserRole, (userRole) => userRole.store)
     userRoles!: Relation<UserRole[]>;
