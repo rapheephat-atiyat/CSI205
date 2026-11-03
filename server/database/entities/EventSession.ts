@@ -1,4 +1,4 @@
-import { Events } from "@/server/database/entities/event";
+import { Events } from "@/server/database/entities/Event";
 import {
     Column,
     Entity,

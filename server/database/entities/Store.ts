@@ -1,5 +1,7 @@
-import { Events } from "@/server/database/entities/event";
+import { Events } from "@/server/database/entities/Event";
+import { Product } from "@/server/database/entities/Product";
 import { UserRole } from "@/server/database/entities/UserRole";
+import { Wallet } from "@/server/database/entities/Wallet";
 import {
     Column,
     CreateDateColumn,
@@ -7,6 +9,7 @@ import {
     JoinColumn,
     ManyToOne,
     OneToMany,
+    OneToOne,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
     type Relation,
@@ -30,6 +33,9 @@ export class Store {
     @JoinColumn({ name: "event_id", referencedColumnName: "id" })
     event!: Relation<Events>;
 
+    @OneToOne(() => Product, (p) => p.store)
+    product!: Relation<Product> | null;
+
     @Column({ type: "varchar", length: 255 })
     name!: string;
 
@@ -40,7 +46,10 @@ export class Store {
     banner!: string | null;
 
     @Column({ type: "text", nullable: true })
-    thumnail!: string | null;
+    thumbnail!: string | null;
+
+    @OneToOne(() => Wallet, (wallet) => wallet.store)
+    wallet!: Relation<Wallet> | null;
 
     @OneToMany(() => UserRole, (userRole) => userRole.store)
     userRoles!: Relation<UserRole[]>;

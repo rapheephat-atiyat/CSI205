@@ -4,6 +4,7 @@ import {
     Entity,
     Index,
     OneToMany,
+    OneToOne,
     PrimaryColumn,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
@@ -13,6 +14,7 @@ import {
 import { Session } from "./Session";
 import { Account } from "./Account";
 import { UserRole } from "./UserRole";
+import { Wallet } from "@/server/database/entities/Wallet";
 
 @Entity({ name: "users", schema: "public" })
 @Index("uq_users_email", ["email"], { unique: true })
@@ -51,6 +53,9 @@ export class User {
 
     @Column({ type: "text", nullable: true })
     graduationInstitution!: string | null;
+
+    @OneToOne(() => Wallet, (wallet) => wallet.user)
+    wallet!: Relation<Wallet> | null;
 
     @Column({
         type: "varchar",

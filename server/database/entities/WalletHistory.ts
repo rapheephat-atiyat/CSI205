@@ -38,10 +38,10 @@ export class WalletHistory {
     after!: string;
 
     @Column({ type: "uuid", nullable: true })
-    ref!: string;
+    ref!: string | null;
 
     @Column({ type: "text", nullable: true })
-    note!: string;
+    note!: string | null;
 
     @CreateDateColumn({
         name: "created_at",

@@ -1,4 +1,4 @@
-import { Events } from "@/server/database/entities/event";
+import { Events } from "@/server/database/entities/Event";
 import { Store } from "@/server/database/entities/Store";
 import { User } from "@/server/database/entities/User";
 
