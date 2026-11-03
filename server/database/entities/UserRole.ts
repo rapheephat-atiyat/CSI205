@@ -1,4 +1,8 @@
+import { Events } from "@/server/database/entities/event";
+import { Store } from "@/server/database/entities/Store";
 import { User } from "@/server/database/entities/User";
+
+import { UserRolePermission } from "@/server/database/entities/UserRolePermission";
 import { Role } from "@/server/database/enums/role.enum";
 import {
     Column,
@@ -11,14 +15,17 @@ import {
     PrimaryGeneratedColumn,
     type Relation,
 } from "typeorm";
-import { UserRolePermission } from "./UserRolePermission";
 
 @Entity({ name: "user_roles", schema: "public" })
-@Index("uq_user_roles_user_role", ["userId", "role"], { unique: true })
+@Index(
+    "uq_user_roles_user_role_scope",
+    ["userId", "role", "eventId", "storeId"],
+    { unique: true },
+)
 export class UserRole {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
-    
+
     @Column({
         name: "user_id",
         type: "uuid",
@@ -37,6 +44,34 @@ export class UserRole {
         enum: Role,
     })
     role!: Role;
+
+    @Column({
+        name: "event_id",
+        type: "uuid",
+        nullable: true,
+    })
+    eventId!: string | null;
+
+    @ManyToOne(() => Events, (event) => event.userRoles, {
+        onDelete: "CASCADE",
+        nullable: true,
+    })
+    @JoinColumn({ name: "event_id", referencedColumnName: "id" })
+    event!: Relation<Events> | null;
+
+    @Column({
+        name: "store_id",
+        type: "uuid",
+        nullable: true,
+    })
+    storeId!: string | null;
+
+    @ManyToOne(() => Store, (store) => store.userRoles, {
+        onDelete: "CASCADE",
+        nullable: true,
+    })
+    @JoinColumn({ name: "store_id", referencedColumnName: "id" })
+    store!: Relation<Store> | null;
 
     @OneToMany(() => UserRolePermission, (permission) => permission.userRole)
     permissions!: Relation<UserRolePermission[]>;

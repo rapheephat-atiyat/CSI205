@@ -46,8 +46,8 @@ export class User {
     @Column({ type: "varchar", length: 10, nullable: true })
     phone!: string | null;
 
-    @Column({ type: "date", nullable: true })
-    graduationDate!: string | null;
+    @Column({ type: "timestamptz", nullable: true })
+    graduationAt!: Date | null;
 
     @Column({ type: "text", nullable: true })
     graduationInstitution!: string | null;

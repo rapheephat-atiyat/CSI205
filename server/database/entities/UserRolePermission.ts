@@ -10,9 +10,7 @@ import {
 } from "typeorm";
 
 import { PERMISSIONS, type Permission } from "@/lib/permissions";
-import { UserRole } from "./UserRole";
-
-/** A grant belongs to one user's role assignment, not every user with the same role name. */
+import { UserRole } from "@/server/database/entities/UserRole";
 @Entity({ name: "user_role_permissions", schema: "public" })
 @Index(
     "uq_user_role_permissions_assignment_permission",
@@ -20,7 +18,6 @@ import { UserRole } from "./UserRole";
     { unique: true },
 )
 export class UserRolePermission {
-
     @PrimaryGeneratedColumn("uuid")
     id!: string;
 
