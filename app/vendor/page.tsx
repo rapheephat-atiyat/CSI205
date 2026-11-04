@@ -1,4 +1,5 @@
-"use client"
+
+"use client";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -7,8 +8,21 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/ui/chart";
-import { ChartNoAxesCombined, Coffee, Coins, Receipt } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, Cell, LabelList, XAxis, YAxis } from "recharts";
+import {
+  ChartNoAxesCombined,
+  Coffee,
+  Coins,
+  Receipt,
+} from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 const chartData = [
   { day: "15 ต.ค.", sales: 1980 },
@@ -29,12 +43,37 @@ const chartConfig = {
 
 const HIGHLIGHT = "#e0313f";
 const LIGHT = "#f8cdd2";
-const total = chartData.reduce((sum, d) => sum + d.sales, 0); // 18,750
+const total = chartData.reduce((sum, d) => sum + d.sales, 0);
 const lastIndex = chartData.length - 1;
 
-function page() {
+const transactions = [
+  {
+    id: "ORD-0042",
+    customer: "พิมพ์ชนก ใจดี",
+    time: "10:42",
+    status: "สำเร็จ",
+    amount: 70,
+  },
+  {
+    id: "ORD-0041",
+    customer: "ธนกร สุขใจ",
+    time: "10:38",
+    status: "สำเร็จ",
+    amount: 140,
+  },
+  {
+    id: "ORD-0040",
+    customer: "ณัฐชา วงศ์ดี",
+    time: "10:31",
+    status: "สำเร็จ",
+    amount: 70,
+  },
+];
+
+export default function Page() {
   return (
-    <div className="flex flex-col gap-15">
+    <div className="w-full flex flex-col gap-10 pb-8">
+
       {/* ส่วนหัว */}
       <div className="flex items-center justify-between p-4">
         <div className="text-4xl font-bold">
@@ -53,7 +92,7 @@ function page() {
       </div>
 
       {/* การ์ดสรุป 3 ใบ */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-15 mx-15">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 px-4 md:px-10">
         <div className="border border-black/10 rounded-xl relative p-6 flex flex-col gap-5">
           <h6>ยอดขายวันนี้</h6>
           <div className="text-5xl text-brand font-bold">3241 T</div>
@@ -76,26 +115,41 @@ function page() {
         </div>
       </div>
 
-      {/* กราฟ + กล่องขวา */}
-      <div className="container mx-auto flex gap-5">
-        <div className="min-w-2/3 border border-black/10 rounded-xl p-6">
+      {/* กราฟ + กล่องยอดขายสินค้า */}
+      <div className="w-full flex flex-col lg:flex-row gap-5 px-4">
+
+        {/* กล่องกราฟ */}
+        <div className="w-full lg:w-2/3 min-w-0 border border-black/10 rounded-xl p-6">
           <div className="flex flex-col gap-6">
+
             <div className="flex items-start justify-between">
               <div>
-                <h3 className="text-lg font-medium">แนวโน้มยอดขาย</h3>
-                <div className="text-gray-500">7 วันล่าสุด · 15–21 ตุลาคม 2569</div>
+                <h3 className="text-lg font-medium">
+                  แนวโน้มยอดขาย
+                </h3>
+                <div className="text-gray-500">
+                  7 วันล่าสุด · 15–21 ตุลาคม 2569
+                </div>
               </div>
-              <span className="text-sm font-semibold text-red-600">รายสัปดาห์ ˅</span>
+
+              <span className="text-sm font-semibold text-red-600">
+                รายสัปดาห์ ˅
+              </span>
             </div>
 
-            <div className="flex items-end justify-between">
-              <div className="text-4xl font-bold">{total.toLocaleString()} Token</div>
-              <div className="text-sm text-green-700">↑ 18.6% จากสัปดาห์ก่อน</div>
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="text-4xl font-bold">
+                {total.toLocaleString()} Token
+              </div>
+              <div className="text-sm text-green-700">
+                ↑ 18.6% จากสัปดาห์ก่อน
+              </div>
             </div>
 
             <ChartContainer config={chartConfig} className="h-[260px] w-full">
               <BarChart data={chartData} margin={{ top: 24 }}>
                 <CartesianGrid vertical={false} />
+
                 <XAxis
                   dataKey="day"
                   tickLine={false}
@@ -112,6 +166,7 @@ function page() {
                     </text>
                   )}
                 />
+
                 <YAxis
                   domain={[0, 4000]}
                   ticks={[0, 2000, 4000]}
@@ -120,12 +175,20 @@ function page() {
                   tickFormatter={(v) => v.toLocaleString()}
                   width={40}
                 />
-                <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+
+                <ChartTooltip
+                  cursor={false}
+                  content={<ChartTooltipContent hideLabel />}
+                />
 
                 <Bar dataKey="sales" radius={[6, 6, 0, 0]}>
                   {chartData.map((_, i) => (
-                    <Cell key={i} fill={i === lastIndex ? HIGHLIGHT : LIGHT} />
+                    <Cell
+                      key={i}
+                      fill={i === lastIndex ? HIGHLIGHT : LIGHT}
+                    />
                   ))}
+
                   <LabelList
                     dataKey="sales"
                     content={({ x, y, width, value, index }: any) => (
@@ -147,9 +210,16 @@ function page() {
           </div>
         </div>
 
-        <div className="border border-black/10 w-full rounded-xl p-6 text-2xl ">
-          <div className="text-xl font-bold"> ยอดขายสินค้า</div>
-          <div className="text-gray-500  text-xs">ลาเต้เย็น · 70 T ต่อแก้ว</div>
+        {/* กล่องยอดขายสินค้า */}
+        <div className="w-full lg:w-1/3 min-w-0 border border-black/10 rounded-xl p-6">
+          <div className="text-xl font-bold">
+            ยอดขายสินค้า
+          </div>
+
+          <div className="text-gray-500 text-xs mb-5">
+            ลาเต้เย็น · 70 T ต่อแก้ว
+          </div>
+
           <div className="w-full flex flex-col gap-2">
 
             {/* ชื่อสินค้า */}
@@ -157,22 +227,93 @@ function page() {
               <span className="font-medium flex items-center gap-2">
                 <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-brand">
                   <Coffee size={18} strokeWidth={2} />
-                </span >
+                </span>
                 อเมริกาโน่เย็น
               </span>
-              <span className="text-sm text-gray-500">70 T</span>
+
+              <span className="text-sm text-gray-500">
+                70 T
+              </span>
             </div>
 
             {/* Progress Bar */}
             <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
               <div className="h-full w-[60%] bg-[#e0313f] rounded-full" />
             </div>
-
           </div>
         </div>
+
       </div>
+
+      {/* ตารางรายการรับชำระล่าสุด */}
+      <div className="w-full border border-black/10 rounded-xl p-6 mx-auto max-w-full">
+
+        {/* หัวข้อตาราง */}
+        <div className="flex justify-between items-center mb-5">
+          <h2 className="text-lg font-bold">
+            รายการรับชำระล่าสุด
+          </h2>
+
+          <button className="text-sm text-red-500 hover:text-red-700">
+            ดูรายการทั้งหมด →
+          </button>
+        </div>
+
+        {/* ตาราง */}
+        <div className="w-full overflow-x-auto">
+          <table className="w-full text-sm text-left">
+
+            <thead className="bg-gray-50 text-gray-400 text-xs">
+              <tr>
+                <th className="px-3 py-3 font-medium">หมายเลขรายการ</th>
+                <th className="px-3 py-3 font-medium">ลูกค้า</th>
+                <th className="px-3 py-3 font-medium">เวลา</th>
+                <th className="px-3 py-3 font-medium">สถานะ</th>
+                <th className="px-3 py-3 font-medium text-right">ยอดชำระ</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {transactions.map((item) => (
+                <tr
+                  key={item.id}
+                  className="border-b border-gray-100 hover:bg-gray-50"
+                >
+                  <td className="px-3 py-4 font-medium">
+                    {item.id}
+                  </td>
+
+                  <td className="px-3 py-4">
+                    {item.customer}
+                  </td>
+
+                  <td className="px-3 py-4 text-gray-500">
+                    {item.time}
+                  </td>
+
+                  <td className="px-3 py-4">
+                    <span className="rounded-full bg-green-50 text-green-700 px-3 py-1 text-xs">
+                      {item.status}
+                    </span>
+                  </td>
+
+                  <td className="px-3 py-4 text-right font-semibold">
+                    +{item.amount} T
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+
+          </table>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="flex justify-between items-center px-6 text-xs text-gray-400">
+        <span>© 2026 Token · ใช้อย่างสะดวก ทุกวัน</span>
+        <span>♧ การเชื่อมต่อปลอดภัย</span>
+      </div>
+
     </div>
   );
 }
-
-export default page;
