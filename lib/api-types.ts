@@ -11,7 +11,7 @@ export type EventSummary = {
     slug: string;
     title: string;
     subTitle: string;
-    thumnail: string;
+    thumbnail: string;
     venue: string;
     tags: string[];
     buyAt: string;
@@ -33,12 +33,12 @@ export type EventInput = {
     title: string;
     subTitle: string;
     banner: string;
-    thumnail: string;
-    vanue: string;
+    thumbnail: string;
+    venue: string;
     description: string;
     tags: string[];
     buyAt: string;
-    buyendAt: string;
+    buyEndAt: string;
     minTicketQTY: number;
     maxTicketQTY: number;
 }
