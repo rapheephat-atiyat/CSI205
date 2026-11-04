@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 // import ui
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,6 +28,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { EventSummary } from "@/lib/api-types";
+import { api } from "@/lib/api-client";
+import { Spinner } from "@/components/ui/spinner";
 
 // head
 type HeadEv = {
@@ -41,53 +47,26 @@ const headEv: HeadEv = {
   place: "สถานที่",
 };
 
-// data
-const invoices = [
-  {
-    invoice: "INV001",
-    paymentStatus: "paid" as const,
-    totalAmount: "$250.00",
-    paymentMethod: "creditCard" as const,
-  },
-  {
-    invoice: "INV002",
-    paymentStatus: "pending" as const,
-    totalAmount: "$150.00",
-    paymentMethod: "paypal" as const,
-  },
-  {
-    invoice: "INV003",
-    paymentStatus: "unpaid" as const,
-    totalAmount: "$350.00",
-    paymentMethod: "bankTransfer" as const,
-  },
-  {
-    invoice: "INV004",
-    paymentStatus: "paid" as const,
-    totalAmount: "$450.00",
-    paymentMethod: "creditCard" as const,
-  },
-  {
-    invoice: "INV005",
-    paymentStatus: "paid" as const,
-    totalAmount: "$550.00",
-    paymentMethod: "paypal" as const,
-  },
-  {
-    invoice: "INV006",
-    paymentStatus: "pending" as const,
-    totalAmount: "$200.00",
-    paymentMethod: "bankTransfer" as const,
-  },
-  {
-    invoice: "INV007",
-    paymentStatus: "unpaid" as const,
-    totalAmount: "$300.00",
-    paymentMethod: "creditCard" as const,
-  },
-];
-
 export default function Page() {
+  const [events, setEvents] = useState<EventSummary[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState<string>("");
+
+  useEffect(() => {
+    async function load() {
+      const res = await api.events.list();
+      if (res.success) setEvents(res.data);
+      else setError(res.error.message);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  useEffect(() => {
+    console.log(search);
+  }, [search]);
+
   return (
     <div className="p-4 mx-auto w-full flex flex-col items-center justify-start">
       {/* Breadcrumbs */}
@@ -138,12 +117,14 @@ export default function Page() {
             <div className="w-full">
               <div className="w-full">
                 <Field>
-                  <FieldLabel htmlFor="input-button-group">ชื่องาน</FieldLabel>
+                  <FieldLabel htmlFor="input-event-group">ชื่องาน</FieldLabel>
                   <ButtonGroup className="flex flex-row items-start justify-center">
                     <Input
                       id="input-event-name"
                       placeholder="ค้นหาชื่องาน"
                       className="p-5 rounded-[10px]"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
                     />
                   </ButtonGroup>
                 </Field>
@@ -161,49 +142,64 @@ export default function Page() {
             </div>
           </div>
           <div className="w-full mt-4">
-            <Table>
-              <TableCaption>{headEv.caption}</TableCaption>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-50 text-[14px] text-muted-foreground font-normal">
-                    {headEv.name}
-                  </TableHead>
-                  <TableHead className="text-[14px] text-muted-foreground font-normal">
-                    {headEv.date}
-                  </TableHead>
-                  <TableHead className="text-[14px] text-muted-foreground font-normal">
-                    {headEv.place}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="w-full">
-                {invoices.map((invoice) => (
-                  <TableRow key={invoice.invoice}>
-                    <TableCell className="w-auto! text-[16px] overflow-hidden">
-                      {invoice.invoice}asd
-                    </TableCell>
-                    <TableCell className="w-auto text-[16px]">
-                      {invoice.paymentMethod}
-                    </TableCell>
-                    <TableCell className="w-auto text-[16px]">
-                      {invoice.paymentStatus}
-                    </TableCell>
-                    <TableCell className="w-30 text-right ">
-                      <Badge
-                        asChild
-                        variant={"outline"}
-                        className="p-3 mt-1 text-sm flex gap-1.5 items-center justify-center rounded-[10px] hover:cursor-pointer hover:bg-brand-hover [&>svg]:size-4!"
-                      >
-                        <Link href={`/admin/settings/event/detail`}>
-                          <Pencil />
-                          แก้ไขงาน
-                        </Link>
-                      </Badge>
-                    </TableCell>
+            <Badge
+              variant={"outline"}
+              className="p-2 w-full h-auto flex items-center justify-center rounded-2xl"
+            >
+              <Table>
+                {!loading && <TableCaption>{headEv.caption}</TableCaption>}
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-50 text-[14px] text-muted-foreground font-normal">
+                      {headEv.name}
+                    </TableHead>
+                    <TableHead className="text-[14px] text-muted-foreground font-normal">
+                      {headEv.place}
+                    </TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody className="w-full">
+                  {loading ? (
+                    <TableRow className="">
+                      <TableCell colSpan={4}>
+                        <div className="flex items-center justify-center py-4">
+                          <Spinner className="size-8 text-brand" />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    events
+                      .filter((event) => {
+                        return event.title.startsWith(search);
+                      })
+                      .map((event) => (
+                        <TableRow key={event.id}>
+                          <TableCell className="w-auto min-w-80 text-[16px] overflow-hidden">
+                            {event.title}
+                          </TableCell>
+                          <TableCell className="w-auto text-[16px]">
+                            {event.venue}
+                          </TableCell>
+                          <TableCell className="w-30 text-right ">
+                            <Badge
+                              asChild
+                              variant={"outline"}
+                              className="p-3 mt-1 text-sm flex gap-1.5 items-center justify-center rounded-[10px] hover:cursor-pointer hover:bg-brand-hover [&>svg]:size-4!"
+                            >
+                              <Link
+                                href={`/admin/settings/event/${event.slug}`}
+                              >
+                                <Pencil />
+                                แก้ไขงาน
+                              </Link>
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                  )}
+                </TableBody>
+              </Table>
+            </Badge>
           </div>
         </div>
       </div>
