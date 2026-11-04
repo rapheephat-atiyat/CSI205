@@ -59,6 +59,22 @@ export default function Page() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const [form, setForm] = useState({
+    title: "",
+    venue: "",
+    description: "",
+  });
+
+  useEffect(() => {
+    if (event) {
+      setForm({
+        title: event.title ?? "",
+        venue: event.venue ?? "",
+        description: event.description ?? "",
+      });
+    }
+  }, [event]);
+
   useEffect(() => {
     async function load() {
       const res = await api.events.get(`${slug}`);
@@ -124,9 +140,11 @@ export default function Page() {
       <div className="p-4 mx-auto w-full max-w-7xl flex flex-col items-start justify-center gap-4">
         {/* หัวเรื่อง */}
         <div className="flex flex-col items-start justify-center">
-          <div className="text-[24px] font-semibold text-black">ตั้งค่างาน</div>
+          <div className="text-[24px] font-semibold text-black">
+            แก้ไขรายการงาน
+          </div>
           <div className="text-[14px] font-medium text-muted-foreground">
-            ข้อมูลหลักของงาน
+            แก้ไขข้อมูลหลักของงาน
           </div>
         </div>
 
@@ -140,10 +158,10 @@ export default function Page() {
             {/* Event name */}
             <div className="w-full flex flex-col items-start justify-center gap-1">
               <div className="text-[24px] font-semibold text-black">
-                {event?.title !== "" ? event?.subTitle : "ชื่องาน"}
+                {event?.title}
               </div>
               <div className="text-[13px] text-muted-foreground text-wrap">
-                28 พฤศจิกายน 2569 เวลา 16:00–22:00 น. ณ หอประชุมศิษย์เก่า
+                28 พฤศจิกายน 2569 เวลา 16:00–22:00 น. ณ {event?.venue}
               </div>
             </div>
           </Badge>
@@ -159,9 +177,6 @@ export default function Page() {
             <div className="w-full flex flex-col items-start justify-center gap-1">
               <div className="text-lg font-semibold text-black">
                 แก้ไขข้อมูลงาน
-              </div>
-              <div className="text-sm text-muted-foreground text-wrap">
-                กรอกข้อมูลจำเป็นให้ครบก่อนบันทึก
               </div>
             </div>
             {/* form */}
@@ -179,6 +194,10 @@ export default function Page() {
                       placeholder="กรุณาใส่ชื่องาน"
                       required
                       className="py-3 w-full h-auto font-light"
+                      value={form.title}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, title: e.target.value }))
+                      }
                     />
                   </Field>
                   {/* วันที่จัดงาน (กดแล้วเปิด dialog เลือกวันที่/เวลา) */}
@@ -297,6 +316,10 @@ export default function Page() {
                       placeholder="หอประชุมศิษย์เก่า มหาวิทยาลัย"
                       required
                       className="py-3 w-full h-auto font-light"
+                      value={form.venue}
+                      onChange={(e) =>
+                        setForm((f) => ({ ...f, venue: e.target.value }))
+                      }
                     />
                   </Field>
                   {/* รายละเอียดงาน */}
@@ -313,6 +336,13 @@ export default function Page() {
                       placeholder="รายละเอียดเกี่ยวกับงาน"
                       required
                       className="py-3 w-full h-auto font-light"
+                      value={form.description}
+                      onChange={(e) =>
+                        setForm((form) => ({
+                          ...form,
+                          description: e.target.value,
+                        }))
+                      }
                     />
                   </Field>
                   {/* อีเมลติดต่อผู้จัดงาน */}
@@ -323,7 +353,7 @@ export default function Page() {
                     <Input
                       id="event-email"
                       type="email"
-                      placeholder="tuatua@gmail.com"
+                      placeholder="event@gmail.com"
                       required
                       className="py-3 w-full h-auto font-light"
                     />
