@@ -1,11 +1,13 @@
 import { AspectRatio } from "@/components/ui/aspect-ratio";
+import { Badge } from "@/components/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Stepper, StepperContent, StepperDescription, StepperIndicator, StepperItem, StepperList, StepperSeparator, StepperTitle, StepperTrigger } from "@/components/ui/stepper";
-import { Calendar, ChevronRight, House, MapPinned, Minus, Plus, Ticket, Tickets } from "lucide-react";
+import { Calendar, ChevronRight, House, MapPinned, Minus, PencilLine, Plus, Ticket, Tickets } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -65,7 +67,14 @@ export default function page() {
                                 <div className="border border-brand rounded-md p-4 flex gap-5">
                                     <div className="w-48">
                                         <AspectRatio ratio={4 / 3}>
-                                            <Image alt="งานทดสอบ" src={"https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1600&q=80"} fill className="rounded-md object-cover" />
+                                            <Image
+                                                src="https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1600&q=80"
+                                                alt="Event"
+                                                fill
+                                                sizes="(max-width: 768px) 100vw, 50vw"
+                                                loading="eager"
+                                                className="object-cover rounded-md"
+                                            />
                                         </AspectRatio>
                                     </div>
 
@@ -113,7 +122,7 @@ export default function page() {
                                                 <Input
                                                     type="number"
                                                     min={1}
-                                                    value={1}
+                                                    defaultValue={1}
                                                     className="focus-visible:ring-2 focus-visible:border-input w-14 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                                 />
 
@@ -151,7 +160,7 @@ export default function page() {
                                                 <Input
                                                     type="number"
                                                     min={1}
-                                                    value={1}
+                                                    defaultValue={1}
                                                     className="focus-visible:ring-2 focus-visible:border-input w-14 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                                 />
 
@@ -166,7 +175,7 @@ export default function page() {
                                     </div>
                                 </div>
                             </div>
-                            <aside className="w-full flex-1 outline outline-green-500 lg:sticky lg:top-[calc(var(--navbar-height)+1.25rem)]">
+                            <aside className="flex-1 outline outline-green-500 lg:sticky lg:top-[calc(var(--navbar-height)+1.25rem)]">
                                 <div className="rounded-xl border p-5 text-card-foreground space-y-4">
                                     <h2 className="text-lg font-semibold">สรุปรายการ</h2>
                                     <div className="flex flex-col items-center justify-center py-6 text-center">
@@ -184,6 +193,32 @@ export default function page() {
                                     </div>
                                 </div>
                             </aside>
+                        </div>
+                    </StepperContent>
+
+                    <StepperContent value="buyer">
+                        <div className="flex flex-col lg:flex-row lg:items-start gap-5">
+                            <div className="w-full lg:w-2/3 space-y-5 outline outline-red-500">
+                                <div className="space-y-3 outline outline-blue-500 p-4 border rounded-md">
+                                    <div className="flex justify-between">
+                                        <div className="flex gap-2 items-center">
+                                            <h2 className="text-lg font-semibold">ใบที่ 1</h2>
+                                            <Badge variant={"outline"}>บัตร VIP</Badge>
+                                        </div>
+                                        <div className="my-auto">
+                                            <Badge variant={"outline"} className="border-dashed border-2 items-center"><PencilLine />ยังไม่ครบ</Badge>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox /> ใช้ที่อยู่ของฉัน
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <div className="flex-1 outline outline-green-500">
+                                ww
+                            </div>
                         </div>
                     </StepperContent>
                 </Stepper>
