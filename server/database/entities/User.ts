@@ -5,7 +5,6 @@ import {
     Index,
     OneToMany,
     OneToOne,
-    PrimaryColumn,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
     type Relation,
@@ -15,6 +14,8 @@ import { Session } from "./Session";
 import { Account } from "./Account";
 import { UserRole } from "./UserRole";
 import { Wallet } from "@/server/database/entities/Wallet";
+import { Order } from "@/server/database/entities/Order";
+import { Ticket } from "@/server/database/entities/Ticket";
 
 @Entity({ name: "users", schema: "public" })
 @Index("uq_users_email", ["email"], { unique: true })
@@ -39,11 +40,11 @@ export class User {
     @Column({ type: "varchar", length: 255, nullable: true })
     username!: string | null;
 
-    @Column({ type: "varchar", length: 255, nullable: true })
-    firstName!: string | null;
+    @Column({ type: "varchar", length: 255, nullable: false })
+    firstName!: string;
 
-    @Column({ type: "varchar", length: 255, nullable: true })
-    lastName!: string | null;
+    @Column({ type: "varchar", length: 255, nullable: false })
+    lastName!: string;
 
     @Column({ type: "varchar", length: 10, nullable: true })
     phone!: string | null;
@@ -72,6 +73,12 @@ export class User {
 
     @OneToMany(() => UserRole, (userRole) => userRole.user)
     userRoles!: Relation<UserRole[]>;
+
+    @OneToMany(() => Order, (order) => order.user)
+    orders!: Relation<Order[]>;
+
+    @OneToMany(() => Ticket, (ticket) => ticket.user)
+    tickets!: Relation<Ticket[]>;
 
     @CreateDateColumn({
         name: "created_at",

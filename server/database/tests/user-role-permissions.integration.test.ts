@@ -49,8 +49,8 @@ beforeEach(async () => {
     await source.query(`TRUNCATE user_role_permissions, user_roles, users CASCADE`);
     const users = source.getRepository(User);
     [firstUser, secondUser] = await users.save([
-        users.create({ name: "First alumni", email: "first@example.test" }),
-        users.create({ name: "Second alumni", email: "second@example.test" }),
+        users.create({ name: "First alumni", firstName: "First", lastName: "Alumni", email: "first@example.test" }),
+        users.create({ name: "Second alumni", firstName: "Second", lastName: "Alumni", email: "second@example.test" }),
     ]);
     const roles = source.getRepository(UserRole);
     [firstStaff, firstVendor, secondStaff] = await roles.save([
