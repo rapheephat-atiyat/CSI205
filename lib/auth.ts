@@ -142,7 +142,15 @@ function createAuth() {
             },
             session: {
                 create: {
-                    before: async (session) => {
+                    before: async (session, context) => {
+                        if (context) {
+                            const authUser = await context.context.internalAdapter.findUserById(session.userId);
+                            const status = authUser && "status" in authUser ? authUser.status : undefined;
+                            if (!authUser || status !== "ACTIVE") {
+                                throw new APIError("FORBIDDEN", { message: "บัญชีนี้ถูกระงับการใช้งาน" });
+                            }
+                            return;
+                        }
                         const db = await getDatabase();
                         const dbUser = await db.getRepository(User).findOneBy({ id: session.userId });
                         if (!dbUser || dbUser.status !== "ACTIVE") {
