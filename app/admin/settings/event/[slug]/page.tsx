@@ -467,11 +467,11 @@ export default function Page() {
             <div className="w-full flex flex-col items-start justify-center">
               <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="fieldgroup-name" className="text-[16px]">
+                  <FieldLabel htmlFor="token-rate" className="text-[16px]">
                     จำนวนเงินบาทต่อ 1 Token *
                   </FieldLabel>
                   <Input
-                    id="fieldgroup-name"
+                    id="token-rate"
                     placeholder="10"
                     className="py-3 w-full h-auto font-light"
                     required
@@ -481,11 +481,11 @@ export default function Page() {
                   </FieldDescription>
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="fieldgroup-name" className="text-[16px]">
+                  <FieldLabel htmlFor="token-reason" className="text-[16px]">
                     เหตุผลในการเปลี่ยน *
                   </FieldLabel>
                   <Input
-                    id="fieldgroup-name"
+                    id="token-reason"
                     placeholder=""
                     className="py-3 h-auto w-full font-light"
                     required
