@@ -472,7 +472,7 @@ export default function Page() {
                   </FieldLabel>
                   <Input
                     id="fieldgroup-name"
-                    placeholder="12"
+                    placeholder="10"
                     className="py-3 w-full h-auto font-light"
                     required
                   />
