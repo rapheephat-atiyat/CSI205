@@ -14,6 +14,8 @@ import { Session } from "./Session";
 import { Account } from "./Account";
 import { UserRole } from "./UserRole";
 import { Wallet } from "@/server/database/entities/Wallet";
+import { Order } from "@/server/database/entities/Order";
+import { Ticket } from "@/server/database/entities/Ticket";
 
 @Entity({ name: "users", schema: "public" })
 @Index("uq_users_email", ["email"], { unique: true })
@@ -71,6 +73,12 @@ export class User {
 
     @OneToMany(() => UserRole, (userRole) => userRole.user)
     userRoles!: Relation<UserRole[]>;
+
+    @OneToMany(() => Order, (order) => order.user)
+    orders!: Relation<Order[]>;
+
+    @OneToMany(() => Ticket, (ticket) => ticket.user)
+    tickets!: Relation<Ticket[]>;
 
     @CreateDateColumn({
         name: "created_at",
