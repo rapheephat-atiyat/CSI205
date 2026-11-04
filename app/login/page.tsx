@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import {
   Mail,
   Eye,
@@ -9,22 +10,46 @@ import {
   ArrowRight,
   ShieldCheck,
   Check,
+  AlertCircle,
+  Loader2,
 } from "lucide-react"
+import { authClient } from "@/lib/auth-client"
 
 export default function LoginPage() {
+  const router = useRouter()
   const [showPassword, setShowPassword] = React.useState(false)
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [rememberMe, setRememberMe] = React.useState(true)
   const [isLoading, setIsLoading] = React.useState(false)
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true)
-    setTimeout(() => {
-      setIsLoading(false)
-      alert(`เข้าสู่ระบบสำเร็จ: ${email}`)
-    }, 800)
+    setErrorMessage(null)
+
+    await authClient.signIn.email(
+      {
+        email: email.trim(),
+        password,
+        rememberMe,
+        callbackURL: "/",
+      },
+      {
+        onRequest: () => {
+          setIsLoading(true)
+        },
+        onSuccess: () => {
+          setIsLoading(false)
+          router.push("/")
+          router.refresh()
+        },
+        onError: (ctx) => {
+          setIsLoading(false)
+          setErrorMessage(ctx.error.message || "อีเมลหรือรหัสผ่านไม่ถูกต้อง")
+        },
+      }
+    )
   }
 
   return (
@@ -43,6 +68,13 @@ export default function LoginPage() {
           เข้าสู่ระบบเพื่อจัดการข้อมูลสมาชิกและดูบัตรของคุณ
         </p>
 
+        {errorMessage && (
+          <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
+            <AlertCircle className="size-4 shrink-0 text-[#b62b38] mt-0.5" />
+            <div className="leading-relaxed">{errorMessage}</div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="mt-6 space-y-4">
           <div className="space-y-1.5">
             <label
@@ -56,8 +88,12 @@ export default function LoginPage() {
                 id="email"
                 type="email"
                 required
+                autoComplete="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(e) => {
+                  setEmail(e.target.value)
+                  if (errorMessage) setErrorMessage(null)
+                }}
                 placeholder="name@example.com"
                 className="w-full h-11 pl-3.5 pr-10 rounded-xl border border-zinc-200 bg-white text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-[#b62b38] focus:ring-2 focus:ring-[#b62b38]/15 transition-all"
               />
@@ -79,8 +115,12 @@ export default function LoginPage() {
                 id="password"
                 type={showPassword ? "text" : "password"}
                 required
+                autoComplete="current-password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  if (errorMessage) setErrorMessage(null)
+                }}
                 placeholder="กรอกรหัสผ่านของคุณ"
                 className="w-full h-11 pl-3.5 pr-10 rounded-xl border border-zinc-200 bg-white text-xs sm:text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:border-[#b62b38] focus:ring-2 focus:ring-[#b62b38]/15 transition-all"
               />
@@ -133,7 +173,10 @@ export default function LoginPage() {
             className="w-full h-11 mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-[#b62b38] text-white font-medium text-xs sm:text-sm shadow-sm hover:bg-[#9e2430] active:scale-[0.99] transition-all duration-150 disabled:opacity-60 cursor-pointer"
           >
             {isLoading ? (
-              <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              <div className="flex items-center gap-2">
+                <Loader2 className="size-4 animate-spin" />
+                <span>กำลังเข้าสู่ระบบ...</span>
+              </div>
             ) : (
               <>
                 <ArrowRight className="size-4" />
