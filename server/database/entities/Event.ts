@@ -31,10 +31,10 @@ export class Events {
     banner!: string;
 
     @Column({ type: "text" })
-    thumnail!: string;
+    thumbnail!: string;
 
     @Column({ type: "varchar", length: 255 })
-    vanue!: string;
+    venue!: string;
 
     @Column({ type: "text" })
     description!: string;
@@ -55,7 +55,7 @@ export class Events {
     buyAt!: Date;
 
     @Column({ type: "timestamptz" })
-    buyendAt!: Date;
+    buyEndAt!: Date;
 
     @Column({ type: "int", default: 1 })
     minTicketQTY!: number;

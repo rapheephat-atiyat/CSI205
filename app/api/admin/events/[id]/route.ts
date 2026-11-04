@@ -3,12 +3,12 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { requirePermission } from "@/server/auth/permission";
 import { withHandler } from "@/server/http/handler"
 import { success } from "@/server/http/response";
-import { dropEvnet, getEventById, listManagableEvents, updateEvent } from "@/server/services/event.service";
+import { dropEvnet, getEventById, updateEvent } from "@/server/services/event.service";
 
 export const GET = withHandler(async (req, { params }: { params: Promise<{ id: string }> }) => {
     const { id } = await params;
     await requirePermission(req, PERMISSIONS.EVENT_UPDATE, { eventId: id });
-    return success(getEventById(id))
+    return success(await getEventById(id))
 });
 
 export const DELETE = withHandler(async (req, { params }: { params: Promise<{ id: string }> }) => {
