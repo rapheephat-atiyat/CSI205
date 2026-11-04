@@ -3,8 +3,9 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
 import { Stepper, StepperContent, StepperDescription, StepperIndicator, StepperItem, StepperList, StepperSeparator, StepperTitle, StepperTrigger } from "@/components/ui/stepper";
-import { Calendar, House, MapPinned, Minus, Plus, Ticket } from "lucide-react";
+import { Calendar, ChevronRight, House, MapPinned, Minus, Plus, Ticket, Tickets } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
@@ -19,7 +20,7 @@ const steps = [
 
 export default function page() {
     return (
-        <div className="my-5">
+        <div className="my-5 mx-5 xl:mx-0">
             <div className="mx-auto max-w-7xl container outline outline-red-500 flex flex-col gap-5">
                 <Breadcrumb>
                     <BreadcrumbList>
@@ -59,8 +60,8 @@ export default function page() {
                         ))}
                     </StepperList>
                     <StepperContent value="tickets">
-                        <div className="flex gap-5">
-                            <div className="w-2/3 flex flex-col gap-5">
+                        <div className="flex flex-col lg:flex-row lg:items-start gap-5">
+                            <div className="w-full lg:w-2/3 flex flex-col gap-5">
                                 <div className="border border-brand rounded-md p-4 flex gap-5">
                                     <div className="w-48">
                                         <AspectRatio ratio={4 / 3}>
@@ -88,8 +89,8 @@ export default function page() {
                                         <Ticket size={18} /> เลือกประเภทบัตร
                                     </div>
                                     <div className="border rounded-md p-4 flex justify-between">
-                                        <div>
-                                            w
+                                        <div className="self-center">
+                                            บัตร VIP
                                         </div>
                                         <div className="flex gap-3 items-center text-sm">
                                             <div>
@@ -125,17 +126,68 @@ export default function page() {
                                             </ButtonGroup>
                                         </div>
                                     </div>
+                                    <div className="border rounded-md p-4 flex justify-between">
+                                        <div className="self-center">
+                                            บัตรยืน
+                                        </div>
+                                        <div className="flex gap-3 items-center text-sm">
+                                            <div>
+                                                {Intl.NumberFormat("th-TH", {
+                                                    style: "currency",
+                                                    currency: "THB",
+                                                    minimumFractionDigits: 0,
+                                                    maximumFractionDigits: 0,
+                                                }).format(200)}
+                                                <p className="text-end">ต่อใบ</p>
+                                            </div>
+                                            <ButtonGroup>
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                >
+                                                    <Minus />
+                                                </Button>
+
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    value={1}
+                                                    className="focus-visible:ring-2 focus-visible:border-input w-14 text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                                />
+
+                                                <Button
+                                                    variant="outline"
+                                                    size="icon"
+                                                >
+                                                    <Plus />
+                                                </Button>
+                                            </ButtonGroup>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="flex-1 outline outline-green-500">
-                                wไไไไ
-                            </div>
+                            <aside className="w-full flex-1 outline outline-green-500 lg:sticky lg:top-[calc(var(--navbar-height)+1.25rem)]">
+                                <div className="rounded-xl border p-5 text-card-foreground space-y-4">
+                                    <h2 className="text-lg font-semibold">สรุปรายการ</h2>
+                                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                                        <div className="mb-3 flex size-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                            <Tickets className="size-5" strokeWidth={1.75} />
+                                        </div>
+                                        <p className="text-sm font-medium text-foreground">ยังไม่ได้เลือกบัตร</p>
+                                        <p className="mt-1 text-xs text-muted-foreground">
+                                            เลือกประเภทและจำนวนบัตรทางด้านซ้ายเพื่อดูยอดรวม
+                                        </p>
+                                    </div>
+                                    <Separator />
+                                    <div>
+                                        <Button className="w-full h-10">ถัดไป <ChevronRight /></Button>
+                                    </div>
+                                </div>
+                            </aside>
                         </div>
                     </StepperContent>
                 </Stepper>
-
-
             </div>
-        </div>
+        </div >
     );
 }
