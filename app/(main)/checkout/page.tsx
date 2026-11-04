@@ -22,7 +22,7 @@ const steps = [
 
 export default function page() {
     return (
-        <div className="my-5 mx-5 xl:mx-0">
+        <div className="m-5 xl:mx-0">
             <div className="mx-auto max-w-7xl container outline outline-red-500 flex flex-col gap-5">
                 <Breadcrumb>
                     <BreadcrumbList>
