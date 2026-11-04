@@ -7,7 +7,7 @@ export class Product {
     id!: string;
 
     @Column({ name: "store_id", type: "uuid" })
-    storedId!: string;
+    storeId!: string;
 
     @OneToOne(() => Store, (s) => s.product, { onDelete: "CASCADE", nullable: false })
     @JoinColumn({ name: "store_id", referencedColumnName: "id" })

@@ -9,7 +9,6 @@ import { In } from "typeorm";
 
 const notFound = () => new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
 
-
 export async function getEvents(): Promise<EventSummary[]> {
     const db = await getDatabase();
     const events = await db.getRepository(Events).find({ order: { createdAt: "ASC", buyAt: "ASC" } });
@@ -76,7 +75,7 @@ export async function createEvent(input: EventInput): Promise<EventDetail> {
     const raw = repo.create({
         ...input,
         buyAt: new Date(input.buyAt),
-        buyendAt: new Date(input.buyendAt)
+        buyEndAt: new Date(input.buyEndAt)
     });
 
     const event = await repo.save(raw);
@@ -93,7 +92,7 @@ export async function updateEvent(id: string, input: Partial<EventInput>): Promi
 
     CheckEventRules({
         buyAt: input.buyAt ?? event.buyAt.toISOString(),
-        buyendAt: input.buyendAt ?? event.buyendAt.toISOString(),
+        buyEndAt: input.buyEndAt ?? event.buyEndAt.toISOString(),
         minTicketQTY: input.minTicketQTY ?? event.minTicketQTY,
         maxTicketQTY: input.maxTicketQTY ?? event.maxTicketQTY,
     });
@@ -101,7 +100,7 @@ export async function updateEvent(id: string, input: Partial<EventInput>): Promi
     repo.merge(event, {
         ...input,
         buyAt: input.buyAt ? new Date(input.buyAt) : event.buyAt,
-        buyendAt: input.buyendAt ? new Date(input.buyendAt) : event.buyendAt,
+        buyEndAt: input.buyEndAt ? new Date(input.buyEndAt) : event.buyEndAt,
     });
 
     const newEvent = await repo.save(event);
@@ -114,8 +113,8 @@ export async function dropEvnet(id: string): Promise<void> {
     if (!res.affected) throw notFound();
 }
 
-function CheckEventRules(values: Pick<EventInput, "buyAt" | "buyendAt" | "minTicketQTY" | "maxTicketQTY">) {
-    if (Date.parse(values.buyAt) >= Date.parse(values.buyendAt)) {
+function CheckEventRules(values: Pick<EventInput, "buyAt" | "buyEndAt" | "minTicketQTY" | "maxTicketQTY">) {
+    if (Date.parse(values.buyAt) >= Date.parse(values.buyEndAt)) {
         throw new ApiError("VALIDATION_ERROR", "วันปิดขายต้องอยู่หลังวันเริ่มขาย", 422);
     }
     if (values.minTicketQTY > values.maxTicketQTY) {
@@ -129,11 +128,11 @@ function toEventSummary(event: Events): EventSummary {
         slug: event.slug,
         title: event.title,
         subTitle: event.subTitle,
-        thumnail: event.thumnail,
-        venue: event.vanue,
+        thumbnail: event.thumbnail,
+        venue: event.venue,
         tags: event.tags,
         buyAt: event.buyAt.toISOString(),
-        buyEndAt: event.buyendAt.toISOString(),
+        buyEndAt: event.buyEndAt.toISOString(),
     };
 }
 

@@ -1,4 +1,6 @@
 import { EventSession } from "@/server/database/entities/EventSession";
+import { EventTicket } from "@/server/database/entities/EventTicket";
+import { Order } from "@/server/database/entities/Order";
 import { Store } from "@/server/database/entities/Store";
 import { UserRole } from "@/server/database/entities/UserRole";
 import {
@@ -31,10 +33,10 @@ export class Events {
     banner!: string;
 
     @Column({ type: "text" })
-    thumnail!: string;
+    thumbnail!: string;
 
     @Column({ type: "varchar", length: 255 })
-    vanue!: string;
+    venue!: string;
 
     @Column({ type: "text" })
     description!: string;
@@ -42,11 +44,38 @@ export class Events {
     @Column({ type: "varchar", array: true, default: [] })
     tags!: string[];
 
+    @Column({ type: "boolean", default: false })
+    hasSouvenir!: boolean;
+
+    @Column({ type: "varchar", length: 255, nullable: true })
+    souvenirName!: string | null;
+
+    @Column({ type: "text", nullable: true })
+    souvenirImage!: string | null;
+
+    @Column({ type: "varchar", array: true, default: [] })
+    souvenirSizes!: string[];
+
+    @Column({ type: "boolean", default: true })
+    souvenirAllowDecline!: boolean;
+
+    @Column({ name: "allow_shipping", type: "boolean", default: false })
+    allowShipping!: boolean;
+
+    @Column({ name: "shipping_fee", type: "decimal", precision: 10, scale: 2, default: 0 })
+    shippingFee!: string;
+
+    @OneToMany(() => EventTicket, (et) => et.event)
+    tickets!: Relation<EventTicket[]>;
+
     @OneToMany(() => EventSession, (es) => es.event)
     sessions!: Relation<EventSession[]>;
 
     @OneToMany(() => Store, (store) => store.event)
     stores!: Relation<Store[]>;
+
+    @OneToMany(() => Order, (o) => o.event)
+    orders!: Relation<Order[]>;
 
     @OneToMany(() => UserRole, (userRole) => userRole.event)
     userRoles!: Relation<UserRole[]>;
@@ -55,7 +84,7 @@ export class Events {
     buyAt!: Date;
 
     @Column({ type: "timestamptz" })
-    buyendAt!: Date;
+    buyEndAt!: Date;
 
     @Column({ type: "int", default: 1 })
     minTicketQTY!: number;

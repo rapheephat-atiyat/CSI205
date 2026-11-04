@@ -6,6 +6,10 @@ export { UserRole } from "@/server/database/entities/UserRole";
 export { UserRolePermission } from "@/server/database/entities/UserRolePermission";
 export { Events } from "@/server/database/entities/Event";
 export { EventSession } from "@/server/database/entities/EventSession";
+export { EventTicket } from "@/server/database/entities/EventTicket";
+export { Order } from "@/server/database/entities/Order";
+export { OrderShipping } from "@/server/database/entities/OrderShipping";
+export { Ticket } from "@/server/database/entities/Ticket";
 export { Store } from "@/server/database/entities/Store";
 export { Product } from "@/server/database/entities/Product";
 export { Wallet } from "@/server/database/entities/Wallet";
@@ -14,9 +18,13 @@ export { WalletHistory } from "@/server/database/entities/WalletHistory";
 import { Account } from "@/server/database/entities/Account";
 import { Events } from "@/server/database/entities/Event";
 import { EventSession } from "@/server/database/entities/EventSession";
+import { EventTicket } from "@/server/database/entities/EventTicket";
+import { Order } from "@/server/database/entities/Order";
+import { OrderShipping } from "@/server/database/entities/OrderShipping";
 import { Product } from "@/server/database/entities/Product";
 import { Session } from "@/server/database/entities/Session";
 import { Store } from "@/server/database/entities/Store";
+import { Ticket } from "@/server/database/entities/Ticket";
 import { User } from "@/server/database/entities/User";
 import { UserRole } from "@/server/database/entities/UserRole";
 import { UserRolePermission } from "@/server/database/entities/UserRolePermission";
@@ -33,6 +41,10 @@ export const databaseEntities = [
     UserRolePermission,
     Events,
     EventSession,
+    EventTicket,
+    Order,
+    OrderShipping,
+    Ticket,
     Store,
     Product,
     Wallet,

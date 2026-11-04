@@ -1,4 +1,4 @@
-import { ApiResponse, EventDetail, EventInput, EventSummary } from "@/lib/api-types";
+import { ApiResponse, EventDetail, EventInput, EventSummary, User as Profile, UserInput } from "@/lib/api-types";
 
 async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse<T>> {
     try {
@@ -13,11 +13,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<ApiResponse
 }
 
 export const api = {
+    me: {
+        get: () => request<Profile>("/api/me"),
+        update: (input: UserInput) => request<Profile>("/api/me", { method: "PATCH", body: JSON.stringify(input) }),
+    },
     events: {
         list: () => request<EventSummary[]>("/api/events"),
         get: (slug: string) => request<EventDetail>(`/api/events/${encodeURIComponent(slug)}`),
         create: (input: EventInput) => request<EventDetail>(`/api/admin/events`, { method: "POST", body: JSON.stringify(input) }),
         update: (id: string, input: EventInput) => request<EventDetail>(`/api/admin/events/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(input) }),
-        drop: (id: string, input: EventInput) => request<EventDetail>(`/api/admin/events/${encodeURIComponent(id)}`, { method: "DELETE" }),
+        drop: (id: string) => request<EventDetail>(`/api/admin/events/${encodeURIComponent(id)}`, { method: "DELETE" }),
     },
 };
