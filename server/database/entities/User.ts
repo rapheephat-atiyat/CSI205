@@ -5,7 +5,6 @@ import {
     Index,
     OneToMany,
     OneToOne,
-    PrimaryColumn,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
     type Relation,
@@ -39,11 +38,11 @@ export class User {
     @Column({ type: "varchar", length: 255, nullable: true })
     username!: string | null;
 
-    @Column({ type: "varchar", length: 255, nullable: true })
-    firstName!: string | null;
+    @Column({ type: "varchar", length: 255, nullable: false })
+    firstName!: string;
 
-    @Column({ type: "varchar", length: 255, nullable: true })
-    lastName!: string | null;
+    @Column({ type: "varchar", length: 255, nullable: false })
+    lastName!: string;
 
     @Column({ type: "varchar", length: 10, nullable: true })
     phone!: string | null;

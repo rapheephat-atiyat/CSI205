@@ -9,7 +9,6 @@ import { In } from "typeorm";
 
 const notFound = () => new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
 
-
 export async function getEvents(): Promise<EventSummary[]> {
     const db = await getDatabase();
     const events = await db.getRepository(Events).find({ order: { createdAt: "ASC", buyAt: "ASC" } });

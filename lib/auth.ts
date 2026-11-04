@@ -63,8 +63,8 @@ function createAuth() {
             fields: timestamps,
             additionalFields: {
                 username: { type: "string", required: false },
-                firstName: { type: "string", required: false },
-                lastName: { type: "string", required: false },
+                firstName: { type: "string", required: true },
+                lastName: { type: "string", required: true },
                 phone: { type: "string", required: false },
                 graduationAt: { type: "date", required: false },
                 graduationInstitution: { type: "string", required: false },
@@ -76,6 +76,12 @@ function createAuth() {
             user: {
                 create: {
                     before: async (user) => {
+                        const firstName = normalizeOptionalText(user.firstName);
+                        const lastName = normalizeOptionalText(user.lastName);
+                        if (!firstName || !lastName) {
+                            throw new APIError("BAD_REQUEST", { message: "กรุณาระบุชื่อและนามสกุล" });
+                        }
+
                         const username = normalizeOptionalText(user.username);
                         if (username) {
                             const db = await getDatabase();
@@ -99,13 +105,16 @@ function createAuth() {
                             }
                         }
 
+                        const normalizedName = normalizeOptionalText(user.name) ?? `${firstName} ${lastName}`;
+
                         return {
                             data: {
                                 ...user,
+                                name: normalizedName,
+                                firstName,
+                                lastName,
                                 ...(username !== undefined ? { username } : {}),
                                 ...(phone !== undefined ? { phone } : {}),
-                                ...(user.firstName !== undefined ? { firstName: normalizeOptionalText(user.firstName) } : {}),
-                                ...(user.lastName !== undefined ? { lastName: normalizeOptionalText(user.lastName) } : {}),
                                 ...(user.graduationInstitution !== undefined
                                     ? { graduationInstitution: normalizeOptionalText(user.graduationInstitution) }
                                     : {}),
