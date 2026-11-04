@@ -1,7 +1,12 @@
 "use client";
 
+import { use, useEffect, useState } from "react";
+
+import { api } from "@/lib/api-client";
+import { EventDetail } from "@/lib/api-types";
+
 // import icon
-import { CircleCheck, Clock2Icon, Save } from "lucide-react";
+import { Clock2Icon, Save } from "lucide-react";
 
 // import ui
 import { Badge } from "@/components/ui/badge";
@@ -30,7 +35,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useEffect, useState } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -39,6 +43,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { useParams } from "next/navigation";
+
 function formatThaiDate(d?: Date) {
   if (!d) return "";
   const dd = String(d.getDate()).padStart(2, "0");
@@ -46,7 +52,23 @@ function formatThaiDate(d?: Date) {
   return `${dd} / ${mm} / ${d.getFullYear() + 543}`;
 }
 
-export default function EventDetailForm() {
+export default function Page() {
+  const { slug } = useParams();
+
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      const res = await api.events.get(`${slug}`);
+      if (res.success) setEvent(res.data);
+      else setError(res.error.message);
+      setLoading(false);
+    }
+    load();
+  }, [slug]);
+
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [startTime, setStartTime] = useState("00:00");
   const [endTime, setEndTime] = useState("00:00");
@@ -118,7 +140,7 @@ export default function EventDetailForm() {
             {/* Event name */}
             <div className="w-full flex flex-col items-start justify-center gap-1">
               <div className="text-[24px] font-semibold text-black">
-                คืนสู่เหย้า 2569
+                {event?.title !== "" ? event?.subTitle : "ชื่องาน"}
               </div>
               <div className="text-[13px] text-muted-foreground text-wrap">
                 28 พฤศจิกายน 2569 เวลา 16:00–22:00 น. ณ หอประชุมศิษย์เก่า
@@ -263,7 +285,10 @@ export default function EventDetailForm() {
                   </Field>
                   {/* สถานที่ */}
                   <Field>
-                    <FieldLabel htmlFor="event-location" className="text-[16px]">
+                    <FieldLabel
+                      htmlFor="event-location"
+                      className="text-[16px]"
+                    >
                       สถานที่ *
                     </FieldLabel>
                     <Input
