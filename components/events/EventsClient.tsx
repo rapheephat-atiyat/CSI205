@@ -60,7 +60,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
                     {initialEvents.map((event) => (
                         <Link
                             key={event.id}
-                            href={`/event?slug=${encodeURIComponent(event.slug)}`}
+                            href={`/e/${encodeURIComponent(event.slug)}`}
                             className="group/card block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
                             <Card
