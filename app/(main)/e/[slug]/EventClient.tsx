@@ -89,7 +89,6 @@ export default function EventClient({ event, description }: { event: EventDetail
                     <section className="pt-10">
                         {description ?? <p className="whitespace-pre-wrap leading-8 text-muted-foreground">{event.description || "ผู้จัดงานยังไม่ได้เพิ่มรายละเอียด"}</p>}
                     </section>
-                    <div>ww</div>
                 </div>
                 <aside className="w-84 outline-indigo-500 outline shrink-0 scroll-mt-[calc(var(--navbar-height)+1.5rem)] top-[calc(var(--navbar-height)+2rem)] sticky">
                     <div className="rounded-xl border border-border bg-background">
