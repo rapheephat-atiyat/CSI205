@@ -19,7 +19,6 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
-import { Kbd } from "@/components/ui/kbd";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -159,7 +158,7 @@ export default function Page() {
           </div>
         </div>
 
-        {/* ticket */}
+        {/* users */}
         <div className="w-full flex flex-col gap-1.5">
           <Badge
             variant={"outline"}
