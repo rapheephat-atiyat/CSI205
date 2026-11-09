@@ -74,7 +74,12 @@ export default function ProductManagement() {
                 <div className="col-span-3 text-center">สถานะ</div>
               </div>
 
-           
+
+
+            </div>
+
+            <div className="flex items-center justify-between mb-4">
+
 
             </div>
           </div>

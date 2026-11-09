@@ -310,8 +310,7 @@ export default function Page() {
 
       {/* Footer */}
       <div className="flex justify-between items-center px-6 text-xs text-gray-400">
-        <span>© 2026 Token · ใช้อย่างสะดวก ทุกวัน</span>
-        <span>♧ การเชื่อมต่อปลอดภัย</span>
+        
       </div>
 
     </div>
