@@ -3,10 +3,8 @@
 import * as React from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search, X, Calendar, MapPin, Tag, SlidersHorizontal, RefreshCw } from "lucide-react";
+import { Calendar, MapPin } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { type EventSummary } from "@/lib/api-types";
 
 const THAI_DAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."] as const;
@@ -23,59 +21,11 @@ function formatThaiDate(dateString: string): string {
     return `${dayName} ${formatted}`;
 }
 
-type SortOption = "date-asc" | "date-desc" | "name-asc";
-
 interface EventsClientProps {
     readonly initialEvents: readonly EventSummary[];
 }
 
 export default function EventsClient({ initialEvents }: EventsClientProps) {
-    const [searchQuery, setSearchQuery] = React.useState<string>("");
-    const [selectedTag, setSelectedTag] = React.useState<string>("ทั้งหมด");
-    const [sortBy, setSortBy] = React.useState<SortOption>("date-asc");
-
-    // ดึงแท็กทั้งหมดที่มีในงานแบบ unique
-    const allTags = React.useMemo(() => {
-        const tagsSet = new Set<string>();
-        initialEvents.forEach((ev) => {
-            if (Array.isArray(ev.tags)) {
-                ev.tags.forEach((t) => tagsSet.add(t));
-            }
-        });
-        return ["ทั้งหมด", ...Array.from(tagsSet)];
-    }, [initialEvents]);
-
-    // กรองและเรียงลำดับ
-    const filteredEvents = React.useMemo(() => {
-        return initialEvents
-            .filter((ev) => {
-                const query = searchQuery.trim().toLowerCase();
-                const matchQuery =
-                    !query ||
-                    ev.title.toLowerCase().includes(query) ||
-                    (ev.subTitle && ev.subTitle.toLowerCase().includes(query)) ||
-                    (ev.venue && ev.venue.toLowerCase().includes(query)) ||
-                    (ev.tags && ev.tags.some((t) => t.toLowerCase().includes(query)));
-
-                const matchTag =
-                    selectedTag === "ทั้งหมด" || (ev.tags && ev.tags.includes(selectedTag));
-
-                return matchQuery && matchTag;
-            })
-            .sort((a, b) => {
-                if (sortBy === "date-asc") {
-                    return new Date(a.buyAt).getTime() - new Date(b.buyAt).getTime();
-                }
-                if (sortBy === "date-desc") {
-                    return new Date(b.buyAt).getTime() - new Date(a.buyAt).getTime();
-                }
-                if (sortBy === "name-asc") {
-                    return a.title.localeCompare(b.title, "th");
-                }
-                return 0;
-            });
-    }, [initialEvents, searchQuery, selectedTag, sortBy]);
-
     return (
         <div className="flex flex-col gap-6 sm:gap-8">
             {/* Header ส่วนหัวของหน้า */}
@@ -99,82 +49,15 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
                     </div>
 
                     <span className="text-xs text-muted-foreground">
-                        พบทั้งหมด <strong className="text-foreground">{filteredEvents.length}</strong> กิจกรรม
+                        ทั้งหมด <strong className="text-foreground">{initialEvents.length}</strong> กิจกรรม
                     </span>
                 </div>
             </div>
 
-            {/* แถบเครื่องมือค้นหาและฟิลเตอร์ */}
-            <div className="flex flex-col gap-4 rounded-xl border bg-card p-4 sm:p-5 shadow-xs">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                    {/* ช่องค้นหา */}
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                        <Input
-                            type="text"
-                            placeholder="ค้นหาชื่องาน, สถานที่จัด, หรือคำค้นหา..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9 pr-8 h-10 w-full"
-                        />
-                        {searchQuery && (
-                            <button
-                                type="button"
-                                onClick={() => setSearchQuery("")}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full text-muted-foreground hover:text-foreground"
-                                aria-label="ล้างคำค้นหา"
-                            >
-                                <X className="size-3.5" />
-                            </button>
-                        )}
-                    </div>
-
-                    {/* ตัวเลือกการเรียงลำดับ */}
-                    <div className="flex items-center gap-2 shrink-0">
-                        <SlidersHorizontal className="size-4 text-muted-foreground hidden sm:block" />
-                        <select
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as SortOption)}
-                            className="h-10 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-                        >
-                            <option value="date-asc">เรียงตาม: วันที่จัดงาน (เร็วที่สุด)</option>
-                            <option value="date-desc">เรียงตาม: วันที่จัดงาน (หลังสุด)</option>
-                            <option value="name-asc">เรียงตาม: ตัวอักษร (ก-ฮ)</option>
-                        </select>
-                    </div>
-                </div>
-
-                {/* หมวดหมู่ / แท็ก (Categories) */}
-                {allTags.length > 1 && (
-                    <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs scrollbar-none">
-                        <span className="text-muted-foreground shrink-0 flex items-center gap-1 mr-1">
-                            <Tag className="size-3.5" /> หมวดหมู่:
-                        </span>
-                        {allTags.map((tag) => {
-                            const isSelected = selectedTag === tag;
-                            return (
-                                <button
-                                    key={tag}
-                                    type="button"
-                                    onClick={() => setSelectedTag(tag)}
-                                    className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium transition-colors cursor-pointer ${
-                                        isSelected
-                                            ? "bg-brand text-on-brand shadow-xs"
-                                            : "bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground border border-border/50"
-                                    }`}
-                                >
-                                    {tag}
-                                </button>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
-
-            {/* แสดงการ์ดกิจกรรม */}
-            {filteredEvents.length > 0 ? (
+            {/* แสดงการ์ดกิจกรรมทั้งหมด */}
+            {initialEvents.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-                    {filteredEvents.map((event) => (
+                    {initialEvents.map((event) => (
                         <Link
                             key={event.id}
                             href={`/event?slug=${encodeURIComponent(event.slug)}`}
@@ -241,33 +124,8 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
                     ))}
                 </div>
             ) : (
-                /* สถานะไม่พบข้อมูล (Empty State) */
-                <div className="rounded-2xl border border-dashed p-12 text-center flex flex-col items-center justify-center gap-3">
-                    <div className="size-12 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                        <Search className="size-6" />
-                    </div>
-                    <div className="space-y-1">
-                        <p className="text-base font-semibold text-foreground">
-                            ไม่พบงานกิจกรรมที่คุณค้นหา
-                        </p>
-                        <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                            ลองเปลี่ยนคำค้นหา หรือเลือกตัวกรองหมวดหมู่อื่นเพื่อค้นหากิจกรรมที่สนใจ
-                        </p>
-                    </div>
-                    {(searchQuery || selectedTag !== "ทั้งหมด") && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => {
-                                setSearchQuery("");
-                                setSelectedTag("ทั้งหมด");
-                            }}
-                            className="mt-2 text-xs"
-                        >
-                            <RefreshCw className="size-3.5 mr-1.5" />
-                            ล้างตัวกรองทั้งหมด
-                        </Button>
-                    )}
+                <div className="rounded-2xl border border-dashed p-12 text-center text-sm text-muted-foreground">
+                    ไม่มีงานกิจกรรมในขณะนี้
                 </div>
             )}
         </div>
