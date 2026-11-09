@@ -29,7 +29,6 @@ import {
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { staffProfile } from "@/lib/staff-mock";
 
@@ -49,7 +48,7 @@ function isItemActive(pathname: string, href: string) {
   return href === "/staff" ? pathname === href : pathname.startsWith(href);
 }
 
-export function StaffSidebarNav() {
+export function StaffSidebarNav({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { state, setOpenMobile, setOpen } = useSidebar();
   const pathname = usePathname();
   const sidebarExpanded = state === "expanded";
@@ -59,45 +58,44 @@ export function StaffSidebarNav() {
   }, [pathname, setOpen]);
 
   return (
-    <Sidebar collapsible="icon" className="flex items-center justify-center">
-      <SidebarHeader className="flex items-center justify-center">
-        {sidebarExpanded && (
-          <div className="flex items-center gap-2.5 px-2 py-1">
-            <span className="flex size-9 items-center justify-center rounded-lg bg-brand text-on-brand shrink-0">
-              <QrCode className="size-5" aria-hidden />
+    <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader>
+        {sidebarExpanded ? (
+          <div className="flex items-center gap-2.5 px-2 py-1.5">
+            <span className="flex size-8 items-center justify-center rounded-lg bg-brand text-on-brand shrink-0">
+              <QrCode className="size-4" aria-hidden />
             </span>
             <div className="leading-tight text-left min-w-0">
               <p className="font-semibold text-sm truncate">TuaTua</p>
               <p className="text-xs text-muted-foreground truncate">Staff &amp; Check-in</p>
             </div>
           </div>
-        )}
+        ) : null}
       </SidebarHeader>
 
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-sm md:text-xs group-data-[collapsible=icon]:pointer-events-none">
-            {sidebarExpanded && <span>พื้นที่เจ้าหน้าที่</span>}
+          <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">
+            พื้นที่เจ้าหน้าที่
           </SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-start group-data-[collapsible=icon]:items-center">
+            <SidebarMenu>
               {staffNav.map((item) => {
                 const Icon = item.icon;
                 const active = isItemActive(pathname, item.href);
 
                 return (
-                  <SidebarMenuItem key={item.href} className="mt-2">
+                  <SidebarMenuItem key={item.href}>
                     <SidebarMenuButton
                       asChild
-                      onClick={() => setOpenMobile(false)}
+                      isActive={active}
                       tooltip={item.label}
                       className={cn(
-                        active
-                          ? "bg-brand text-on-brand font-semibold hover:bg-brand hover:text-on-brand"
-                          : "hover:border hover:border-brand-hover hover:text-brand-hover"
+                        active &&
+                          "bg-brand text-on-brand font-semibold hover:bg-brand hover:text-on-brand"
                       )}
                     >
-                      <Link href={item.href}>
+                      <Link href={item.href} onClick={() => setOpenMobile(false)}>
                         <Icon />
                         <span>{item.label}</span>
                       </Link>
@@ -110,33 +108,38 @@ export function StaffSidebarNav() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="p-2">
-        {sidebarExpanded ? (
-          <div className="rounded-lg bg-muted p-2.5 text-xs">
-            <p className="font-medium text-foreground truncate">{staffProfile.name}</p>
-            <p className="text-muted-foreground truncate">{staffProfile.role}</p>
-          </div>
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <div
-                className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted cursor-default"
-                aria-label={`${staffProfile.name} (${staffProfile.role})`}
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            {sidebarExpanded ? (
+              <div className="flex items-center gap-2 rounded-lg bg-muted p-2 text-xs">
+                <div className="flex size-7 items-center justify-center rounded-full bg-brand/10 text-brand font-semibold shrink-0">
+                  <User className="size-3.5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-foreground truncate">{staffProfile.name}</p>
+                  <p className="text-muted-foreground truncate">{staffProfile.role}</p>
+                </div>
+              </div>
+            ) : (
+              <SidebarMenuButton
+                size="default"
+                tooltip={`${staffProfile.name} (${staffProfile.role})`}
+                className="justify-center"
               >
                 <User className="size-4" />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p className="font-medium">{staffProfile.name}</p>
-              <p className="text-xs text-muted-foreground">{staffProfile.role}</p>
-            </TooltipContent>
-          </Tooltip>
-        )}
+                <span className="sr-only">{staffProfile.name}</span>
+              </SidebarMenuButton>
+            )}
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );
 }
+
+export { StaffSidebarNav as StaffSidebar, StaffSidebarNav as AppSidebar };
 
 export function StaffTabNav() {
   const pathname = usePathname();
