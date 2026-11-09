@@ -11,22 +11,8 @@ export const metadata: Metadata = {
 export default function NotFound() {
     return (
         <main className="relative isolate flex min-h-[calc(100dvh-var(--navbar-height))] items-center justify-center overflow-hidden px-6 py-16">
-            <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(to_right,var(--color-border)_1px,transparent_1px),linear-gradient(to_bottom,var(--color-border)_1px,transparent_1px)] bg-size-[3.5rem_3.5rem] mask-[radial-gradient(ellipse_at_center,black_10%,transparent_65%)]"
-            />
-            <div
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1/2 left-1/2 -z-10 size-128 -translate-1/2 rounded-full bg-brand/7 blur-3xl"
-            />
 
             <div className="max-w-xl text-center animate-in fade-in slide-in-from-bottom-4 duration-700 fill-mode-both motion-reduce:animate-none">
-                <p className="inline-flex items-center gap-2.5 text-[11px] tracking-[0.24em] text-muted-foreground">
-                    <span aria-hidden="true" className="h-px w-5 bg-brand" />
-                    ERROR 404
-                    <span aria-hidden="true" className="h-px w-5 bg-brand" />
-                </p>
-
                 <p
                     aria-hidden="true"
                     className="mt-2 select-none text-[8rem] leading-none font-extralight tracking-tighter sm:text-[11rem]"

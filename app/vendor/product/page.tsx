@@ -26,7 +26,17 @@ interface Product {
 
 
 export default function ProductManagement() {
+
+  const [price, setPrice] = useState<number>(65);
+  const [inputPrice, setInputPrice] = useState<number>(65);
+  const handleSave = () => {
+    setPrice(inputPrice);
+  };
+  const [inputName, setInputName] = useState<string>("กาแฟอเมริกาโน่เย็น");
+
   return (
+
+
     <div className="min-h-screen bg-[#F4F5F7] flex font-sans text-slate-800">
       <main className="flex-1 flex flex-col min-w-0">
 
@@ -34,7 +44,7 @@ export default function ProductManagement() {
         <header className="h-14 bg-white border-b border-slate-200 px-8 flex items-center justify-between text-xs text-slate-500">
 
           <div className="flex items-center gap-2">
-            <span>Vendor workspace</span>
+            <span>Vendor Dashboard</span>
             <span>&gt;</span>
             <span className="text-slate-800 font-medium">Product Management</span>
           </div>
@@ -82,7 +92,7 @@ export default function ProductManagement() {
 
                 {/* ช่องที่ 1: รูป + ชื่อสินค้า (กินพื้นที่ 6 จาก 12 ช่อง) */}
                 <div className="col-span-6 flex items-center gap-3">
-                  
+
                   <img
                     src="https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=150"
                     alt="กาแฟอเมริกาโน่เย็น"
@@ -141,58 +151,69 @@ export default function ProductManagement() {
                 </label>
                 <input
                   type="text"
-                  defaultValue="กาแฟอเมริกาโน่เย็น"
+                  value={inputName}
+                  onChange={(e) => setInputName(e.target.value)}
                   className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-400"
                 />
-              </div>
 
 
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  หมวดหมู่
-                </label>
-                <div className="relative">
-                  <select
-                    defaultValue="น้ำดื่ม"
-                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm appearance-none bg-white text-slate-700 focus:outline-none focus:border-slate-400"
-                  >
-                    <option value="น้ำดื่ม">น้ำดื่ม</option>
-                    <option value="อาหาร">อาหาร</option>
-                    <option value="ขนมหวาน">ขนมหวาน</option>
-                  </select>
-                  <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
-                </div>
-              </div>
-
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  ราคา (Token) *
-                </label>
-                <input
-                  type="number"
-                  defaultValue={65}
-                  className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-400"
-                />
-              </div>
-
-              {/* เปืดปิดสินค้า */}
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-semibold text-slate-800">เปิดขายสินค้า</p>
-                  <p className="text-[10px] text-slate-400">แสดงในหน้าสแกนรับชำระ</p>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    หมวดหมู่
+                  </label>
+                  <div className="relative">
+                    <select
+                      defaultValue="น้ำดื่ม"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm appearance-none bg-white text-slate-700 focus:outline-none focus:border-slate-400"
+                    >
+                      <option value="น้ำดื่ม">น้ำดื่ม</option>
+                      <option value="อาหาร">อาหาร</option>
+                      <option value="ขนมหวาน">ขนมหวาน</option>
+                    </select>
+                    <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-3 pointer-events-none" />
+                  </div>
                 </div>
 
-                <button className="w-11 h-6 rounded-full bg-[#E52E40] relative p-0.5 transition-colors">
-                  <div className="w-5 h-5 bg-white rounded-full shadow-sm translate-x-5 transition-transform" />
-                </button>
+
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    ราคา (Token) *
+                  </label>
+
+                  <input
+                    type="number"
+                    value={inputPrice}
+                    onChange={(e) => setInputPrice(Number(e.target.value))}
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-400"
+                  />
+                  {/* ปุ่มยืนยันการแก้ไข */}
+                  <button
+                    onClick={handleSave}
+                    className="w-full mt-6 bg-[#E52E40] hover:bg-[#d02536] text-white py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors"
+                  >
+                    บันทึกการเปลี่ยนแปลง
+                  </button>
+
+
+                  {/* เปืดปิดสินค้า */}
+                  <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-800">เปิดขายสินค้า</p>
+                      <p className="text-[10px] text-slate-400">แสดงในหน้าสแกนรับชำระ</p>
+                    </div>
+
+                    <button className="w-11 h-6 rounded-full bg-[#E52E40] relative p-0.5 transition-colors">
+                      <div className="w-5 h-5 bg-white rounded-full shadow-sm translate-x-5 transition-transform" />
+                    </button>
+                  </div>
+
+                </div>
               </div>
+
+
 
             </div>
           </div>
-
-
-
         </div>
 
 
