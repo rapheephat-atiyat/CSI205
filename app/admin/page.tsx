@@ -41,7 +41,7 @@ const stats: stats[] = [
   { icon: Coins, label: "เติม Token หน้างาน", value: "1,248", unit: "คน" },
 ];
 
-type Vendor = {
+export type Vendor = {
   id: number;
   name: string;
   food: string;
@@ -52,7 +52,7 @@ type Vendor = {
   incomeMn: number;
 };
 
-const vendors: Vendor[] = [
+export const vendors: Vendor[] = [
   {
     id: 1,
     name: "ครัวศิษย์เก่า",
