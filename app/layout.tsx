@@ -1,12 +1,7 @@
 import type { Metadata } from "next";
-import { Audiowide, Geist, Geist_Mono, Inter, Kanit } from "next/font/google";
+import { Inter, Kanit } from "next/font/google";
 import "./globals.css";
-
-const audiowide = Audiowide({
-  variable: "--audiowide",
-  subsets: ["latin"],
-  weight: ["400"],
-});
+import { Toaster } from "@/components/ui/sonner";
 
 const kanit = Kanit({
   variable: "--font-kanit",
@@ -29,10 +24,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      className={`${kanit.variable} ${inter.variable} ${audiowide.variable} h-full antialiased`}
+      className={`${kanit.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="[--navbar-height:4.5rem] lg:[--navbar-height:5rem] min-h-full flex flex-col">
         {children}
+        <Toaster />
       </body>
     </html>
   );

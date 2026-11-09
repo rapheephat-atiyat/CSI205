@@ -1,0 +1,94 @@
+import {
+    Column,
+    CreateDateColumn,
+    Entity,
+    Index,
+    OneToMany,
+    OneToOne,
+    PrimaryGeneratedColumn,
+    UpdateDateColumn,
+    type Relation,
+} from "typeorm";
+
+import { Session } from "./Session";
+import { Account } from "./Account";
+import { UserRole } from "./UserRole";
+import { Wallet } from "@/server/database/entities/Wallet";
+import { Order } from "@/server/database/entities/Order";
+import { Ticket } from "@/server/database/entities/Ticket";
+
+@Entity({ name: "users", schema: "public" })
+@Index("uq_users_email", ["email"], { unique: true })
+@Index("uq_users_username", ["username"], { unique: true })
+export class User {
+
+    @PrimaryGeneratedColumn("uuid")
+    id!: string;
+
+    @Column({ type: "varchar", length: 255 })
+    name!: string;
+
+    @Column({ type: "varchar", length: 255 })
+    email!: string;
+
+    @Column({ type: "boolean", default: false })
+    emailVerified!: boolean;
+
+    @Column({ type: "text", nullable: true })
+    image!: string | null;
+
+    @Column({ type: "varchar", length: 255, nullable: true })
+    username!: string | null;
+
+    @Column({ type: "varchar", length: 255, nullable: false })
+    firstName!: string;
+
+    @Column({ type: "varchar", length: 255, nullable: false })
+    lastName!: string;
+
+    @Column({ type: "varchar", length: 10, nullable: true })
+    phone!: string | null;
+
+    @Column({ type: "timestamptz", nullable: true })
+    graduationAt!: Date | null;
+
+    @Column({ type: "text", nullable: true })
+    graduationInstitution!: string | null;
+
+    @OneToOne(() => Wallet, (wallet) => wallet.user)
+    wallet!: Relation<Wallet> | null;
+
+    @Column({
+        type: "varchar",
+        length: 20,
+        default: "ACTIVE",
+    })
+    status!: "ACTIVE" | "SUSPENDED";
+
+    @OneToMany(() => Session, (session) => session.user)
+    sessions!: Relation<Session[]>;
+
+    @OneToMany(() => Account, (account) => account.user)
+    accounts!: Relation<Account[]>;
+
+    @OneToMany(() => UserRole, (userRole) => userRole.user)
+    userRoles!: Relation<UserRole[]>;
+
+    @OneToMany(() => Order, (order) => order.user)
+    orders!: Relation<Order[]>;
+
+    @OneToMany(() => Ticket, (ticket) => ticket.user)
+    tickets!: Relation<Ticket[]>;
+
+    @CreateDateColumn({
+        name: "created_at",
+        type: "timestamptz",
+    })
+    createdAt!: Date;
+
+    @UpdateDateColumn({
+        name: "updated_at",
+        type: "timestamptz",
+    })
+    updatedAt!: Date;
+}

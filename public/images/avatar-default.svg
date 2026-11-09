@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 480" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8ded4"/>
+      <stop offset="100%" stop-color="#ebd0c5"/>
+    </linearGradient>
+    <linearGradient id="skinGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#b87b58"/>
+      <stop offset="100%" stop-color="#9a6242"/>
+    </linearGradient>
+    <linearGradient id="beanieGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e05328"/>
+      <stop offset="100%" stop-color="#b63814"/>
+    </linearGradient>
+    <linearGradient id="shirtGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1f2428"/>
+      <stop offset="100%" stop-color="#0f1214"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="400" height="480" fill="url(#bgGrad)"/>
+
+  <!-- Body / Shoulders -->
+  <path d="M70 480 C70 370 120 330 200 330 C280 330 330 370 330 480 Z" fill="url(#shirtGrad)"/>
+
+  <!-- Turtleneck Collar -->
+  <path d="M160 345 C160 315 170 300 200 300 C230 300 240 315 240 345 C230 355 170 355 160 345 Z" fill="#181c1f"/>
+
+  <!-- Neck -->
+  <path d="M172 260 L172 320 C185 325 215 325 228 320 L228 260 Z" fill="#8d5639"/>
+
+  <!-- Head Base -->
+  <ellipse cx="200" cy="225" rx="55" ry="68" fill="url(#skinGrad)"/>
+
+  <!-- Ears -->
+  <ellipse cx="143" cy="225" rx="10" ry="16" fill="#8d5639"/>
+  <ellipse cx="257" cy="225" rx="10" ry="16" fill="#8d5639"/>
+
+  <!-- Beard & Mustache -->
+  <path d="M165 240 C165 285 180 300 200 300 C220 300 235 285 235 240 C230 248 215 252 200 252 C185 252 170 248 165 240 Z" fill="#14181a"/>
+  <path d="M180 238 C190 234 210 234 220 238 C215 244 185 244 180 238 Z" fill="#14181a"/>
+
+  <!-- Nose -->
+  <path d="M196 210 L194 228 L205 228" stroke="#75442a" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Eyes & Eyebrows -->
+  <ellipse cx="180" cy="206" rx="5" ry="3" fill="#14181a"/>
+  <ellipse cx="220" cy="206" rx="5" ry="3" fill="#14181a"/>
+  <path d="M172 196 Q182 192 190 196" stroke="#14181a" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+  <path d="M210 196 Q218 192 228 196" stroke="#14181a" stroke-width="3.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Beanie (Orange knit cap) -->
+  <path d="M142 190 C140 120 160 110 200 110 C240 110 260 120 258 190 Z" fill="url(#beanieGrad)"/>
+  <!-- Beanie Fold -->
+  <rect x="138" y="174" width="124" height="24" rx="12" fill="#d34920"/>
+  <!-- Top Beanie tip -->
+  <ellipse cx="200" cy="112" rx="12" ry="5" fill="#c03e17"/>
+</svg>
