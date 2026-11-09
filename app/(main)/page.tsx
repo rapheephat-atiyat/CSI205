@@ -55,7 +55,7 @@ function formatThaiDate(dateString: string): string {
 function EventCard({ event }: { event: EventSummary }) {
     return (
         <Link
-            href={`/event?slug=${encodeURIComponent(event.slug)}`}
+            href={`/e/${encodeURIComponent(event.slug)}`}
             className="group/card block w-48 shrink-0 snap-start sm:w-56 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
             <Card size="sm" className="overflow-hidden pt-0 transition-all duration-200 hover:shadow-md hover:border-foreground/20">
