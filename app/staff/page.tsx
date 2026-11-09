@@ -16,7 +16,6 @@ export default function StaffDashboardPage() {
   const checkedIn = attendees.filter((a) => a.status === "checked-in").length;
   const checkedOut = attendees.filter((a) => a.status === "checked-out").length;
   const waiting = total - checkedIn - checkedOut;
-  const percent = Math.round(((checkedIn + checkedOut) / total) * 100);
   const quotaLeft = staffProfile.topUpQuotaTotal - staffProfile.topUpQuotaUsed;
 
   const stats = [
@@ -52,25 +51,6 @@ export default function StaffDashboardPage() {
         ))}
       </section>
 
-      <section className="mt-4 rounded-xl border bg-background p-4 sm:p-5">
-        <div className="flex items-center justify-between text-sm">
-          <h2 className="font-medium">ความคืบหน้าการเช็กอิน</h2>
-          <span className="tabular-nums text-muted-foreground">{percent}%</span>
-        </div>
-        <div
-          role="progressbar"
-          aria-valuenow={percent}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="ความคืบหน้าการเช็กอิน"
-          className="mt-3 h-2.5 overflow-hidden rounded-full bg-muted"
-        >
-          <div className="h-full rounded-full bg-brand" style={{ width: `${percent}%` }} />
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          เข้างานแล้ว {checkedIn + checkedOut} จาก {total} คน (ข้อมูลตัวอย่าง)
-        </p>
-      </section>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <section className="rounded-xl border bg-background lg:col-span-2">
