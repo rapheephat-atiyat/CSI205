@@ -36,19 +36,23 @@ export default function Navabr() {
     const init = displayName.trim().charAt(0).toUpperCase();
 
     const handleSignOut = async () => {
+        if (isSigningOut) return;
         setIsSigningOut(true);
-        await authClient.signOut({
-            fetchOptions: {
-                onSuccess: () => {
-                    setMobileOpen(false)
-                    router.refresh();
+        try {
+            await authClient.signOut({
+                fetchOptions: {
+                    onSuccess: () => {
+                        setMobileOpen(false);
+                        const protectedPrefixes = ["/profile", "/my-tickets", "/admin", "/vendor", "/checkout"];
+                        if (protectedPrefixes.some((p) => pathname.startsWith(p))) {
+                            router.replace("/");
+                        }
+                    },
                 },
-                onError: () => {
-                    setIsSigningOut(false);
-                },
-            }
-        });
-        setIsSigningOut(false);
+            });
+        } finally {
+            setIsSigningOut(false);
+        }
     }
 
     return (
