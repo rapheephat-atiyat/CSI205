@@ -23,6 +23,7 @@ export function createDatabaseOptions(databaseUrl: string): PostgresOptions {
         logging: false,
         poolSize: Number(process.env.DATABASE_POOL_MAX ?? 5),
         extra: {
+            keepAlive: true,
             connectionTimeoutMillis: 10_000,
             idleTimeoutMillis: 30_000,
         },
