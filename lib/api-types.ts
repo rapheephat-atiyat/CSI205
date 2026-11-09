@@ -27,6 +27,14 @@ export type EventDetail = EventSummary & {
     maxTicketQTY: number;
     sessions: { id: string }[];
     stores: { id: string; name: string; description: string | null; thumbnail: string | null }[];
+    tickets?: EventTicketSummary[];
+};
+
+export type EventTicketSummary = {
+    id: string;
+    name: string;
+    price: string;
+    isActive: boolean;
 };
 
 export type EventInput = {

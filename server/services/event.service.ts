@@ -21,7 +21,7 @@ export async function getEventBySlug(slug: string): Promise<EventDetail> {
         where: {
             slug
         },
-        relations: { sessions: true, stores: true }
+        relations: { sessions: true, stores: true, tickets: true }
     });
     if (!event) throw new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
     return {
@@ -37,6 +37,12 @@ export async function getEventBySlug(slug: string): Promise<EventDetail> {
             description: s.description,
             thumbnail: s.thumbnail,
         })),
+        tickets: event.tickets?.map((t) => ({
+            id: t.id,
+            name: t.name,
+            price: t.price,
+            isActive: t.isActive,
+        })) ?? [],
     }
 }
 

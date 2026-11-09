@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { EventDetail } from "@/lib/api-types";
-import { ArrowLeft, ArrowUpRight, CalendarDays, ChevronRight, ImageIcon, MapPin, Share2, Ticket } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarDays, ChevronRight, ImageIcon, MapPin, Share2, Ticket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ReactNode, useState } from "react";
@@ -13,6 +13,9 @@ import { toast } from "sonner";
 export default function EventClient({ event, description }: { event: EventDetail, description?: ReactNode }) {
     const [isImageOkay, setIsImageOkay] = useState(true);
     const poster = event.banner || event.thumbnail;
+    const activeTickets = event.tickets?.filter((t) => t.isActive) ?? [];
+    const minPrice = activeTickets.length > 0 ? Math.min(...activeTickets.map((t) => Number(t.price))) : null;
+
 
     async function handleShared() {
         try {
@@ -26,7 +29,7 @@ export default function EventClient({ event, description }: { event: EventDetail
     }
     return (
         <main className="mx-auto w-full max-w-7xl outline outline-red-500 pt-8 px-10 pb-20">
-            <div className="mb-8 flex items-center justify-between gap-4">
+            <div className="mb-8 flex items-center justify-between gap-4 ">
                 <Breadcrumb>
                     <BreadcrumbList>
                         <BreadcrumbItem>
@@ -60,7 +63,7 @@ export default function EventClient({ event, description }: { event: EventDetail
                     <p className="outline outline-green-500 max-w-2xl text-base leading-relaxed text-muted-foreground">{event.subTitle}</p>
                 }
             </header>
-            <div className="flex flex-row gap-10">
+            <div className="flex flex-row items-start gap-10">
                 <div className="flex-1 outline-pink-500 outline">
                     <div className="relative aspect-video overflow-hidden rounded-xl border border-border/60 bg-muted/40">
                         {poster && isImageOkay ? <Image alt="รูปโปสเตอร์" src={poster} fill priority unoptimized className="object-cover" /> : <div><ImageIcon /></div>}
@@ -98,6 +101,19 @@ export default function EventClient({ event, description }: { event: EventDetail
                             <span className="text-xs tracking-widest text-muted-foreground">TUATUA</span>
                         </div>
                         <div className="space-y-6 p-6">
+                            <div className="flex items-baseline justify-between">
+                                <span className="text-sm text-muted-foreground">ราคาบัตร</span>
+                                {minPrice !== null ? (
+                                    <div className="text-right">
+                                        <span className="text-xs text-muted-foreground mr-1">เริ่มต้น</span>
+                                        <span className="text-2xl font-bold text-brand">
+                                            {formatPrice(minPrice)}
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <span className="text-sm font-medium text-muted-foreground">รอประกาศราคา</span>
+                                )}
+                            </div>
                             <div className="rounded-lg bg-muted/50 p-4">
                                 <p className="mb-4 flex items-center gap-2 text-sm font-medium">
                                     <CalendarDays aria-hidden="true" className="size-4 text-muted-foreground" strokeWidth={1.5} />
@@ -122,6 +138,12 @@ export default function EventClient({ event, description }: { event: EventDetail
                                     </div>
                                 </dl>
                             </div>
+                            <Button asChild variant="brand" className="min-h-12 w-full justify-between px-4 text-sm">
+                                <Link href={{ pathname: "/checkout", query: { event: event.slug } }}>
+                                    เลือกบัตร
+                                    <ArrowRight className="size-4" />
+                                </Link>
+                            </Button>
                         </div>
                     </div>
                 </aside>
@@ -136,3 +158,10 @@ function dateLabel(v: string) {
         day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok"
     }).format(date));
 }
+
+const formatPrice = (price: number) =>
+    new Intl.NumberFormat("th-TH", {
+        style: "currency",
+        currency: "THB",
+        maximumFractionDigits: 0,
+    }).format(price);
