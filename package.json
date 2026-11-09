@@ -18,7 +18,9 @@
     "migration:generate": "npm run typeorm -- migration:generate -d server/database/data-source.cli.ts",
     "migration:run": "npm run typeorm -- migration:run -d server/database/data-source.cli.ts",
     "migration:show": "npm run typeorm -- migration:show -d server/database/data-source.cli.ts",
-    "migration:revert": "npm run typeorm -- migration:revert -d server/database/data-source.cli.ts"
+    "migration:revert": "npm run typeorm -- migration:revert -d server/database/data-source.cli.ts",
+    "db:seed": "ts-node -r tsconfig-paths/register --project tsconfig.typeorm.json server/database/seed.ts",
+    "db:reset": "ts-node -r tsconfig-paths/register --project tsconfig.typeorm.json server/database/seed.ts --reset"
   },
   "dependencies": {
     "@next/env": "16.4.2",
