@@ -19,49 +19,32 @@ export async function getEventBySlug(slug: string): Promise<EventDetail> {
     const db = await getDatabase();
     const event = await db.getRepository(Events).findOne({
         where: {
-            slug
+            slug,
         },
-        relations: { sessions: true, stores: true, tickets: true }
+        relations: { sessions: true, stores: true, tickets: true },
     });
     if (!event) throw new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
-    return {
-        ...toEventSummary(event),
-        banner: event.banner,
-        description: event.description,
-        minTicketQTY: event.minTicketQTY,
-        maxTicketQTY: event.maxTicketQTY,
-        sessions: event.sessions.map((s) => ({ id: s.id })),
-        stores: event.stores.map((s) => ({
-            id: s.id,
-            name: s.name,
-            description: s.description,
-            thumbnail: s.thumbnail,
-        })),
-        tickets: event.tickets?.map((t) => ({
-            id: t.id,
-            name: t.name,
-            price: t.price,
-            isActive: t.isActive,
-        })) ?? [],
-    }
+    return toEventDetail(event);
 }
 
 export async function listManagableEvents(user: User): Promise<EventSummary[]> {
     if (hasPermission(user, PERMISSIONS.EVENT_UPDATE)) {
-        const events = (await getDatabase()).getRepository(Events).find({ order: { createdAt: "ASC", buyAt: "ASC" } });
-        return (await events).map(toEventSummary);
+        const events = await (await getDatabase()).getRepository(Events).find({ order: { createdAt: "ASC", buyAt: "ASC" } });
+        return events.map(toEventSummary);
     }
 
-    const eventIds = user.userRoles.flatMap((r) => r.eventId !== null && r.permissions.some((p) => p.permission === PERMISSIONS.EVENT_UPDATE) ? [r.eventId] : []);
+    const eventIds = user.userRoles.flatMap((r) =>
+        r.eventId !== null && r.permissions.some((p) => p.permission === PERMISSIONS.EVENT_UPDATE) ? [r.eventId] : []
+    );
 
     if (eventIds.length === 0) return [];
-    const events = (await getDatabase()).getRepository(Events).find({ where: { id: In(eventIds) }, order: { buyAt: "ASC" } });
-    return (await events).map(toEventSummary);
+    const events = await (await getDatabase()).getRepository(Events).find({ where: { id: In(eventIds) }, order: { buyAt: "ASC" } });
+    return events.map(toEventSummary);
 }
 
 export async function getEventById(id: string): Promise<EventDetail> {
     const repo = (await getDatabase()).getRepository(Events);
-    const event = await repo.findOne({ where: { id }, relations: { sessions: true, stores: true } });
+    const event = await repo.findOne({ where: { id }, relations: { sessions: true, stores: true, tickets: true } });
     if (!event) throw notFound();
     return toEventDetail(event);
 }
@@ -81,11 +64,11 @@ export async function createEvent(input: EventInput): Promise<EventDetail> {
     const raw = repo.create({
         ...input,
         buyAt: new Date(input.buyAt),
-        buyEndAt: new Date(input.buyEndAt)
+        buyEndAt: new Date(input.buyEndAt),
     });
 
     const event = await repo.save(raw);
-    return toEventDetail(event)
+    return toEventDetail(event);
 }
 
 export async function updateEvent(id: string, input: Partial<EventInput>): Promise<EventDetail> {
@@ -93,7 +76,7 @@ export async function updateEvent(id: string, input: Partial<EventInput>): Promi
         throw new ApiError("VALIDATION_ERROR", "ไม่มีข้อมูลที่ต้องแก้ไข", 422);
     }
     const repo = (await getDatabase()).getRepository(Events);
-    const event = await repo.findOneBy({ id });
+    const event = await repo.findOne({ where: { id }, relations: { sessions: true, stores: true, tickets: true } });
     if (!event) throw notFound();
 
     CheckEventRules({
@@ -149,12 +132,36 @@ function toEventDetail(event: Events): EventDetail {
         description: event.description,
         minTicketQTY: event.minTicketQTY,
         maxTicketQTY: event.maxTicketQTY,
-        sessions: event.sessions.map((session) => ({ id: session.id })),
-        stores: event.stores.map((store) => ({
+        hasSouvenir: event.hasSouvenir,
+        souvenirName: event.souvenirName,
+        souvenirImage: event.souvenirImage,
+        souvenirSizes: event.souvenirSizes,
+        souvenirAllowDecline: event.souvenirAllowDecline,
+        allowShipping: event.allowShipping,
+        shippingFee: event.shippingFee,
+        sessions: (event.sessions ?? []).map((session) => ({ id: session.id })),
+        stores: (event.stores ?? []).map((store) => ({
             id: store.id,
             name: store.name,
             description: store.description,
             thumbnail: store.thumbnail,
+        })),
+        tickets: (event.tickets ?? []).map((t) => ({
+            id: t.id,
+            eventId: t.eventId,
+            name: t.name,
+            description: t.description,
+            price: t.price,
+            quota: t.quota,
+            sold: t.sold,
+            minTicketQTY: t.minTicketQTY,
+            maxTicketQTY: t.maxTicketQTY,
+            sortOrder: t.sortOrder,
+            isActive: t.isActive,
+            includesSouvenir: t.includesSouvenir,
+            requiredFields: t.requiredFields,
+            createdAt: t.createdAt.toISOString(),
+            updatedAt: t.updatedAt.toISOString(),
         })),
     };
 }
