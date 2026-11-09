@@ -40,6 +40,16 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // data
 type TicketStatus = "pending" | "paid" | "rejected";
@@ -164,8 +174,8 @@ export default function Page() {
 
             {/* form */}
             <div className="flex w-full flex-col items-start justify-center gap-1">
-              <FieldGroup>
-                <Field>
+              <FieldGroup className="flex lg:flex-row">
+                <Field className="lg:flex-2">
                   <FieldLabel
                     htmlFor="input-user"
                     className="text-sm text-muted-foreground"
@@ -185,13 +195,11 @@ export default function Page() {
                     <InputGroupAddon
                       align="inline-end"
                       className="hidden lg:flex"
-                    >
-                      <Kbd>⌘K</Kbd>
-                    </InputGroupAddon>
+                    ></InputGroupAddon>
                   </InputGroup>
                 </Field>
 
-                <Field>
+                <Field className="lg:flex-1">
                   <FieldLabel
                     htmlFor="enroll-year"
                     className="text-sm text-muted-foreground"
@@ -234,7 +242,7 @@ export default function Page() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </Field>
-                <Field>
+                <Field className="lg:flex-1">
                   <FieldLabel
                     htmlFor="check-in-status"
                     className="text-sm text-muted-foreground"
@@ -278,7 +286,8 @@ export default function Page() {
             </div>
 
             {/* show users */}
-            <div className="mt-2 w-full flex flex-col items-start justify-start gap-1.5 ">
+            {/* mobile */}
+            <div className="mt-2 w-full flex flex-col items-start justify-start gap-1.5 lg:hidden">
               {paged.map((p) => {
                 return (
                   <div
@@ -361,6 +370,59 @@ export default function Page() {
                   </PaginationContent>
                 </Pagination>
               )}
+            </div>
+            {/* desktop */}
+            <div className="hidden mt-2 w-full lg:flex flex-col items-start justify-start gap-1.5">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ชื่อ</TableHead>
+                    <TableHead>สถานะ</TableHead>
+                    <TableHead className="text-center">จัดการ</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paged.map((p) => {
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="text-lg font-medium">
+                          {p.name}
+                          <span className="block font-light text-muted-foreground">
+                            {p.email}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          {p.checkInStatus === "checked_in" ? (
+                            <Badge
+                              variant={"outline"}
+                              className="p-1 bg-green-100 text-green-500 [&>svg]:size-4!"
+                            >
+                              <CircleCheck />
+                              เช็คอินแล้ว
+                            </Badge>
+                          ) : (
+                            <Badge
+                              variant={"outline"}
+                              className="p-1 bg-red-100 text-red-500 [&>svg]:size-4!"
+                            >
+                              <CircleDot />
+                              ยังไม่เช็คอิน
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Badge
+                            variant={"outline"}
+                            className="p-3 w-fit text-[14px] rounded-[10px]"
+                          >
+                            ดูข้อมูล
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
             </div>
           </Badge>
         </div>
