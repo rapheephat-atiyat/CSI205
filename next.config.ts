@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // Avoid the Next 16.4 dev-cache restart/HMR reload loop (vercel/next.js#100267).
+    turbopackFileSystemCacheForDev: false,
+  },
   turbopack: {
     rules: {
       "*.css": {
