@@ -359,7 +359,7 @@ export default function AdminDashboardPage() {
                         {vendor.name} / {vendor.food}
                         <Badge
                           variant={"ghost"}
-                          className="h-full my-5 bg-amber-100"
+                          className="h-full my-5"
                         ></Badge>
                       </TableCell>
                       <TableCell className="text-[16px]">
