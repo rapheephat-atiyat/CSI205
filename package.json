@@ -3,6 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "packageManager": "npm@10.9.2",
+  "devEngines": {
+    "packageManager": {
+      "name": "npm",
+      "version": "10.9.2",
+      "onFail": "error"
+    }
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
