@@ -25,7 +25,7 @@ export default async function Footer() {
 
     return (
         <footer className="w-full border-t border-border/60 bg-muted/20">
-            <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 lg:px-10">
+            <div className="mx-auto w-full max-w-7xl px-5 sm:px-8 xl:px-0">
                 <div className="grid gap-10 py-12 sm:py-14 md:grid-cols-[1.4fr_1fr] md:gap-16 lg:py-16">
                     <div>
                         <Brand />
