@@ -1,0 +1,25 @@
+name: Cloudflare lockfile
+
+on:
+  pull_request:
+    branches: [dev, main]
+
+permissions:
+  contents: read
+
+jobs:
+  npm-ci:
+    name: Cloudflare npm ci
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.1'
+      - name: Select Cloudflare's npm version
+        working-directory: ${{ runner.temp }}
+        run: npm install --global npm@10.9.2
+      - name: Verify lockfile and clean install
+        run: |
+          test -f package-lock.json
+          npm ci --progress=false
