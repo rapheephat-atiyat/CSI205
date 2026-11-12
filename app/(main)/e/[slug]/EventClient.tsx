@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { EventDetail } from "@/lib/api-types";
-import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarDays, ChevronRight, ImageIcon, MapPin, Share2, Ticket } from "lucide-react";
+import { ArrowLeft, ArrowRight, ArrowUpRight, CalendarDays, ImageIcon, MapPin, Share2, Ticket } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { ReactNode, useState } from "react";
@@ -15,7 +15,6 @@ export default function EventClient({ event, description }: { event: EventDetail
     const poster = event.banner || event.thumbnail;
     const activeTickets = event.tickets?.filter((t) => t.isActive) ?? [];
     const minPrice = activeTickets.length > 0 ? Math.min(...activeTickets.map((t) => Number(t.price))) : null;
-
 
     async function handleShared() {
         try {
@@ -28,7 +27,7 @@ export default function EventClient({ event, description }: { event: EventDetail
         }
     }
     return (
-        <main className="mx-auto w-full max-w-7xl outline outline-red-500 pt-8 px-10 pb-20">
+        <main className="mx-auto w-full max-w-7xl px-4 pt-6 pb-12 sm:px-6 lg:px-10 lg:pt-8">
             <div className="mb-8 flex items-center justify-between gap-4 ">
                 <Breadcrumb>
                     <BreadcrumbList>
@@ -52,7 +51,7 @@ export default function EventClient({ event, description }: { event: EventDetail
                     <span className="hidden sm:inline">แชร์</span>
                 </Button>
             </div>
-            <header className="mb-6 space-y-4 outline outline-red-500 max-w-4xl">
+            <header className="mb-6 max-w-4xl space-y-4">
                 {event.tags.length > 0 &&
                     <div className="flex flex-wrap gap-2">
                         {event.tags.map((t) => <Badge key={t} variant={"secondary"}>{t}</Badge>)}
@@ -60,13 +59,13 @@ export default function EventClient({ event, description }: { event: EventDetail
                 }
                 <h1 className="text-3xl leading-tight font-semibold text-balance tracking-tight">{event.title}</h1>
                 {event.subTitle &&
-                    <p className="outline outline-green-500 max-w-2xl text-base leading-relaxed text-muted-foreground">{event.subTitle}</p>
+                    <p className="max-w-2xl text-base leading-relaxed text-muted-foreground">{event.subTitle}</p>
                 }
             </header>
-            <div className="flex flex-row items-start gap-10">
-                <div className="flex-1 outline-pink-500 outline">
+            <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_21rem] lg:gap-10">
+                <div className="min-w-0">
                     <div className="relative aspect-video overflow-hidden rounded-xl border border-border/60 bg-muted/40">
-                        {poster && isImageOkay ? <Image alt="รูปโปสเตอร์" src={poster} fill priority unoptimized className="object-cover" /> : <div><ImageIcon /></div>}
+                        {poster && isImageOkay ? <Image alt="รูปโปสเตอร์" src={poster} fill priority unoptimized className="object-cover" onError={() => setIsImageOkay(false)} /> : <div className="flex size-full items-center justify-center text-muted-foreground"><ImageIcon aria-hidden="true" /></div>}
                     </div>
                     <section className="flex gap-1 border-b border-border/70 py-6">
                         <span className="flex size-10 items-center justify-center rounded-lg text-brand  ">
@@ -90,7 +89,7 @@ export default function EventClient({ event, description }: { event: EventDetail
                         {description ?? <p className="whitespace-pre-wrap leading-8 text-muted-foreground">{event.description || "ผู้จัดงานยังไม่ได้เพิ่มรายละเอียด"}</p>}
                     </section>
                 </div>
-                <aside className="w-84 outline-indigo-500 outline shrink-0 scroll-mt-[calc(var(--navbar-height)+1.5rem)] top-[calc(var(--navbar-height)+2rem)] sticky">
+                <aside className="lg:sticky lg:top-[calc(var(--navbar-height)+2rem)]">
                     <div className="rounded-xl border border-border bg-background">
                         <div className="flex items-center justify-between border-b border-dashed border-border px-6 py-5">
                             <div className="flex items-center gap-2.5">
@@ -153,9 +152,9 @@ export default function EventClient({ event, description }: { event: EventDetail
 
 function dateLabel(v: string) {
     const date = new Date(v);
-    return Number.isNaN(date.getTime() ? "รอประกาศ" : new Intl.DateTimeFormat("th-TH", {
+    return Number.isNaN(date.getTime()) ? "รอประกาศ" : new Intl.DateTimeFormat("th-TH", {
         day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Bangkok"
-    }).format(date));
+    }).format(date);
 }
 
 const formatPrice = (price: number) =>

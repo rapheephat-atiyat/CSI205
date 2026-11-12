@@ -30,6 +30,7 @@ export type EventDetail = EventSummary & {
     souvenirName?: string | null;
     souvenirImage?: string | null;
     souvenirSizes?: string[];
+    souvenirPrice?: string | null;
     souvenirAllowDecline?: boolean;
     allowShipping?: boolean;
     shippingFee?: string;
@@ -193,6 +194,7 @@ export type TicketItem = {
     orderId: string;
     eventId: string;
     eventTicketId: string;
+    ticketTypeName?: string;
     userId: string;
     unitPrice: string;
     ticketCode: string;
@@ -220,24 +222,34 @@ export type OrderDetail = {
     total: string;
     status: OrderStatus;
     paymentSlip: string | null;
+    hasPaymentSlip?: boolean;
+    paymentDueAt?: string;
     paidAt: string | null;
     deliveryMethod: DeliveryMethod;
     shippingFee: string;
+    souvenirItems: OrderSouvenirItem[];
     shipping: OrderShippingDetail | null;
     tickets: TicketItem[];
     createdAt: string;
     updatedAt: string;
 };
 
-export type CreateOrderInput = {
-    eventId: string;
+export type OrderSouvenirInput = { size: string; quantity: number };
+export type OrderSouvenirItem = OrderSouvenirInput & { unitPrice: string };
+
+type OrderSelection = {
     eventTicketId: string;
     quantity: number;
+    attendees: TicketAttendeeInput[];
+};
+
+export type CreateOrderInput = {
+    eventId: string;
     deliveryMethod: DeliveryMethod;
     paymentSlip?: string | null;
-    attendees: TicketAttendeeInput[];
     shipping?: OrderShippingInput | null;
-};
+    souvenirItems?: OrderSouvenirInput[];
+} & (OrderSelection | { requestId: string; items: OrderSelection[] });
 
 export type ScanTicketInput = {
     qrToken: string;

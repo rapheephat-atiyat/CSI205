@@ -102,6 +102,11 @@ export async function dropEvnet(id: string): Promise<void> {
     if (!res.affected) throw notFound();
 }
 
+export function isEventSelling(event: Pick<EventDetail, "buyAt" | "buyEndAt">) {
+    const now = Date.now();
+    return now >= Date.parse(event.buyAt) && now < Date.parse(event.buyEndAt);
+}
+
 function CheckEventRules(values: Pick<EventInput, "buyAt" | "buyEndAt" | "minTicketQTY" | "maxTicketQTY">) {
     if (Date.parse(values.buyAt) >= Date.parse(values.buyEndAt)) {
         throw new ApiError("VALIDATION_ERROR", "วันปิดขายต้องอยู่หลังวันเริ่มขาย", 422);
@@ -136,6 +141,7 @@ function toEventDetail(event: Events): EventDetail {
         souvenirName: event.souvenirName,
         souvenirImage: event.souvenirImage,
         souvenirSizes: event.souvenirSizes,
+        souvenirPrice: event.souvenirPrice,
         souvenirAllowDecline: event.souvenirAllowDecline,
         allowShipping: event.allowShipping,
         shippingFee: event.shippingFee,
@@ -146,7 +152,7 @@ function toEventDetail(event: Events): EventDetail {
             description: store.description,
             thumbnail: store.thumbnail,
         })),
-        tickets: (event.tickets ?? []).map((t) => ({
+        tickets: (event.tickets ?? []).toSorted((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id)).map((t) => ({
             id: t.id,
             eventId: t.eventId,
             name: t.name,

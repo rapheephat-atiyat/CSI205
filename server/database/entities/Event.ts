@@ -56,6 +56,9 @@ export class Events {
     @Column({ type: "varchar", array: true, default: [] })
     souvenirSizes!: string[];
 
+    @Column({ name: "souvenir_price", type: "decimal", precision: 10, scale: 2, nullable: true })
+    souvenirPrice!: string | null;
+
     @Column({ type: "boolean", default: true })
     souvenirAllowDecline!: boolean;
 
