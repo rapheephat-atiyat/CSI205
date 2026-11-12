@@ -14,7 +14,7 @@ const footerGroups = [
         title: "ให้เราช่วยคุณ",
         links: [
             { label: "ศูนย์ช่วยเหลือ", href: "/help" },
-            { label: "บัตรของฉัน", href: "/my-tickets" },
+            { label: "บัตรของฉัน", href: "/account/tickets" },
         ],
     },
 ] as const;
@@ -39,7 +39,7 @@ export default async function Footer() {
                         </p>
                     </div>
 
-                    <div className="debug grid grid-cols-2 gap-6 md:pt-3 lg:gap-12">
+                    <div className="grid grid-cols-2 gap-6 md:pt-3 lg:gap-12">
                         {footerGroups.map(({ title, links }) => (
                             <nav key={title} aria-label={title}>
                                 <h2 className="mb-4 text-xs font-normal tracking-wide text-muted-foreground">

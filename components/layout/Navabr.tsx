@@ -43,7 +43,7 @@ export default function Navabr() {
                 fetchOptions: {
                     onSuccess: () => {
                         setMobileOpen(false);
-                        const protectedPrefixes = ["/profile", "/my-tickets", "/admin", "/vendor", "/checkout"];
+                        const protectedPrefixes = ["/profile", "/account", "/admin", "/vendor", "/checkout"];
                         if (protectedPrefixes.some((p) => pathname.startsWith(p))) {
                             router.replace("/");
                         }
@@ -76,11 +76,13 @@ export default function Navabr() {
 
                 <div className="flex shrink-0 items-center gap-1 sm:gap-3">
                     <Button
+                        asChild
                         size="icon"
-                        aria-label="ตะกร้าสินค้า"
                         className="size-11 rounded-lg bg-brand-soft text-brand hover:bg-brand hover:text-on-brand"
                     >
-                        <ShoppingCart aria-hidden="true" className="size-5" strokeWidth={1.75} />
+                        <Link href="/account/orders" aria-label="คำสั่งซื้อของฉัน">
+                            <ShoppingCart aria-hidden="true" className="size-5" strokeWidth={1.75} />
+                        </Link>
                     </Button>
                     <div className="hidden items-center gap-2 lg:flex">
                         {isPending ? (
@@ -122,7 +124,7 @@ export default function Navabr() {
                                             </Link>
                                         </DropdownMenuItem>
                                         <DropdownMenuItem asChild className="py-2 cursor-pointer">
-                                            <Link href="/my-tickets">
+                                            <Link href="/account/tickets">
                                                 <Ticket />
                                                 บัตรของฉัน
                                             </Link>
