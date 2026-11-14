@@ -21,6 +21,15 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/ui/input-group";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // data
 type AuditLog = {
@@ -188,7 +197,8 @@ export default function Page() {
               variant={"outline"}
               className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5"
             >
-              <div className="flex w-full flex-col items-start justify-center gap-1">
+              {/* mobile */}
+              <div className="flex w-full flex-col items-start justify-center gap-1 md:hidden">
                 {auditLog
                   .filter((log) => {
                     return (
@@ -257,6 +267,101 @@ export default function Page() {
                       </div>
                     );
                   })}
+              </div>
+              {/* desktop */}
+              <div className="hidden w-full flex-col items-start justify-center gap-1 md:flex">
+                <Table>
+                  <TableHeader className="bg-[#FAFAFA]">
+                    <TableRow className="text-[15px]">
+                      <TableHead className="text-muted-foreground font-normal">
+                        วันเวลา
+                      </TableHead>
+                      <TableHead className="text-muted-foreground font-normal">
+                        ผู้กระทำ / บทบาท
+                      </TableHead>
+                      <TableHead className="text-muted-foreground font-normal">
+                        การกระทำ
+                      </TableHead>
+                      <TableHead className="text-muted-foreground font-normal">
+                        รายการที่เกี่ยวข้อง
+                      </TableHead>
+                      <TableHead className="text-muted-foreground font-normal">
+                        ก่อน → หลัง
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {auditLog
+                      .filter((log) => {
+                        return (
+                          log.actor.name.startsWith(search) ||
+                          log.relatedItem.value.startsWith(search)
+                        );
+                      })
+                      .map((log) => (
+                        <TableRow key={log.id} className="text-sm">
+                          {/* วันเวลา */}
+                          <TableCell className="text-muted-foreground whitespace-nowrap">
+                            {log.timestamp}
+                          </TableCell>
+
+                          {/* ผู้กระทำ / บทบาท */}
+                          <TableCell>
+                            <div className="font-medium text-foreground">
+                              {log.actor.name}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              {log.actor.role}
+                            </div>
+                          </TableCell>
+
+                          {/* การกระทำ */}
+                          <TableCell className="font-medium text-foreground">
+                            {log.action}
+                          </TableCell>
+
+                          {/* รายการที่เกี่ยวข้อง */}
+                          <TableCell>
+                            <div className="text-xs text-muted-foreground">
+                              {log.relatedItem.label}
+                            </div>
+                            <div className="font-medium">
+                              {log.relatedItem.value}
+                            </div>
+                          </TableCell>
+
+                          {/* ก่อน → หลัง */}
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5 text-xs">
+                              {log.changes.statusChange && (
+                                <span className="font-medium">
+                                  {log.changes.statusChange.from} →{" "}
+                                  {log.changes.statusChange.to}
+                                </span>
+                              )}
+                              {log.changes.roleChange && (
+                                <span className="font-medium">
+                                  {log.changes.roleChange.from} →{" "}
+                                  {log.changes.roleChange.to}
+                                </span>
+                              )}
+                              {log.changes.description && (
+                                <span className="text-muted-foreground">
+                                  {log.changes.description}
+                                </span>
+                              )}
+                              {log.changes.note && (
+                                <span className="text-muted-foreground">
+                                  {log.changes.note}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                  </TableBody>
+                </Table>
               </div>
             </Badge>
           </Badge>
