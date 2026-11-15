@@ -40,6 +40,8 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
+import { useRouter } from "next/navigation";
+
 function formatDate(d?: Date) {
   if (!d) return "";
   return d.toLocaleDateString("th-TH", {
@@ -47,6 +49,15 @@ function formatDate(d?: Date) {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+function slugify(text: string) {
+  const s = text
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return s || `event-${Date.now()}`;
 }
 
 export default function EventDetailForm() {
@@ -77,6 +88,9 @@ export default function EventDetailForm() {
   const [draftEventTimeFrom, setDraftEventTimeFrom] = useState("00:00");
   const [draftEventTimeTo, setDraftEventTimeTo] = useState("00:00");
 
+  const router = useRouter();
+  const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => {
     setDraftDate((date) => date ?? new Date());
   }, []);
@@ -86,6 +100,52 @@ export default function EventDetailForm() {
       eventTimeFrom=> ${eventTimeFrom}
       eventTimeTo=> ${eventTimeTo}`);
   }, [date, eventTimeFrom, eventTimeTo]);
+
+  function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    if (!date) return alert("กรุณาเลือกวันที่จัดงาน");
+    if (new Date(buyEndAt) <= new Date(buyAt)) {
+      return alert("วันปิดขายต้องมากกว่าวันเปิดขาย");
+    }
+    const minQ = Number(minTicketQTY);
+    const maxQ = Number(maxTicketQTY);
+    if (!(minQ >= 1) || !(maxQ >= minQ)) {
+      return alert("จำนวนบัตรสูงสุดต้องไม่น้อยกว่าขั้นต่ำ");
+    }
+
+    const newEvent = {
+      id: crypto.randomUUID(),
+      slug: slugify(title),
+      title,
+      subTitle,
+      banner,
+      thumbnail,
+      venue,
+      description,
+      tags: tagsText
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+      buyAt: new Date(buyAt).toISOString(),
+      buyEndAt: new Date(buyEndAt).toISOString(),
+      minTicketQTY: minQ,
+      maxTicketQTY: maxQ,
+      eventDate: date.toISOString(),
+      eventTimeFrom,
+      eventTimeTo,
+    };
+
+    const localEvnts = localStorage.getItem("events");
+    if (!localEvnts) {
+      localStorage.setItem("events", JSON.stringify([newEvent]));
+    } else {
+      const events = JSON.parse(localEvnts);
+      localStorage.setItem("events", JSON.stringify([newEvent, ...events]));
+    }
+
+    router.push("/admin/settings/event");
+  }
 
   return (
     <div className="p-4 mx-auto w-full flex flex-col items-center justify-start">
@@ -123,7 +183,7 @@ export default function EventDetailForm() {
         </div>
 
         {/* ข้อมูลงาน */}
-        <form className="w-full">
+        <form className="w-full" onSubmit={handleCreate}>
           <div className="w-full flex flex-col">
             <Badge
               variant={"outline"}
@@ -585,8 +645,13 @@ export default function EventDetailForm() {
             </Badge>
 
             <div className="w-full mt-4 flex flex-col">
-              <Button type="submit" variant={"brand"} className="p-3 flex-1">
-                สร้างงาน
+              <Button
+                type="submit"
+                variant={"brand"}
+                className="p-3 flex-1"
+                disabled={submitting}
+              >
+                {submitting ? "กำลังสร้าง..." : "สร้างงาน"}
               </Button>
             </div>
           </div>
