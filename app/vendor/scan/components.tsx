@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+
+
 export function ScannerBox() {
   // 1. ต้องประกาศตัวแปร State ก่อนคำสั่ง return เสมอ
   const [isCameraOpen, setIsCameraOpen] = useState(false);

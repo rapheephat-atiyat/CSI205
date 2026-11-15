@@ -1,41 +1,29 @@
-"use client";
+import { ScannerBox, PaymentSummary } from "./components"; 
 
-
-import { ScannerBox, PaymentSummary } from "./components";
-
-export default function page() {
-    return (
-
-        <div>
-            <div className="mb-6">
-                <h1 className="text-2xl font-bold text-slate-900 mt-5"> QR Scanner</h1>
-                <p className="text-xs text-slate-400 mt-1">ตรวจสอบจำนวน สแกน QR และยืนยันรับชำระ Token</p>
-            </div>
-
-            <div className=" bg-white  border border-slate-200/80 p-6 shadow-sm ">
-                สแกน QR เพื่อรับชำระ
-
-                <div className="p-8">
-                    <div className="mb-6">
-                        <h1 className="text-2xl font-bold text-slate-900 mt-5">QR Scanner</h1>
-                    </div>
-
-                    {/* 3. เอา Component มาวางประกอบกัน */}
-                    <div className="col-span-1 md:col-span-8">
-                        <ScannerBox />
-                        <PaymentSummary />
-                    </div>
-
-
-
-                </div>
-
-
-            </div>
-
-            
+export default function VendorQRScannerPage() {
+  return (
+    <div className="max-w-6xl mx-auto w-full">
+      
+      {/* ส่วนหัว (เอาข้อความที่ลอยๆ ผิดที่ออกไปแล้ว) */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-slate-900">QR Scanner</h1>
+        <p className="text-sm text-gray-500 mt-1">ตรวจสอบจำนวน สแกน QR และยืนยันรับชำระ Token</p>
+      </div>
+      
+      {/* โครงสร้างจัดวาง ซ้าย-ขวา */}
+      <div className="flex flex-col lg:flex-row gap-6 items-start">
+        
+        {/* ฝั่งซ้าย: กล่องสแกน (บังคับกว้าง 65% ในจอใหญ่) */}
+        <div className="w-full lg:w-[65%]">
+          <ScannerBox />
         </div>
 
-    );
-}
+        {/* ฝั่งขวา: กล่องสรุปยอด (บังคับกว้าง 35% ในจอใหญ่) */}
+        <div className="w-full lg:w-[35%]">
+          <PaymentSummary />
+        </div>
 
+      </div>
+    </div>
+  );
+}
