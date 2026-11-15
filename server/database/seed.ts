@@ -179,6 +179,7 @@ async function runSeed() {
                     souvenirName: "เสื้อยืดที่ระลึก TUATUA Reunion 2026 (Oversize)",
                     souvenirImage: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600&q=80",
                     souvenirSizes: ["S", "M", "L", "XL", "2XL"],
+                    souvenirPrice: "300.00",
                     souvenirAllowDecline: true,
                     allowShipping: true,
                     shippingFee: "50.00",
@@ -249,7 +250,7 @@ async function runSeed() {
             // ==========================================
             // 3. สร้าง Ticket Types (ราคาบัตรของแต่ละงาน)
             // ==========================================
-            const [t1Early, t1Regular, t1Vip] = await manager.save([
+            const [, t1Regular, t1Vip] = await manager.save([
                 manager.create(EventTicket, {
                     eventId: event1.id,
                     name: "บัตรศิษย์เก่าสัมพันธ์ (Early Bird)",

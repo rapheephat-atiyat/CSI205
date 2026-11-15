@@ -2,6 +2,7 @@ import { Events } from "@/server/database/entities/Event";
 import { OrderShipping } from "@/server/database/entities/OrderShipping";
 import { Ticket } from "@/server/database/entities/Ticket";
 import { User } from "@/server/database/entities/User";
+import type { OrderSouvenirItem } from "@/lib/api-types";
 import { DELIVERY_METHODS, type DeliveryMethod, ORDER_STATUSES, type OrderStatus } from "@/server/database/enums/domain.enum";
 import {
     Column,
@@ -70,6 +71,9 @@ export class Order {
 
     @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
     shippingFee!: string;
+
+    @Column({ name: "souvenir_items", type: "jsonb", default: () => "'[]'::jsonb" })
+    souvenirItems!: OrderSouvenirItem[];
 
     @OneToOne(() => OrderShipping, (s) => s.order)
     shipping!: Relation<OrderShipping> | null;

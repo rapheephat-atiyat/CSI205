@@ -152,15 +152,13 @@ export default function Page() {
                 variant={"outline"}
                 className="p-4 w-full h-full flex-1 flex flex-col gap-2 rounded-[10px]"
               >
-                <div className="flex flex-col items-start justify-center gap-0.5">
-                  <div className="text-lg font-semibold">
-                    ยอดเงินรับที่ยืนยันแล้ว
-                  </div>
+                <div className="w-full flex flex-col items-start justify-center gap-0.5">
+                  <div className="text-lg font-semibold">ยอดเงินรับที่ยืนยันแล้ว</div>
                   <div className="text-sm font-medium text-muted-foreground">
                     บัตร, เสื้อ และการเติม Token
                   </div>
                 </div>
-                <div className="flex flex-col items-start justify-center gap-1">
+                <div className="flex w-full flex-col items-start justify-center gap-1">
                   <div className="w-full flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
                       บัตรอนุมัติ 960 ใบ
@@ -197,7 +195,7 @@ export default function Page() {
                     ไม่บวกซ้ำเป็นเงินรับใหม่
                   </div>
                 </div>
-                <div className="flex flex-col items-start justify-center gap-1">
+                <div className="flex w-full flex-col items-start justify-center gap-1">
                   <div className="w-full flex items-center justify-between">
                     <div className="text-sm text-muted-foreground">
                       Token รวมจากบัตร + เติม

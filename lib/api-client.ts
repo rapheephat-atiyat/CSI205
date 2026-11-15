@@ -81,6 +81,14 @@ export const api = {
     orders: {
         listMy: () => request<OrderDetail[]>("/api/orders"),
         create: (input: CreateOrderInput) => request<OrderDetail>("/api/orders", { method: "POST", body: JSON.stringify(input) }),
+        submitPayment: (id: string, proof: string) => request<OrderDetail>(`/api/orders/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ action: "submit", proof }),
+        }),
+        cancel: (id: string) => request<null>(`/api/orders/${encodeURIComponent(id)}`, {
+            method: "PATCH",
+            body: JSON.stringify({ action: "cancel" }),
+        }),
     },
     tickets: {
         scan: (input: ScanTicketInput) => request<TicketItem>("/api/tickets/scan", { method: "POST", body: JSON.stringify(input) }),
