@@ -39,45 +39,45 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-
-function formatThaiDate(d?: Date) {
-  if (!d) return "";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  return `${dd} / ${mm} / ${d.getFullYear() + 543}`;
-}
+import { string } from "better-auth";
 
 export default function EventDetailForm() {
-  // event date
-  const [date, setDate] = useState<Date | undefined>(undefined);
-  const [startTime, setStartTime] = useState("00:00");
-  const [endTime, setEndTime] = useState("00:00");
-  const [draftDate, setDraftDate] = useState<Date | undefined>(undefined);
-  const [draftStart, setDraftStart] = useState("00:00");
-  const [draftEnd, setDraftEnd] = useState("00:00");
-
+  // open dialog
   const [open, setOpen] = useState(false);
 
-  const handleOpenChange = (next: boolean) => {
-    if (next) {
-      setDraftDate(date ?? new Date());
-      setDraftDate(date);
-      setDraftStart(startTime);
-      setDraftEnd(endTime);
-    }
-    setOpen(next);
-  };
+  // event
+  const [title, setTitle] = useState("");
+  const [subTitle, setSubTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [thumbnail, setThumbnail] = useState("");
+  const [banner, setBanner] = useState("");
+  const [tagsText, setTagsText] = useState("");
+  const [venue, setVenue] = useState("");
+  const [buyAt, setBuyAt] = useState("");
+  const [buyEndAt, setBuyEndAt] = useState("");
+  const [minTicketQTY, setMinTicketQTY] = useState("1");
+  const [maxTicketQTY, setMaxTicketQTY] = useState("10");
+  const [token, setToken] = useState("1");
 
-  const handleConfirmDateTime = () => {
-    setDate(draftDate);
-    setStartTime(draftStart);
-    setEndTime(draftEnd);
-    setOpen(false);
-  };
+  // date evnet
+  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [eventTimeFrom, setEventTimeFrom] = useState("00:00");
+  const [eventTimeTo, setEventTimeTo] = useState("00:00");
+
+  // draft in dialog b4 submit
+  const [draftDate, setDraftDate] = useState<Date | undefined>(undefined);
+  const [draftEventTimeFrom, setDraftEventTimeFrom] = useState("00:00");
+  const [draftEventTimeTo, setDraftEventTimeTo] = useState("00:00");
 
   useEffect(() => {
-    setDate((date) => date ?? new Date());
+    setDraftDate((date) => date ?? new Date());
   }, []);
+
+  useEffect(() => {
+    console.log(`Date=> ${date}
+      eventTimeFrom=> ${eventTimeFrom}
+      eventTimeTo=> ${eventTimeTo}`);
+  }, [date, eventTimeFrom, eventTimeTo]);
 
   return (
     <div className="p-4 mx-auto w-full flex flex-col items-center justify-start">
@@ -106,7 +106,9 @@ export default function EventDetailForm() {
       <div className="p-4 mx-auto w-full max-w-7xl flex flex-col items-start justify-center gap-4">
         {/* หัวเรื่อง */}
         <div className="flex flex-col items-start justify-center">
-          <div className="text-[24px] font-semibold text-black">สร้างงานใหม่</div>
+          <div className="text-[24px] font-semibold text-black">
+            สร้างงานใหม่
+          </div>
           <div className="text-[14px] font-medium text-muted-foreground">
             ระบุข้อมูลหลักของงาน
           </div>
@@ -142,8 +144,101 @@ export default function EventDetailForm() {
                       type="text"
                       placeholder="กรุณาใส่ชื่องาน"
                       required
+                      value={title}
+                      onChange={(e) => setTitle(e.target.value)}
                       className="py-3 w-full h-auto font-light"
                     />
+                  </Field>
+
+                  {/* คำโปรย */}
+                  <Field>
+                    <FieldLabel
+                      htmlFor="event-subtitle"
+                      className="text-[16px]"
+                    >
+                      คำโปรย *
+                    </FieldLabel>
+                    <Input
+                      id="event-subtitle"
+                      type="text"
+                      placeholder="เชียร์สุดใจ มิตรภาพในสนามหญ้า"
+                      required
+                      value={subTitle}
+                      onChange={(e) => setSubTitle(e.target.value)}
+                      className="py-3 w-full h-auto font-light"
+                    />
+                  </Field>
+
+                  {/* รายละเอียดงาน */}
+                  <Field>
+                    <FieldLabel
+                      htmlFor="event-description"
+                      className="text-[16px]"
+                    >
+                      รายละเอียดงาน *
+                    </FieldLabel>
+                    <Input
+                      id="event-description"
+                      type="text"
+                      placeholder="รายละเอียดเกี่ยวกับงาน"
+                      required
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      className="py-3 w-full h-auto font-light"
+                    />
+                  </Field>
+
+                  {/* รูปปก */}
+                  <Field>
+                    <FieldLabel
+                      htmlFor="event-thumbnail"
+                      className="text-[16px]"
+                    >
+                      รูปปกงาน (URL) *
+                    </FieldLabel>
+                    <Input
+                      id="event-thumbnail"
+                      type="url"
+                      placeholder="https://example.com/image.jpg"
+                      required
+                      value={thumbnail}
+                      onChange={(e) => setThumbnail(e.target.value)}
+                      className="py-3 w-full h-auto font-light"
+                    />
+                  </Field>
+
+                  {/* แบนเนอร์ */}
+                  <Field>
+                    <FieldLabel htmlFor="event-banner" className="text-[16px]">
+                      แบนเนอร์งาน (URL) *
+                    </FieldLabel>
+                    <Input
+                      id="event-banner"
+                      type="url"
+                      placeholder="https://example.com/banner.jpg"
+                      required
+                      value={banner}
+                      onChange={(e) => setBanner(e.target.value)}
+                      className="py-3 w-full h-auto font-light"
+                    />
+                  </Field>
+
+                  {/* แท็ก */}
+                  <Field>
+                    <FieldLabel htmlFor="event-tags" className="text-[16px]">
+                      แท็ก
+                    </FieldLabel>
+                    <Input
+                      id="event-tags"
+                      type="text"
+                      placeholder="กีฬา, ฟุตบอล, ศิษย์เก่า"
+                      value={tagsText}
+                      onChange={(e) => setTagsText(e.target.value)}
+                      className="py-3 w-full h-auto font-light"
+                    />
+                    <FieldDescription className="text-wrap">
+                      คั่นแต่ละแท็กด้วยเครื่องหมายจุลภาค (,)
+                    </FieldDescription>
                   </Field>
 
                   {/* วันที่จัดงาน */}
@@ -151,13 +246,12 @@ export default function EventDetailForm() {
                     <FieldLabel htmlFor="event-date" className="text-[16px]">
                       วันที่จัดงาน *
                     </FieldLabel>
-                    <Dialog open={open} onOpenChange={handleOpenChange}>
-                      <DialogTrigger asChild>
+                    <Dialog open={open} onOpenChange={setOpen}>
+                      <DialogTrigger asChild onClick={() => setOpen(true)}>
                         <Input
                           id="event-date"
                           type="text"
                           readOnly
-                          value={formatThaiDate(date)}
                           placeholder={"mm / dd / year"}
                           className="py-3 w-full h-auto font-light cursor-pointer"
                         />
@@ -189,9 +283,9 @@ export default function EventDetailForm() {
                                   <InputGroupInput
                                     id="dialog-time-from"
                                     type="time"
-                                    value={draftStart}
+                                    value={draftEventTimeFrom}
                                     onChange={(e) =>
-                                      setDraftStart(e.target.value)
+                                      setDraftEventTimeFrom(e.target.value)
                                     }
                                     className="appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                                   />
@@ -208,9 +302,9 @@ export default function EventDetailForm() {
                                   <InputGroupInput
                                     id="dialog-time-to"
                                     type="time"
-                                    value={draftEnd}
+                                    value={draftEventTimeTo}
                                     onChange={(e) =>
-                                      setDraftEnd(e.target.value)
+                                      setDraftEventTimeTo(e.target.value)
                                     }
                                     className="appearance-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-calendar-picker-indicator]:appearance-none"
                                   />
@@ -229,7 +323,15 @@ export default function EventDetailForm() {
                               ยกเลิก
                             </Button>
                           </DialogClose>
-                          <Button type="button" onClick={handleConfirmDateTime}>
+                          <Button
+                            type="button"
+                            onClick={() => {
+                              setDate(draftDate);
+                              setEventTimeFrom(draftEventTimeFrom);
+                              setEventTimeTo(draftEventTimeTo);
+                              setOpen(false);
+                            }}
+                          >
                             ตกลง
                           </Button>
                         </DialogFooter>
@@ -246,7 +348,7 @@ export default function EventDetailForm() {
                       id="event-time"
                       type="text"
                       readOnly
-                      value={`${startTime} – ${endTime} น.`}
+                      // value={`${startTime} – ${endTime} น.`}
                       placeholder="16:00 – 22:00 น."
                       className="py-3 w-full h-auto font-light"
                     />
@@ -265,27 +367,11 @@ export default function EventDetailForm() {
                       type="text"
                       placeholder="หอประชุมศิษย์เก่า มหาวิทยาลัย"
                       required
+                      value={venue}
+                      onChange={(e) => setVenue(e.target.value)}
                       className="py-3 w-full h-auto font-light"
                     />
                   </Field>
-
-                  {/* รายละเอียดงาน */}
-                  <Field>
-                    <FieldLabel
-                      htmlFor="event-description"
-                      className="text-[16px]"
-                    >
-                      รายละเอียดงาน *
-                    </FieldLabel>
-                    <Input
-                      id="event-description"
-                      type="text"
-                      placeholder="รายละเอียดเกี่ยวกับงาน"
-                      required
-                      className="py-3 w-full h-auto font-light"
-                    />
-                  </Field>
-
                   {/* อีเมลติดต่อผู้จัดงาน */}
                   <Field>
                     <FieldLabel htmlFor="event-email" className="text-[16px]">
@@ -299,16 +385,70 @@ export default function EventDetailForm() {
                       className="py-3 w-full h-auto font-light"
                     />
                   </Field>
-
-                  <Field className="w-full flex flex-row items-center justify-between">
-                    <Button
-                      type="submit"
-                      variant={"outline"}
-                      className="p-3 border border-brand flex-1 items-center justify-center h-auto hover:bg-brand hover:text-on-brand"
+                  {/* ช่วงขายบัตร */}
+                  {/* เปิดขายบัตร */}
+                  <Field>
+                    <FieldLabel
+                      htmlFor="event-buy-end-at"
+                      className="text-[16px]"
                     >
-                      <Save />
-                      บันทึกข้อมูลงาน
-                    </Button>
+                      วันและเวลาเปิดขายบัตร *
+                    </FieldLabel>
+                    <Input
+                      id="event-buy-start-at"
+                      type="datetime-local"
+                      required
+                      value={buyAt}
+                      onChange={(e) => setBuyAt(e.target.value)}
+                      className="py-3 w-full h-auto font-light"
+                    />
+                  </Field>
+                  {/* ปิดขายบัตร */}
+                  <Field>
+                    <FieldLabel
+                      htmlFor="event-buy-end-at"
+                      className="text-[16px]"
+                    >
+                      วันและเวลาปิดขายบัตร *
+                    </FieldLabel>
+                    <Input
+                      id="event-buy-end-at"
+                      type="datetime-local"
+                      required
+                      value={buyEndAt}
+                      onChange={(e) => setBuyEndAt(e.target.value)}
+                      className="py-3 w-full h-auto font-light"
+                    />
+                  </Field>
+
+                  {/* จำนวนบัตรต่อการซื้อ */}
+                  <Field>
+                    <FieldLabel htmlFor="event-min-qty" className="text-[16px]">
+                      จำนวนบัตรขั้นต่ำต่อการซื้อ *
+                    </FieldLabel>
+                    <Input
+                      id="event-min-qty"
+                      type="number"
+                      min="1"
+                      required
+                      value={minTicketQTY}
+                      onChange={(e) => setMinTicketQTY(e.target.value)}
+                      className="py-3 w-full h-auto font-light"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="event-max-qty" className="text-[16px]">
+                      จำนวนบัตรสูงสุดต่อการซื้อ *
+                    </FieldLabel>
+                    <Input
+                      id="event-max-qty"
+                      type="number"
+                      min="1"
+                      required
+                      value={maxTicketQTY}
+                      onChange={(e) => setMaxTicketQTY(e.target.value)}
+                      className="py-3 w-full h-auto font-light"
+                    />
                   </Field>
                 </FieldGroup>
               </form>
@@ -363,19 +503,6 @@ export default function EventDetailForm() {
                   ใช้ชื่อบัญชีจริงที่ปรากฏในสมุดบัญชีธนาคาร
                 </FieldDescription>
               </Field>
-              <Field
-                orientation="horizontal"
-                className="w-full flex flex-row items-center justify-between"
-              >
-                <Button
-                  type="submit"
-                  variant={"outline"}
-                  className="p-3 border border-brand flex-1 items-center justify-center h-auto hover:bg-brand hover:text-on-brand"
-                >
-                  <Save />
-                  บันทึกบัญชีรับเงิน
-                </Button>
-              </Field>
             </FieldGroup>
           </Badge>
         </div>
@@ -405,9 +532,13 @@ export default function EventDetailForm() {
                   </FieldLabel>
                   <Input
                     id="token-rate"
-                    placeholder="0"
-                    className="py-3 w-full h-auto font-light"
+                    placeholder="1"
+                    type="number"
+                    min="1"
                     required
+                    value={token}
+                    onChange={(e) => setToken(e.target.value)}
+                    className="py-3 w-full h-auto font-light"
                   />
                   <FieldDescription className="text-wrap">
                     หน่วย: บาท / Token ระบุเป็นค่ามากกว่า 0
@@ -419,29 +550,16 @@ export default function EventDetailForm() {
                 >
                   <div className="flex flex-col items-start justify-center gap-1.5">
                     <div className="text-lg font-semibold">
-                      1 Token = 10 บาท
+                      1 Token = {token} บาท
                     </div>
                   </div>
                   <div className="w-full border border-b-muted-foreground"></div>
                   <div className="flex flex-col items-start justify-center gap-1.5">
                     <div className="text-lg font-semibold">
-                      300 บาท ÷ 10 = 30 Token
+                      300 บาท ÷ {token} = {300 / Number(token)} Token
                     </div>
                   </div>
                 </Badge>
-                <Field
-                  orientation="horizontal"
-                  className="w-full flex flex-row items-center justify-between"
-                >
-                  <Button
-                    type="submit"
-                    variant={"outline"}
-                    className="p-3 border border-brand flex-1 items-center justify-center h-auto hover:bg-brand hover:text-on-brand"
-                  >
-                    <Save />
-                    บันทึก
-                  </Button>
-                </Field>
               </FieldGroup>
             </div>
           </Badge>
