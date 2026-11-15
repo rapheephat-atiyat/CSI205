@@ -1,18 +1,17 @@
-import { ScannerBox, PaymentSummary } from "./components"; 
+"use client";
+import { ScannerBox, PaymentSummary } from "./components";
 
 export default function VendorQRScannerPage() {
   return (
     <div className="max-w-6xl mx-auto w-full">
-      
-      {/* ส่วนหัว (เอาข้อความที่ลอยๆ ผิดที่ออกไปแล้ว) */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">QR Scanner</h1>
-        <p className="text-sm text-gray-500 mt-1">ตรวจสอบจำนวน สแกน QR และยืนยันรับชำระ Token</p>
+        <p className="text-sm text-gray-500 mt-1">
+          ตรวจสอบจำนวน สแกน QR และยืนยันรับชำระ Token
+        </p>
       </div>
-      
-      {/* โครงสร้างจัดวาง ซ้าย-ขวา */}
+
       <div className="flex flex-col lg:flex-row gap-6 items-start">
-        
         {/* ฝั่งซ้าย: กล่องสแกน (บังคับกว้าง 65% ในจอใหญ่) */}
         <div className="w-full lg:w-[65%]">
           <ScannerBox />
@@ -22,7 +21,6 @@ export default function VendorQRScannerPage() {
         <div className="w-full lg:w-[35%]">
           <PaymentSummary />
         </div>
-
       </div>
     </div>
   );
