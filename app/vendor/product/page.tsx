@@ -187,12 +187,12 @@ export default function ProductManagement() {
                     className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-slate-400"
                   />
                   {/* ปุ่มยืนยันการแก้ไข */}
-                  <button
+                  {/* <button
                     onClick={handleSave}
                     className="w-full mt-6 bg-[#E52E40] hover:bg-[#d02536] text-white py-2.5 rounded-xl text-xs font-semibold shadow-sm transition-colors"
                   >
                     บันทึกการเปลี่ยนแปลง
-                  </button>
+                  </button> */}
 
 
                   {/* เปืดปิดสินค้า */}
