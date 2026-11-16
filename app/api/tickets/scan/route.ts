@@ -1,12 +1,12 @@
-import { ScanTicketInput } from "@/lib/api-types";
-import { PERMISSIONS } from "@/lib/permissions";
-import { requirePermission } from "@/server/auth/permission";
+import type { ScanTicketInput } from "@/lib/api-types";
+import { requireUser } from "@/server/auth/current-user";
 import { withHandler } from "@/server/http/handler";
+import { readJson } from "@/server/http/request";
 import { success } from "@/server/http/response";
-import { scanTicket } from "@/server/services/order.service";
+import { scanTicket } from "@/server/services/ticket.service";
 
 export const POST = withHandler(async (req) => {
-    const staff = await requirePermission(req, PERMISSIONS.TICKET_SCAN);
-    const { qrToken } = (await req.json()) as ScanTicketInput;
-    return success(await scanTicket(staff.id, qrToken));
+    const staff = await requireUser(req);
+    const { qrToken } = await readJson<ScanTicketInput>(req);
+    return success(await scanTicket(staff, qrToken));
 });

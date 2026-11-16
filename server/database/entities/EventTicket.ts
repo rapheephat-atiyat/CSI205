@@ -1,7 +1,9 @@
 import { Events } from "@/server/database/entities/Event";
 import { Ticket } from "@/server/database/entities/Ticket";
+import { SouvenirTicketType } from "./SouvenirTicketType";
 import { type AttendeeField } from "@/server/database/enums/domain.enum";
 import {
+    Check,
     Column,
     CreateDateColumn,
     Entity,
@@ -10,10 +12,15 @@ import {
     OneToMany,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
+    Unique,
     type Relation,
 } from "typeorm";
 
 @Entity({ name: "ticket_types", schema: "public" })
+@Unique("uq_ticket_types_event", ["id", "eventId"])
+@Check("chk_ticket_types_stock", `"sold" >= 0 AND "quota" >= "sold"`)
+@Check("chk_ticket_types_order_limits", `"minTicketQTY" >= 1 AND "maxTicketQTY" >= "minTicketQTY"`)
+@Check("chk_ticket_types_price", `"price" >= 0`)
 export class EventTicket {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
@@ -55,8 +62,8 @@ export class EventTicket {
     @OneToMany(() => Ticket, (t) => t.eventTicket)
     issuedTickets!: Relation<Ticket[]>;
 
-    @Column({ name: "includes_souvenir", type: "boolean", default: true })
-    includesSouvenir!: boolean;
+    @OneToMany(() => SouvenirTicketType, (link) => link.ticketType)
+    souvenirLinks!: Relation<SouvenirTicketType[]>;
 
     @Column({ name: "required_fields", type: "varchar", array: true, default: [] })
     requiredFields!: AttendeeField[];

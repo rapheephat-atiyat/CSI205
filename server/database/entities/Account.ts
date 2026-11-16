@@ -5,7 +5,6 @@ import {
     Index,
     JoinColumn,
     ManyToOne,
-    PrimaryColumn,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
     type Relation,
@@ -14,6 +13,7 @@ import {
 import { User } from "./User";
 
 @Entity({ name: "accounts", schema: "public" })
+@Index("idx_accounts_user", ["userId"])
 @Index(
     "uq_accounts_provider_account",
     ["providerId", "accountId"],

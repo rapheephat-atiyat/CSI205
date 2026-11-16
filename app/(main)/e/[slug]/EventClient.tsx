@@ -80,7 +80,8 @@ export default function EventClient({ event, description }: { event: EventDetail
                             </p>
                             {event.venue &&
                                 <a className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-sm text-sm text-brand underline-offset-4 hover:underline" href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.venue)}`} target="_blank" >
-                                    แผนที่<ArrowUpRight aria-hidden="true" className="size-4" />
+                                    แผนที่
+                                    <ArrowUpRight aria-hidden="true" className="size-4" />
                                 </a>
                             }
                         </div>
@@ -137,7 +138,7 @@ export default function EventClient({ event, description }: { event: EventDetail
                                 </dl>
                             </div>
                             <Button asChild variant="brand" className="min-h-12 w-full justify-between px-4 text-sm">
-                                <Link href={{ pathname: "/checkout", query: { event: event.slug } }}>
+                                <Link href={`/e/${encodeURIComponent(event.slug)}/book`}>
                                     เลือกบัตร
                                     <ArrowRight className="size-4" />
                                 </Link>

@@ -1,4 +1,4 @@
-import { CheckoutPanel } from "@/components/checkout/checkout-ui";
+import { BookCard } from "@/components/book/BookUI";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -43,23 +43,25 @@ async function TicketsContent({ searchParams }: Props) {
                 <p className="text-sm text-muted-foreground">แสดง QR ของบัตรแต่ละใบที่จุดเช็กอินหลังยืนยันการชำระเงินแล้ว</p>
                 {order && <Button asChild variant="outline"><Link href="/account/tickets">ดูบัตรทั้งหมด</Link></Button>}
             </header>
-            {!cards.length && <CheckoutPanel title="ยังไม่พบบัตร">
+            {!cards.length && <BookCard title="ยังไม่พบบัตร">
                 <p className="text-sm text-muted-foreground">ตรวจสอบรายการของคุณได้จากประวัติคำสั่งซื้อ</p>
                 <Button asChild variant="brand"><Link href="/account/orders">ดูประวัติคำสั่งซื้อ</Link></Button>
-            </CheckoutPanel>}
+            </BookCard>}
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {cards.map(({ ticket, qr }) => (
-                    <CheckoutPanel key={ticket.id} title={eventTitles.get(ticket.eventId) ?? "บัตรเข้างาน"}>
+                    <BookCard key={ticket.id} title={eventTitles.get(ticket.eventId) ?? "บัตรเข้างาน"}>
                         <Badge variant="secondary" className={ticket.status === "ACTIVE" ? "bg-brand-soft text-brand" : undefined}>{labels[ticket.status]}</Badge>
                         {qr && <Image src={qr} alt={`QR เข้างานสำหรับบัตร ${ticket.ticketCode}`} width={192} height={192} unoptimized className="mx-auto rounded-lg border bg-white" />}
                         <div className="space-y-1 text-sm">
                             <p className="font-medium wrap-anywhere">{[ticket.firstName, ticket.lastName].filter(Boolean).join(" ") || "ผู้เข้าร่วมงาน"}</p>
                             {ticket.ticketTypeName && <p className="text-muted-foreground wrap-anywhere">{ticket.ticketTypeName}</p>}
                             <p className="text-xs text-muted-foreground wrap-anywhere">{ticket.ticketCode}</p>
-                            {ticket.receiveSouvenir && <p className="text-muted-foreground">รับของที่ระลึก{ticket.souvenirSize ? ` · ขนาด ${ticket.souvenirSize}` : ""}</p>}
+                            {ticket.souvenirItems.map(({ souvenirId, name, size }) => (
+                                <p key={souvenirId} className="text-muted-foreground">รับ {name}{size ? ` · ขนาด ${size}` : ""}</p>
+                            ))}
                         </div>
                         {qr && <Button asChild variant="outline" className="h-10 w-full"><a href={qr} download={`${ticket.ticketCode}.png`}>บันทึก QR</a></Button>}
-                    </CheckoutPanel>
+                    </BookCard>
                 ))}
             </div>
         </div>

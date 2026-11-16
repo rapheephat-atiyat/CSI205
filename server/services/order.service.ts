@@ -6,110 +6,47 @@ import { DELIVERY_METHODS, ORDER_STATUSES, TICKET_STATUSES } from "@/server/data
 import { ApiError } from "@/server/http/errors";
 import { In, IsNull, LessThanOrEqual, type EntityManager } from "typeorm";
 import { invalidOrder, priceSouvenirs, validateAttendee, validatePaymentSlip, validateShipping } from "@/server/services/order-validation";
-import { checkoutPaymentQr } from "@/server/services/checkout-payment";
+import { hasCheckoutPromptPay } from "@/server/services/checkout-payment";
+import { getEventSouvenirs } from "./event-souvenirs";
+import { toTicketItem } from "./ticket.service";
 
 const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const orderRelations = { shipping: true, tickets: { eventTicket: true } } as const;
 const paymentHoldMs = 30 * 60 * 1000;
 
-function toTicketItem(t: Ticket): TicketItem {
-    return {
-        id: t.id,
-        orderId: t.orderId,
-        eventId: t.eventId,
-        eventTicketId: t.eventTicketId,
-        ticketTypeName: t.eventTicket?.name,
-        userId: t.userId,
-        unitPrice: t.unitPrice,
-        ticketCode: t.ticketCode,
-        qrToken: t.status === TICKET_STATUSES.ACTIVE || t.status === TICKET_STATUSES.USED ? t.qrToken : "",
-        status: t.status,
-        firstName: t.firstName,
-        lastName: t.lastName,
-        phone: t.phone,
-        email: t.email,
-        graduationYear: t.graduationYear,
-        checkedInAt: t.checkedInAt ? t.checkedInAt.toISOString() : null,
-        checkedInById: t.checkedInById,
-        receiveSouvenir: t.receiveSouvenir,
-        souvenirSize: t.souvenirSize,
-        souvenirClaimedAt: t.souvenirClaimedAt ? t.souvenirClaimedAt.toISOString() : null,
-        createdAt: t.createdAt.toISOString(),
-        updatedAt: t.updatedAt.toISOString(),
-    };
-}
-
-function toOrderDetail(o: Order): OrderDetail {
-    return {
-        id: o.id,
-        orderNo: o.orderNo,
-        userId: o.userId,
-        eventId: o.eventId,
-        total: o.total,
-        status: o.status,
-        paymentSlip: o.paymentSlip?.startsWith("data:") ? null : o.paymentSlip,
-        hasPaymentSlip: Boolean(o.paymentSlip),
-        paymentDueAt: o.status === ORDER_STATUSES.PENDING && !o.paymentSlip
-            ? new Date(o.createdAt.getTime() + paymentHoldMs).toISOString()
-            : undefined,
-        paidAt: o.paidAt ? o.paidAt.toISOString() : null,
-        deliveryMethod: o.deliveryMethod,
-        shippingFee: o.shippingFee,
-        souvenirItems: o.souvenirItems ?? [],
-        shipping: o.shipping
-            ? {
-                id: o.shipping.id,
-                orderId: o.shipping.orderId,
-                recipientName: o.shipping.recipientName,
-                recipientPhone: o.shipping.recipientPhone,
-                addressLine: o.shipping.addressLine,
-                subDistrict: o.shipping.subDistrict,
-                district: o.shipping.district,
-                province: o.shipping.province,
-                postalCode: o.shipping.postalCode,
-                note: o.shipping.note,
-                status: o.shipping.status,
-                carrier: o.shipping.carrier,
-                trackingNumber: o.shipping.trackingNumber,
-                shippedAt: o.shipping.shippedAt ? o.shipping.shippedAt.toISOString() : null,
-                createdAt: o.shipping.createdAt.toISOString(),
-                updatedAt: o.shipping.updatedAt.toISOString(),
-            }
-            : null,
-        tickets: (o.tickets ?? []).map(toTicketItem),
-        createdAt: o.createdAt.toISOString(),
-        updatedAt: o.updatedAt.toISOString(),
-    };
-}
-
-export async function createOrder(userId: string, input: CreateOrderInput): Promise<OrderDetail> {
+function readOrderRequest(input: CreateOrderInput) {
     if (!input || typeof input.eventId !== "string" || !uuidPattern.test(input.eventId)) invalidOrder("ข้อมูลงานไม่ถูกต้อง");
     if (!Object.values(DELIVERY_METHODS).includes(input.deliveryMethod)) invalidOrder("วิธีรับของที่ระลึกไม่ถูกต้อง");
 
-    const requestId = "items" in input ? input.requestId : undefined;
-    if ("items" in input && (typeof requestId !== "string" || !uuidPattern.test(requestId))) invalidOrder("รหัสคำสั่งซื้อไม่ถูกต้อง");
-    const selections = "items" in input ? input.items : [{ ...input, attendees: input.attendees ?? [] }];
-    if (!Array.isArray(selections) || selections.length === 0 || selections.length > 100) invalidOrder("กรุณาเลือกบัตร");
-    for (const selection of selections) {
-        if (!selection || typeof selection.eventTicketId !== "string" || !uuidPattern.test(selection.eventTicketId)
-            || !Number.isSafeInteger(selection.quantity) || selection.quantity < 1
-            || !Array.isArray(selection.attendees) || selection.attendees.length > selection.quantity
-            || ("items" in input && selection.attendees.length !== selection.quantity)) {
+    const { requestId, items: ticketChoices } = input;
+    if (typeof requestId !== "string" || !uuidPattern.test(requestId)) invalidOrder("รหัสคำสั่งซื้อไม่ถูกต้อง");
+
+    if (!Array.isArray(ticketChoices) || ticketChoices.length === 0 || ticketChoices.length > 100) invalidOrder("กรุณาเลือกบัตร");
+    for (const choice of ticketChoices) {
+        if (!choice || typeof choice.eventTicketId !== "string" || !uuidPattern.test(choice.eventTicketId)) {
+            invalidOrder("ประเภทบัตรไม่ถูกต้อง");
+        }
+        if (!Number.isSafeInteger(choice.quantity) || choice.quantity < 1) invalidOrder("จำนวนบัตรไม่ถูกต้อง");
+        if (!Array.isArray(choice.attendees) || choice.attendees.length !== choice.quantity) {
             invalidOrder("จำนวนบัตรหรือข้อมูลผู้เข้าร่วมไม่ถูกต้อง");
         }
     }
-    const typeIds = selections.map((selection) => selection.eventTicketId);
-    if (new Set(typeIds).size !== typeIds.length) invalidOrder("พบประเภทบัตรซ้ำในคำสั่งซื้อ");
-    const slip = input.paymentSlip == null ? null : validatePaymentSlip(input.paymentSlip);
+
+    const ticketTypeIds = ticketChoices.map((choice) => choice.eventTicketId);
+    if (new Set(ticketTypeIds).size !== ticketTypeIds.length) invalidOrder("พบประเภทบัตรซ้ำในคำสั่งซื้อ");
+    return { requestId, ticketChoices, ticketTypeIds };
+}
+
+export async function createOrder(userId: string, input: CreateOrderInput): Promise<OrderDetail> {
+    const { requestId, ticketChoices, ticketTypeIds } = readOrderRequest(input);
     const db = await getDatabase();
     await releaseExpiredOrderHolds({ eventId: input.eventId });
 
-    const order = await db.transaction(async (manager) => {
-        if (requestId) {
-            await manager.findOne(User, { where: { id: userId }, lock: { mode: "pessimistic_write" } });
-            const existing = await manager.findOneBy(Order, { id: requestId, userId });
-            if (existing) return existing;
-        }
+    const orderId = await db.transaction(async (manager) => {
+        // ถ้ากดส่งซ้ำด้วยรหัสเดิม ให้เปิดออเดอร์ที่สร้างไว้แล้ว
+        await manager.findOne(User, { where: { id: userId }, lock: { mode: "pessimistic_write" } });
+        const existingOrder = await manager.findOneBy(Order, { id: requestId, userId });
+        if (existingOrder) return existingOrder.id;
 
         const event = await manager.findOneBy(Events, { id: input.eventId });
         if (!event) throw new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
@@ -117,78 +54,109 @@ export async function createOrder(userId: string, input: CreateOrderInput): Prom
         if (now < event.buyAt.getTime() || now >= event.buyEndAt.getTime()) {
             throw new ApiError("SALES_CLOSED", "ขณะนี้อยู่นอกช่วงจำหน่ายบัตร", 409);
         }
-        const totalQuantity = selections.reduce((sum, item) => sum + item.quantity, 0);
-        if (totalQuantity < event.minTicketQTY || totalQuantity > event.maxTicketQTY) {
+        const totalTickets = ticketChoices.reduce((total, choice) => total + choice.quantity, 0);
+        if (totalTickets < event.minTicketQTY || totalTickets > event.maxTicketQTY) {
             invalidOrder(`กรุณาเลือกบัตรระหว่าง ${event.minTicketQTY} ถึง ${event.maxTicketQTY} ใบ`);
         }
 
-        const types = await manager.find(EventTicket, {
-            where: { id: In(typeIds), eventId: event.id, isActive: true },
+        // ล็อกประเภทบัตรไว้ระหว่างเช็กโควตา
+        const ticketTypes = await manager.find(EventTicket, {
+            where: { id: In(ticketTypeIds), eventId: event.id, isActive: true },
             order: { id: "ASC" },
             lock: { mode: "pessimistic_write" },
         });
-        const byId = new Map(types.map((type) => [type.id, type]));
-        const lines = selections.map((selection) => {
-            const type = byId.get(selection.eventTicketId);
-            if (!type) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบประเภทบัตรที่เปิดจำหน่าย", 404);
-            const { quantity } = selection;
-            if (quantity < type.minTicketQTY || quantity > type.maxTicketQTY) {
-                invalidOrder(`กรุณาเลือก ${type.name} ระหว่าง ${type.minTicketQTY} ถึง ${type.maxTicketQTY} ใบ`);
+        const eventSouvenirs = await getEventSouvenirs(manager, event.id);
+        const bookedTicketTypes = ticketChoices.map((choice) => {
+            const ticketType = ticketTypes.find((type) => type.id === choice.eventTicketId);
+            if (!ticketType) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบประเภทบัตรที่เปิดจำหน่าย", 404);
+
+            if (choice.quantity < ticketType.minTicketQTY || choice.quantity > ticketType.maxTicketQTY) {
+                invalidOrder(`กรุณาเลือก ${ticketType.name} ระหว่าง ${ticketType.minTicketQTY} ถึง ${ticketType.maxTicketQTY} ใบ`);
             }
-            if (type.sold + quantity > type.quota) {
-                throw new ApiError("QUOTA_EXCEEDED", `${type.name} คงเหลือไม่เพียงพอ`, 409);
+            if (choice.quantity > ticketType.quota - ticketType.sold) {
+                throw new ApiError("QUOTA_EXCEEDED", `${ticketType.name} คงเหลือไม่เพียงพอ`, 409);
             }
-            const attendees = Array.from({ length: quantity }, (_, i) => validateAttendee(selection.attendees[i] ?? {}, type, event));
-            return { type, attendees };
+
+            const attendees = [];
+            for (let index = 0; index < choice.quantity; index++) {
+                const attendee = validateAttendee(choice.attendees[index], ticketType, eventSouvenirs);
+                attendees.push(attendee);
+            }
+            return { ticketType, attendees };
         });
 
-        const souvenirItems = priceSouvenirs(input.souvenirItems, event);
-        const hasSouvenir = souvenirItems.length > 0 || lines.some((line) => line.attendees.some((attendee) => attendee.receiveSouvenir));
-        if (input.deliveryMethod === DELIVERY_METHODS.SHIPPING && (!event.allowShipping || !hasSouvenir)) {
+        const souvenirItems = priceSouvenirs(input.souvenirItems, eventSouvenirs);
+        const orderHasSouvenirs = souvenirItems.length > 0
+            || bookedTicketTypes.some(({ attendees }) => attendees.some((attendee) => attendee.souvenirItems.length > 0));
+        const wantsShipping = input.deliveryMethod === DELIVERY_METHODS.SHIPPING;
+        if (wantsShipping && (!event.allowShipping || !orderHasSouvenirs)) {
             invalidOrder("คำสั่งซื้อนี้ไม่สามารถจัดส่งของที่ระลึกได้");
         }
-        const shipping = input.deliveryMethod === DELIVERY_METHODS.SHIPPING ? validateShipping(input.shipping) : null;
-        const deliveryMethod = shipping ? DELIVERY_METHODS.SHIPPING : hasSouvenir ? DELIVERY_METHODS.PICKUP : DELIVERY_METHODS.NONE;
-        const shippingFee = shipping ? Number(event.shippingFee) : 0;
-        const ticketTotal = lines.reduce((sum, { type, attendees }) => sum + Math.round(Number(type.price) * 100) * attendees.length, 0);
-        const souvenirTotal = souvenirItems.reduce((sum, item) => sum + Math.round(Number(item.unitPrice) * 100) * item.quantity, 0);
-        const totalMinor = ticketTotal + souvenirTotal + Math.round(shippingFee * 100);
-        if (!Number.isSafeInteger(totalMinor) || totalMinor < 0 || totalMinor > 9_999_999_999) invalidOrder("ยอดคำสั่งซื้อไม่ถูกต้อง");
-        const free = totalMinor === 0;
-        if (requestId && !free && !checkoutPaymentQr()) throw new ApiError("PAYMENT_UNAVAILABLE", "ผู้จัดงานยังไม่ได้ตั้งค่า QR ชำระเงิน", 409);
-        const savedOrder = manager.create(Order, {
-            id: requestId ?? crypto.randomUUID(),
+        const shippingAddress = wantsShipping ? validateShipping(input.shipping) : null;
+        let deliveryMethod: Order["deliveryMethod"] = DELIVERY_METHODS.NONE;
+        if (shippingAddress) {
+            deliveryMethod = DELIVERY_METHODS.SHIPPING;
+        } else if (orderHasSouvenirs) {
+            deliveryMethod = DELIVERY_METHODS.PICKUP;
+        }
+
+        const shippingFee = shippingAddress ? Number(event.shippingFee) : 0;
+        let totalSatang = Math.round(shippingFee * 100);
+        for (const { ticketType, attendees } of bookedTicketTypes) {
+            totalSatang += Math.round(Number(ticketType.price) * 100) * attendees.length;
+        }
+        for (const item of souvenirItems) {
+            totalSatang += Math.round(Number(item.unitPrice) * 100) * item.quantity;
+        }
+        if (!Number.isSafeInteger(totalSatang) || totalSatang < 0 || totalSatang > 9_999_999_999) {
+            invalidOrder("ยอดคำสั่งซื้อไม่ถูกต้อง");
+        }
+        const isFree = totalSatang === 0;
+        if (!isFree && !hasCheckoutPromptPay()) {
+            throw new ApiError("PAYMENT_UNAVAILABLE", "ผู้จัดงานยังไม่ได้ตั้งค่า QR ชำระเงิน", 409);
+        }
+
+        const order = manager.create(Order, {
+            id: requestId,
             orderNo: `ORD-${crypto.randomUUID().toUpperCase()}`,
             userId,
             eventId: event.id,
-            total: (totalMinor / 100).toFixed(2),
-            status: free ? ORDER_STATUSES.PAID : ORDER_STATUSES.PENDING,
-            paymentSlip: free ? null : slip,
-            paidAt: free ? new Date() : null,
+            total: (totalSatang / 100).toFixed(2),
+            status: isFree ? ORDER_STATUSES.PAID : ORDER_STATUSES.PENDING,
+            paymentSlip: null,
+            paidAt: isFree ? new Date() : null,
             deliveryMethod,
             shippingFee: shippingFee.toFixed(2),
             souvenirItems,
         });
-        await manager.insert(Order, savedOrder);
-        if (shipping) await manager.save(manager.create(OrderShipping, { ...shipping, orderId: savedOrder.id }));
+        await manager.insert(Order, order);
+        if (shippingAddress) {
+            await manager.insert(OrderShipping, { ...shippingAddress, orderId: order.id });
+        }
 
-        for (const { type, attendees } of lines) type.sold += attendees.length;
-        await manager.save(types);
-        await manager.save(lines.flatMap(({ type, attendees }) => attendees.map((attendee) => manager.create(Ticket, {
-            ...attendee,
-            orderId: savedOrder.id,
-            eventId: event.id,
-            eventTicketId: type.id,
-            userId,
-            unitPrice: type.price,
-            ticketCode: `TKT-${crypto.randomUUID().toUpperCase()}`,
-            qrToken: crypto.randomUUID(),
-            status: free ? TICKET_STATUSES.ACTIVE : TICKET_STATUSES.PENDING,
-        }))));
-        return savedOrder;
+        const tickets: Ticket[] = [];
+        for (const { ticketType, attendees } of bookedTicketTypes) {
+            ticketType.sold += attendees.length;
+            for (const attendee of attendees) {
+                tickets.push(manager.create(Ticket, {
+                    ...attendee,
+                    orderId: order.id,
+                    eventId: event.id,
+                    eventTicketId: ticketType.id,
+                    userId,
+                    unitPrice: ticketType.price,
+                    ticketCode: `TKT-${crypto.randomUUID().toUpperCase()}`,
+                    qrToken: crypto.randomUUID(),
+                    status: isFree ? TICKET_STATUSES.ACTIVE : TICKET_STATUSES.PENDING,
+                }));
+            }
+        }
+        await manager.save(ticketTypes);
+        await manager.save(tickets);
+        return order.id;
     });
 
-    return getMyOrder(userId, order.id);
+    return getMyOrder(userId, orderId);
 }
 
 export async function getMyOrder(userId: string, id: string): Promise<OrderDetail> {
@@ -278,22 +246,47 @@ export async function getMyTickets(userId: string): Promise<TicketItem[]> {
     return tickets.map(toTicketItem);
 }
 
-export async function scanTicket(staffUserId: string, qrToken: string): Promise<TicketItem> {
-    const db = await getDatabase();
-    const repo = db.getRepository(Ticket);
-    const ticket = await repo.findOneBy({ qrToken });
-
-    if (!ticket) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบบัตรในระบบ", 404);
-    if (ticket.status === TICKET_STATUSES.USED) {
-        throw new ApiError("TICKET_ALREADY_USED", "บัตรนี้ถูกสแกนเข้างานไปแล้ว", 409);
-    }
-    if (ticket.status !== TICKET_STATUSES.ACTIVE) {
-        throw new ApiError("TICKET_NOT_ACTIVE", "บัตรยังไม่ได้ชำระเงินหรือถูกยกเลิก", 400);
-    }
-
-    ticket.status = TICKET_STATUSES.USED;
-    ticket.checkedInAt = new Date();
-    ticket.checkedInById = staffUserId;
-
-    return toTicketItem(await repo.save(ticket));
+function toOrderDetail(order: Order): OrderDetail {
+    const shipping = order.shipping;
+    const waitingForPayment = order.status === ORDER_STATUSES.PENDING && !order.paymentSlip;
+    return {
+        id: order.id,
+        orderNo: order.orderNo,
+        userId: order.userId,
+        eventId: order.eventId,
+        total: order.total,
+        status: order.status,
+        paymentSlip: order.paymentSlip?.startsWith("data:") ? null : order.paymentSlip,
+        hasPaymentSlip: Boolean(order.paymentSlip),
+        paymentDueAt: waitingForPayment
+            ? new Date(order.createdAt.getTime() + paymentHoldMs).toISOString()
+            : undefined,
+        paidAt: order.paidAt ? order.paidAt.toISOString() : null,
+        deliveryMethod: order.deliveryMethod,
+        shippingFee: order.shippingFee,
+        souvenirItems: order.souvenirItems ?? [],
+        shipping: shipping
+            ? {
+                id: shipping.id,
+                orderId: shipping.orderId,
+                recipientName: shipping.recipientName,
+                recipientPhone: shipping.recipientPhone,
+                addressLine: shipping.addressLine,
+                subDistrict: shipping.subDistrict,
+                district: shipping.district,
+                province: shipping.province,
+                postalCode: shipping.postalCode,
+                note: shipping.note,
+                status: shipping.status,
+                carrier: shipping.carrier,
+                trackingNumber: shipping.trackingNumber,
+                shippedAt: shipping.shippedAt ? shipping.shippedAt.toISOString() : null,
+                createdAt: shipping.createdAt.toISOString(),
+                updatedAt: shipping.updatedAt.toISOString(),
+            }
+            : null,
+        tickets: (order.tickets ?? []).map(toTicketItem),
+        createdAt: order.createdAt.toISOString(),
+        updatedAt: order.updatedAt.toISOString(),
+    };
 }
