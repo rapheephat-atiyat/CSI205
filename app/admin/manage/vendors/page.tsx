@@ -115,44 +115,49 @@ export default function Page() {
             {/* show users */}
             {/* mobile */}
             <div className="mt-2 w-full flex flex-col items-start justify-start gap-1.5 md:hidden">
-              {vendors.map((vendor) => {
-                return (
-                  <div
-                    key={vendor.id}
-                    className="w-full flex flex-col items-start justify-center gap-2.5"
-                  >
-                    <div className="text-sm font-semibold">{vendor.name}</div>
-                    <div className="text-sm font-medium text-muted-foreground">
-                      {vendor.food}
-                    </div>
-                    <div className="w-full flex items-center justify-between">
+              {vendors
+                .filter((vendor) => {
+                  const modSearch = search.toLocaleLowerCase();
+                  return vendor.name.startsWith(modSearch.trim());
+                })
+                .map((vendor) => {
+                  return (
+                    <div
+                      key={vendor.id}
+                      className="w-full flex flex-col items-start justify-center gap-2.5"
+                    >
+                      <div className="text-sm font-semibold">{vendor.name}</div>
                       <div className="text-sm font-medium text-muted-foreground">
-                        ราคา / หน่วย
+                        {vendor.food}
                       </div>
-                      <div className="text-sm font-medium text-black">
-                        {vendor.price} Token
+                      <div className="w-full flex items-center justify-between">
+                        <div className="text-sm font-medium text-muted-foreground">
+                          ราคา / หน่วย
+                        </div>
+                        <div className="text-sm font-medium text-black">
+                          {vendor.price} Token
+                        </div>
                       </div>
+                      <div className="w-full flex items-center justify-around">
+                        <Badge
+                          variant={"outline"}
+                          className="p-3 rounded-[10px] text-[16px] font-medium flex items-center justify-center gap-2 [&>svg]:size-3.5!"
+                        >
+                          <UserRoundPlus />
+                          เพิ่มแอดมินประจำร้าน
+                        </Badge>
+                        <Badge
+                          variant={"outline"}
+                          className="p-3 rounded-[10px] text-[16px] text-brand border border-brand font-medium flex items-center justify-center gap-2"
+                        >
+                          <Trash2 />
+                          ลบ
+                        </Badge>
+                      </div>
+                      <div className="w-full border bg-muted-foreground"></div>
                     </div>
-                    <div className="w-full flex items-center justify-around">
-                      <Badge
-                        variant={"outline"}
-                        className="p-3 rounded-[10px] text-[16px] font-medium flex items-center justify-center gap-2 [&>svg]:size-3.5!"
-                      >
-                        <UserRoundPlus />
-                        เพิ่มแอดมินประจำร้าน
-                      </Badge>
-                      <Badge
-                        variant={"outline"}
-                        className="p-3 rounded-[10px] text-[16px] text-brand border border-brand font-medium flex items-center justify-center gap-2"
-                      >
-                        <Trash2 />
-                        ลบ
-                      </Badge>
-                    </div>
-                    <div className="w-full border bg-muted-foreground"></div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
             {/* desktop */}
             <div className="hidden mt-2 w-full flex-col items-start justify-start gap-1.5 md:flex">
@@ -168,7 +173,8 @@ export default function Page() {
                 <TableBody>
                   {vendors
                     .filter((vendor) => {
-                      return vendor.name.startsWith(search);
+                      const modSearch = search.toLocaleLowerCase();
+                      return vendor.name.startsWith(modSearch.trim());
                     })
                     .map((vendor) => {
                       return (
