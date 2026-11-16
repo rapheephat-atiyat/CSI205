@@ -1,5 +1,8 @@
 "use client";
 
+// import icons
+import { ClipboardCheck, Pencil, Plus } from "lucide-react";
+
 // import ui
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,7 +13,20 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { ClipboardCheck, Pencil, Plus } from "lucide-react";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 
 // data
 // ticket
@@ -21,7 +37,7 @@ type Ticket = {
   tokenPerTicket: number;
 };
 
-const tickets: Ticket[] = [
+const initialTickets: Ticket[] = [
   {
     id: "ticket-1",
     name: "ศิษย์เก่าสัมพันธ์",
@@ -72,6 +88,46 @@ const shirts: Shirt[] = [
 ];
 
 export default function Page() {
+  // open dialog
+  const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
+
+  // initial Ticket
+  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
+
+  // form dialog
+  const [draftName, setDraftName] = useState("");
+  const [draftPrice, setDraftPrice] = useState("");
+  const [draftToken, setDraftToken] = useState("");
+
+  function openEditTicket(ticket: Ticket) {
+    setEditingTicket(ticket);
+    setDraftName(ticket.name);
+    setDraftPrice(String(ticket.price));
+    setDraftToken(String(ticket.tokenPerTicket));
+  }
+
+  function handleSaveTicket(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    const price = Number(draftPrice);
+    const token = Number(draftToken);
+
+    setTickets((pre) => {
+      return pre.map((ticket) => {
+        if (ticket.id === editingTicket?.id) {
+          return {
+            ...ticket,
+            name: draftName.trim(),
+            price,
+            tokenPerTicket: token,
+          };
+        }
+        return ticket;
+      });
+    });
+    setEditingTicket(null);
+  }
+
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
       {/* Breadcrumbs */}
@@ -122,7 +178,7 @@ export default function Page() {
             <div className="w-full flex items-center justify-end">
               <Badge
                 variant={"outline"}
-                className="text-[14px] p-4 flex items-center justify-center rounded-[10px] border border-brand hover:border-brand-hover hover:text-brand [&>svg]:size-4! hover:cursor-pointer"
+                className="text-[14px] p-4 flex items-center justify-center rounded-[10px] border border-brand hover:bg-brand-hover hover:text-on-brand hover:font-bold [&>svg]:size-4! transition hover:cursor-pointer"
               >
                 <Plus />
                 เพิ่มบัตร
@@ -155,6 +211,7 @@ export default function Page() {
                       </div>
                     </div>
                     <Badge
+                      onClick={() => openEditTicket(ticket)}
                       variant={"outline"}
                       className="w-full text-[14px] p-4 flex items-center justify-center rounded-[10px] hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
                     >
@@ -168,6 +225,73 @@ export default function Page() {
             </div>
           </Badge>
         </div>
+
+        {/* dialog edit ticket */}
+        <Dialog
+          open={editingTicket !== null}
+          onOpenChange={(next) => {
+            if (!next) return setEditingTicket(null);
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>แก้ไขบัตร</DialogTitle>
+              <DialogDescription>
+                แก้ไขข้อมูลของบัตร "{editingTicket?.name}"
+              </DialogDescription>
+            </DialogHeader>
+
+            <form className="w-full" onSubmit={handleSaveTicket}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="ticket-name">ชื่อบัตร *</FieldLabel>
+                  <Input
+                    id="ticket-name"
+                    type="text"
+                    required
+                    value={draftName}
+                    onChange={(e) => setDraftName(e.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="ticket-price">
+                    ราคาบัตร (บาท) *
+                  </FieldLabel>
+                  <Input
+                    id="ticket-price"
+                    type="number"
+                    min="0"
+                    required
+                    value={draftPrice}
+                    onChange={(e) => setDraftPrice(e.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="ticket-token">
+                    Token ที่ได้รับ (ต่อใบ) *
+                  </FieldLabel>
+                  <Input
+                    id="ticket-token"
+                    type="number"
+                    min="0"
+                    required
+                    value={draftToken}
+                    onChange={(e) => setDraftToken(e.target.value)}
+                  />
+                </Field>
+              </FieldGroup>
+
+              <DialogFooter className="mt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    ยกเลิก
+                  </Button>
+                </DialogClose>
+                <Button type="submit">บันทึก</Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* shirt */}
         <div className="w-full flex flex-col">
