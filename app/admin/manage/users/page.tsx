@@ -112,8 +112,10 @@ export default function Page() {
   const [search, setSearch] = useState<string>("");
 
   const filtered = attendees.filter((p) => {
+    const searchLower = search.toLowerCase();
     return (
-      p.name.startsWith(search) &&
+      (p.name.startsWith(searchLower.trim()) ||
+        p.email.toLowerCase().startsWith(searchLower.trim())) &&
       (enrollYear === "" || p.enrollYear === Number(enrollYear)) &&
       (checkInStatus === "" || p.checkInStatus === checkInStatus)
     );
@@ -126,9 +128,9 @@ export default function Page() {
     currentPage * itemsPerPage,
   );
 
-  useEffect(() => {
-    console.log(search);
-  }, [search]);
+  // useEffect(() => {
+  //   console.log(search);
+  // }, [search]);
 
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -287,8 +289,12 @@ export default function Page() {
             {/* show users */}
             {/* mobile */}
             <div className="mt-2 w-full flex flex-col items-start justify-start gap-1.5 lg:hidden">
-              {paged.map((p) => {
-                return (
+              {paged.length === 0 ? (
+                <div className="w-full flex flex-col items-center justify-center text-lg font-semibold">
+                  ไม่พบผู้ใช้
+                </div>
+              ) : (
+                paged.map((p) => (
                   <div
                     key={p.id}
                     className="w-full flex flex-col items-start justify-center gap-1"
@@ -322,8 +328,8 @@ export default function Page() {
                     </Badge>
                     <div className="my-1 w-full border "></div>
                   </div>
-                );
-              })}
+                ))
+              )}
 
               {/* Pagination */}
               {totalPages > 1 && (
@@ -381,8 +387,17 @@ export default function Page() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paged.map((p) => {
-                    return (
+                  {paged.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={3}
+                        className="text-center text-xl text-muted-foreground"
+                      >
+                        ไม่พบผู้ใช้
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paged.map((p) => (
                       <TableRow key={p.id}>
                         <TableCell className="text-lg font-medium">
                           {p.name}
@@ -418,8 +433,8 @@ export default function Page() {
                           </Badge>
                         </TableCell>
                       </TableRow>
-                    );
-                  })}
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>
