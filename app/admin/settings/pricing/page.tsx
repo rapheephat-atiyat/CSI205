@@ -99,13 +99,40 @@ const shirts: Shirt[] = [
 ];
 
 export default function Page() {
-  // open dialog
+  // dialog add ticket
+  const [addOpen, setAddOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newPrice, setNewPrice] = useState("");
+  const [newToken, setNewToken] = useState("");
+
+  function openAddTicket() {
+    setNewName("");
+    setNewPrice("");
+    setNewToken("");
+    setAddOpen(true);
+  }
+
+  function handleAddTicket(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+
+    const newTicket: Ticket = {
+      id: crypto.randomUUID(),
+      name: newName.trim(),
+      price: Number(newPrice),
+      tokenPerTicket: Number(newToken),
+    };
+
+    setTickets(() => [...tickets, newTicket]);
+    setAddOpen(false);
+  }
+
+  // dialog edit
   const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
 
   // initial Ticket
   const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
 
-  // form dialog
+  // form dialog edit ticket
   const [draftName, setDraftName] = useState("");
   const [draftPrice, setDraftPrice] = useState("");
   const [draftToken, setDraftToken] = useState("");
@@ -251,6 +278,7 @@ export default function Page() {
                   ระดับราคาบัตรเข้างาน
                 </div>
                 <Badge
+                  onClick={openAddTicket}
                   variant={"outline"}
                   className="w-fit text-[14px] p-4 flex items-center justify-center border border-brand rounded-[10px] text-brand hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
                 >
@@ -370,7 +398,71 @@ export default function Page() {
                     ยกเลิก
                   </Button>
                 </DialogClose>
-                <Button type="submit">บันทึก</Button>
+                <Button type="submit" className="bg-brand hover:bg-brand-hover">
+                  บันทึก
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* dialog add ticket */}
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>เพิ่มบัตร</DialogTitle>
+              <DialogDescription>กรอกข้อมูลบัตรใบใหม่</DialogDescription>
+            </DialogHeader>
+
+            <form className="w-full" onSubmit={handleAddTicket}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="new-ticket-name">ชื่อบัตร *</FieldLabel>
+                  <Input
+                    id="new-ticket-name"
+                    type="text"
+                    required
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="new-ticket-price">
+                    ราคาบัตร (บาท) *
+                  </FieldLabel>
+                  <Input
+                    id="new-ticket-price"
+                    type="number"
+                    min="0"
+                    required
+                    value={newPrice}
+                    onChange={(e) => setNewPrice(e.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="new-ticket-token">
+                    Token ที่ได้รับ (ต่อใบ) *
+                  </FieldLabel>
+                  <Input
+                    id="new-ticket-token"
+                    type="number"
+                    min="0"
+                    required
+                    value={newToken}
+                    onChange={(e) => setNewToken(e.target.value)}
+                  />
+                </Field>
+              </FieldGroup>
+
+              <DialogFooter className="mt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    ยกเลิก
+                  </Button>
+                </DialogClose>
+                <Button type="submit" className="bg-brand hover:bg-brand-hover">
+                  เพิ่มบัตร
+                </Button>
               </DialogFooter>
             </form>
           </DialogContent>
