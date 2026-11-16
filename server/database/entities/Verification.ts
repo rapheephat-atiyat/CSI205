@@ -2,12 +2,13 @@ import {
     Column,
     CreateDateColumn,
     Entity,
-    PrimaryColumn,
+    Index,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from "typeorm";
 
 @Entity({ name: "verifications", schema: "public" })
+@Index("idx_verifications_identifier", ["identifier"])
 export class Verification {
 
     @PrimaryGeneratedColumn("uuid")

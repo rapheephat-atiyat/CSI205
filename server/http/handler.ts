@@ -1,5 +1,6 @@
 import { ApiError } from "@/server/http/errors";
 import { fail } from "@/server/http/response";
+import { unstable_rethrow } from "next/navigation";
 import "server-only";
 
 export function withHandler<Context>(handler: (req: Request, ctx: Context) => Promise<Response>) {
@@ -7,6 +8,7 @@ export function withHandler<Context>(handler: (req: Request, ctx: Context) => Pr
         try {
             return await handler(request, context);
         } catch (error) {
+            unstable_rethrow(error);
             if (error instanceof ApiError) {
                 return fail(error.code, error.message, error.status);
             }

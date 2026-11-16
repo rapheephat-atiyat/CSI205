@@ -25,7 +25,7 @@ interface MobileNavigationProps {
 
 const accountLinks = [
     { href: "/profile", label: "โปรไฟล์ของฉัน", icon: User },
-    { href: "/my-tickets", label: "บัตรของฉัน", icon: Ticket },
+    { href: "/account/tickets", label: "บัตรของฉัน", icon: Ticket },
 ] as const;
 
 export default function MobileNavigation({

@@ -1,8 +1,10 @@
 import { Wallet } from "@/server/database/entities/Wallet";
 import { TRANSACTION_STATUSES, TRANSACTION_TYPES, type TransactionStatus, type TransactionType } from "@/server/database/enums/domain.enum";
-import { Column, CreateDateColumn, Entity, JoinColumn, ManyToOne, PrimaryGeneratedColumn, type Relation } from "typeorm";
+import { Check, Column, CreateDateColumn, Entity, Index, JoinColumn, ManyToOne, PrimaryGeneratedColumn, type Relation } from "typeorm";
 
 @Entity({ name: "wallet_histories", schema: "public" })
+@Index("idx_wallet_history_date", ["walletId", "createdAt"])
+@Check("chk_wallet_history_amount", `"amount" > 0 AND "before" >= 0 AND "after" >= 0`)
 export class WalletHistory {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
@@ -12,7 +14,7 @@ export class WalletHistory {
 
     @ManyToOne(() => Wallet, (w) => w.walletHistories, { onDelete: "RESTRICT" })
     @JoinColumn({ name: "wallet_id", referencedColumnName: "id" })
-    wallet!: Relation<Wallet>
+    wallet!: Relation<Wallet>;
 
     @Column({
         type: "enum",

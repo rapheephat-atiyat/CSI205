@@ -1,9 +1,10 @@
 import "server-only";
-import type { ProductInput, StoreDetail, StoreInput, StoreSellInput } from "@/lib/api-types";
+import type { ProductInput, StoreDetail, StoreInput, StoreSaleResult, StoreSellInput } from "@/lib/api-types";
 import { getDatabase } from "@/server/database/database.souce";
-import { Product, Store, User, Wallet, WalletHistory } from "@/server/database/entities";
+import { Events, Product, Store, Wallet, WalletHistory, type User } from "@/server/database/entities";
 import { TRANSACTION_STATUSES, TRANSACTION_TYPES } from "@/server/database/enums/domain.enum";
 import { ApiError } from "@/server/http/errors";
+import { readMoney } from "./money";
 
 function toStoreDetail(s: Store): StoreDetail {
     return {
@@ -32,36 +33,38 @@ function toStoreDetail(s: Store): StoreDetail {
 }
 
 export async function createStore(input: StoreInput): Promise<StoreDetail> {
+    const name = typeof input.name === "string" ? input.name.trim() : "";
+    if (!name || name.length > 255 || typeof input.eventId !== "string" || !input.eventId) {
+        throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่องานและชื่อร้านค้า", 422);
+    }
     const db = await getDatabase();
-    const storeId = await db.transaction(async (manager) => {
+    return db.transaction(async (manager) => {
+        if (!await manager.existsBy(Events, { id: input.eventId })) {
+            throw new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการเปิดร้าน", 404);
+        }
         const store = manager.create(Store, {
             eventId: input.eventId,
-            name: input.name.trim(),
+            name,
             description: input.description ?? null,
             banner: input.banner ?? null,
             thumbnail: input.thumbnail ?? null,
         });
-        const saved = await manager.save(store);
-
-        const wallet = manager.create(Wallet, { storeId: saved.id, total: "0.00" });
-        await manager.save(wallet);
-        return saved.id;
+        const savedStore = await manager.save(store);
+        savedStore.wallet = await manager.save(Wallet, { storeId: savedStore.id, total: "0.00" });
+        return toStoreDetail(savedStore);
     });
-
-    const fullStore = await db.getRepository(Store).findOne({
-        where: { id: storeId },
-        relations: { product: true, wallet: true },
-    });
-    return toStoreDetail(fullStore!);
 }
 
-export async function getMyStore(user: User): Promise<StoreDetail> {
-    const storeRole = user.userRoles.find((r) => r.storeId !== null);
+export async function getMyStore(user: User, storeId?: string): Promise<StoreDetail> {
+    const storeRole = user.userRoles.find((role) => role.storeId && (!storeId || role.storeId === storeId));
     if (!storeRole?.storeId) throw new ApiError("STORE_NOT_FOUND", "คุณยังไม่ได้ผูกกับร้านค้าใด", 404);
+    return getStoreDetail(storeRole.storeId);
+}
 
+async function getStoreDetail(storeId: string): Promise<StoreDetail> {
     const db = await getDatabase();
     const store = await db.getRepository(Store).findOne({
-        where: { id: storeRole.storeId },
+        where: { id: storeId },
         relations: { product: true, wallet: true },
     });
     if (!store) throw new ApiError("STORE_NOT_FOUND", "ไม่พบข้อมูลร้านค้า", 404);
@@ -69,36 +72,38 @@ export async function getMyStore(user: User): Promise<StoreDetail> {
 }
 
 export async function upsertStoreProduct(storeId: string, input: ProductInput): Promise<StoreDetail> {
-    const db = await getDatabase();
-    const repo = db.getRepository(Product);
-    let product = await repo.findOneBy({ storeId });
-
-    if (!product) {
-        product = repo.create({
-            storeId,
-            title: input.title.trim(),
-            description: input.description,
-            price: Number(input.price).toFixed(2),
-            images: input.images ?? [],
-        });
-    } else {
-        product.title = input.title.trim();
-        product.description = input.description;
-        product.price = Number(input.price).toFixed(2);
-        if (input.images !== undefined) product.images = input.images;
+    const title = typeof input.title === "string" ? input.title.trim() : "";
+    if (!title || title.length > 255 || typeof input.description !== "string") {
+        throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่อและรายละเอียดสินค้า", 422);
     }
-    await repo.save(product);
+    const price = readMoney(input.price, true).toFixed(2);
 
-    const store = await db.getRepository(Store).findOne({
-        where: { id: storeId },
-        relations: { product: true, wallet: true },
+    const db = await getDatabase();
+    await db.transaction(async (manager) => {
+        const store = await manager.findOne(Store, {
+            where: { id: storeId },
+            lock: { mode: "pessimistic_write" },
+        });
+        if (!store) throw new ApiError("STORE_NOT_FOUND", "ไม่พบข้อมูลร้านค้า", 404);
+
+        const product = await manager.findOneBy(Product, { storeId });
+        await manager.save(Product, {
+            id: product?.id,
+            storeId,
+            title,
+            description: input.description,
+            price,
+            images: input.images ?? product?.images ?? [],
+        });
     });
-    return toStoreDetail(store!);
+    return getStoreDetail(storeId);
 }
 
-export async function sellToCustomer(storeId: string, input: StoreSellInput) {
-    const amount = Number(input.amount);
-    if (Number.isNaN(amount) || amount <= 0) throw new ApiError("VALIDATION_ERROR", "จำนวนเงินต้องมากกว่า 0", 422);
+export async function sellToCustomer(storeId: string, input: StoreSellInput): Promise<StoreSaleResult> {
+    const amount = readMoney(input.amount);
+    if (typeof input.customerUserId !== "string" || !input.customerUserId) {
+        throw new ApiError("VALIDATION_ERROR", "กรุณาระบุรหัสผู้ซื้อ", 422);
+    }
 
     const db = await getDatabase();
     return db.transaction(async (manager) => {
@@ -116,7 +121,11 @@ export async function sellToCustomer(storeId: string, input: StoreSellInput) {
             lock: { mode: "pessimistic_write" },
         });
         if (!storeWallet) {
-            storeWallet = await manager.save(manager.create(Wallet, { storeId, total: "0.00" }));
+            await manager.createQueryBuilder().insert().into(Wallet).values({ storeId }).orIgnore().execute();
+            storeWallet = await manager.findOneOrFail(Wallet, {
+                where: { storeId },
+                lock: { mode: "pessimistic_write" },
+            });
         }
 
         const storeBefore = Number(storeWallet.total);
@@ -125,8 +134,8 @@ export async function sellToCustomer(storeId: string, input: StoreSellInput) {
 
         await manager.save([customerWallet, storeWallet]);
 
-        const histories = [
-            manager.create(WalletHistory, {
+        await manager.insert(WalletHistory, [
+            {
                 walletId: customerWallet.id,
                 type: TRANSACTION_TYPES.PURCHASE,
                 status: TRANSACTION_STATUSES.COMPLETED,
@@ -135,8 +144,8 @@ export async function sellToCustomer(storeId: string, input: StoreSellInput) {
                 after: customerWallet.total,
                 ref: storeId,
                 note: input.note ?? "ซื้อสินค้าในงาน",
-            }),
-            manager.create(WalletHistory, {
+            },
+            {
                 walletId: storeWallet.id,
                 type: TRANSACTION_TYPES.PURCHASE,
                 status: TRANSACTION_STATUSES.COMPLETED,
@@ -145,9 +154,8 @@ export async function sellToCustomer(storeId: string, input: StoreSellInput) {
                 after: storeWallet.total,
                 ref: input.customerUserId,
                 note: input.note ?? "รับชำระค่าสินค้า",
-            }),
-        ];
-        await manager.save(histories);
+            },
+        ]);
 
         return { storeBalance: storeWallet.total, customerBalance: customerWallet.total };
     });
