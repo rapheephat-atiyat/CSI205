@@ -49,19 +49,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // data
-type TicketStatus = "pending" | "paid" | "rejected";
-type CheckInStatus = "not_checked_in" | "checked_in";
-
 type Attendee = {
   id: string;
   name: string;
   email: string;
   enrollYear: number;
-  ticketStatus: TicketStatus;
-  checkInStatus: CheckInStatus;
+  ticketStatus: "pending" | "paid" | "rejected";
+  checkInStatus: "not_checked_in" | "checked_in";
+  role: UserRoleName;
 };
+
+type UserRoleName = "ADMIN" | "VENDOR" | "STAFF" | "USER";
 
 export const attendees: Attendee[] = [
   {
@@ -71,6 +83,7 @@ export const attendees: Attendee[] = [
     enrollYear: 2548,
     ticketStatus: "pending",
     checkInStatus: "not_checked_in",
+    role: "USER",
   },
   {
     id: "att-002",
@@ -79,6 +92,7 @@ export const attendees: Attendee[] = [
     enrollYear: 2548,
     ticketStatus: "paid",
     checkInStatus: "checked_in",
+    role: "STAFF",
   },
   {
     id: "att-003",
@@ -87,6 +101,7 @@ export const attendees: Attendee[] = [
     enrollYear: 2548,
     ticketStatus: "paid",
     checkInStatus: "not_checked_in",
+    role: "USER",
   },
   {
     id: "att-004",
@@ -95,6 +110,7 @@ export const attendees: Attendee[] = [
     enrollYear: 2549,
     ticketStatus: "rejected",
     checkInStatus: "not_checked_in",
+    role: "VENDOR",
   },
   {
     id: "att-005",
@@ -103,6 +119,7 @@ export const attendees: Attendee[] = [
     enrollYear: 2547,
     ticketStatus: "pending",
     checkInStatus: "checked_in",
+    role: "ADMIN",
   },
 ];
 
@@ -128,9 +145,17 @@ export default function Page() {
     currentPage * itemsPerPage,
   );
 
-  // useEffect(() => {
-  //   console.log(search);
-  // }, [search]);
+  const [userRoles, setUserRoles] = useState<Attendee[]>(attendees);
+  function handleUpdateRole(id: string, role: UserRoleName) {
+    setUserRoles((pre) => {
+      return pre.map((user) => {
+        if (user.id === id) {
+          return { ...user, role };
+        }
+        return user;
+      });
+    });
+  }
 
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -320,12 +345,43 @@ export default function Page() {
                         ยังไม่เช็คอิน
                       </Badge>
                     )}
-                    <Badge
-                      variant={"outline"}
-                      className="p-3 w-full text-[16px] rounded-[10px]"
-                    >
-                      ดูข้อมูล
-                    </Badge>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Badge
+                          variant={"outline"}
+                          className="p-3 w-full text-[14px] rounded-[10px] border border-brand hover:bg-brand-hover hover:text-on-brand ease-in cursor-pointer"
+                        >
+                          จัดการสิทธิ์
+                        </Badge>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-32">
+                        <DropdownMenuGroup>
+                          <DropdownMenuLabel>Role</DropdownMenuLabel>
+                          <DropdownMenuRadioGroup
+                            value={
+                              userRoles.find((user) => user.id === p.id)
+                                ?.role ?? p.role
+                            }
+                            onValueChange={(value) =>
+                              handleUpdateRole(p.id, value as UserRoleName)
+                            }
+                          >
+                            <DropdownMenuRadioItem value="ADMIN">
+                              ADMIN
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="VENDOR">
+                              VENDOR
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="STAFF">
+                              STAFF
+                            </DropdownMenuRadioItem>
+                            <DropdownMenuRadioItem value="USER">
+                              USER
+                            </DropdownMenuRadioItem>
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuGroup>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <div className="my-1 w-full border "></div>
                   </div>
                 ))
@@ -425,12 +481,46 @@ export default function Page() {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge
-                            variant={"outline"}
-                            className="p-3 w-fit text-[14px] rounded-[10px]"
-                          >
-                            ดูข้อมูล
-                          </Badge>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Badge
+                                variant={"outline"}
+                                className="p-3 w-fit text-[14px] rounded-[10px] border border-brand hover:bg-brand-hover hover:text-on-brand ease-in cursor-pointer"
+                              >
+                                จัดการสิทธิ์
+                              </Badge>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-32">
+                              <DropdownMenuGroup>
+                                <DropdownMenuLabel>Role</DropdownMenuLabel>
+                                <DropdownMenuRadioGroup
+                                  value={
+                                    userRoles.find((user) => user.id === p.id)
+                                      ?.role ?? p.role
+                                  }
+                                  onValueChange={(value) =>
+                                    handleUpdateRole(
+                                      p.id,
+                                      value as UserRoleName,
+                                    )
+                                  }
+                                >
+                                  <DropdownMenuRadioItem value="ADMIN">
+                                    ADMIN
+                                  </DropdownMenuRadioItem>
+                                  <DropdownMenuRadioItem value="VENDOR">
+                                    VENDOR
+                                  </DropdownMenuRadioItem>
+                                  <DropdownMenuRadioItem value="STAFF">
+                                    STAFF
+                                  </DropdownMenuRadioItem>
+                                  <DropdownMenuRadioItem value="USER">
+                                    USER
+                                  </DropdownMenuRadioItem>
+                                </DropdownMenuRadioGroup>
+                              </DropdownMenuGroup>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))
