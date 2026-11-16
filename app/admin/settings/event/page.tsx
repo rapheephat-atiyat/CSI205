@@ -56,11 +56,20 @@ export default function Page() {
   useEffect(() => {
     async function load() {
       const res = await api.events.list();
-      if (res.success) setEvents(res.data);
-      else setError(res.error.message);
+      if (res.success) {
+        setEvents(res.data);
+        localStorage.setItem("events", JSON.stringify(res.data));
+      } else setError(res.error.message);
       setLoading(false);
     }
-    load();
+
+    const localEvents = localStorage.getItem("events");
+    if (!localEvents) {
+      load();
+    } else {
+      setEvents(JSON.parse(localEvents));
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -106,7 +115,7 @@ export default function Page() {
               </div>
               <Badge
                 asChild
-                className="p-3 bg-brand text-on-brand  text-sm flex items-center justify-center rounded-[10px] hover:cursor-pointer hover:bg-brand-hover [&>svg]:size-4!"
+                className="p-3 bg-brand text-on-brand  text-sm flex items-center justify-center rounded-[10px] hover:cursor-pointer hover:bg-brand-hover! hover:scale-110 hover:font-bold ease-in-out [&>svg]:size-4!"
               >
                 <Link href={"/admin/settings/event/create"}>
                   <Plus />

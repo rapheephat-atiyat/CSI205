@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { api } from "@/lib/api-client";
 import { EventDetail } from "@/lib/api-types";
