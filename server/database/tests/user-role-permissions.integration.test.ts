@@ -6,7 +6,7 @@ import { after, before, beforeEach, test } from "node:test";
 import { DataSource, QueryFailedError } from "typeorm";
 import { PERMISSIONS } from "@/lib/permissions";
 import { createDatabaseOptions } from "../database.options";
-import { User, UserRole, UserRolePermission } from "../entities";
+import { Events, Store, User, UserRole, UserRolePermission } from "../entities";
 import { Role } from "../enums/role.enum";
 
 // This runner never loads .env or DATABASE. Only this dedicated disposable local DB may be reset.
@@ -83,6 +83,31 @@ test("two STAFF users load their own permissions and keep roles grouped", async 
 test("the same user cannot receive the same role twice", async () => {
     await assert.rejects(source.getRepository(UserRole).insert({ userId: firstUser.id, role: Role.STAFF }), pgError("23505"));
     assert.equal(await source.getRepository(UserRole).countBy({ userId: firstUser.id }), 2);
+});
+
+test("a role can be used at different events and stores but cannot repeat within a scope", async () => {
+    const event = {
+        title: "Event", subTitle: "", thumbnail: "", banner: "", description: "", venue: "",
+        buyAt: new Date("2026-11-01T00:00:00Z"), buyEndAt: new Date("2026-11-02T00:00:00Z"),
+    };
+    const [firstEvent, secondEvent] = await source.manager.save(Events, [
+        { ...event, slug: randomUUID() },
+        { ...event, slug: randomUUID() },
+    ]);
+    const [firstStore, secondStore] = await source.manager.save(Store, [
+        { eventId: firstEvent.id, name: "First store" },
+        { eventId: firstEvent.id, name: "Second store" },
+    ]);
+    const roles = source.getRepository(UserRole);
+    const firstStaffScope = { userId: firstUser.id, role: Role.STAFF, eventId: firstEvent.id };
+    await roles.insert({ ...firstStaffScope });
+    await roles.insert({ ...firstStaffScope, eventId: secondEvent.id });
+    await assert.rejects(roles.insert(firstStaffScope), pgError("23505"));
+
+    const firstVendorScope = { userId: firstUser.id, role: Role.VENDOR, storeId: firstStore.id };
+    await roles.insert({ ...firstVendorScope, eventId: firstEvent.id });
+    await roles.insert({ ...firstVendorScope, storeId: secondStore.id });
+    await assert.rejects(roles.insert(firstVendorScope), pgError("23505"));
 });
 
 test("duplicate grants are rejected per assignment but the same code is allowed for another user", async () => {

@@ -1,6 +1,7 @@
-import { UserInput } from "@/lib/api-types";
+import type { UserInput } from "@/lib/api-types";
 import { requireUser } from "@/server/auth/current-user";
 import { withHandler } from "@/server/http/handler";
+import { readJson } from "@/server/http/request";
 import { success } from "@/server/http/response";
 import { getMe, updateMe } from "@/server/services/auth.service";
 
@@ -11,6 +12,6 @@ export const GET = withHandler(async (req) => {
 
 export const PATCH = withHandler(async (req) => {
     const user = await requireUser(req);
-    const input = (await req.json()) as UserInput;
+    const input = await readJson<UserInput>(req);
     return success(await updateMe(user.id, input));
 });

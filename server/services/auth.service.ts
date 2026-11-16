@@ -1,23 +1,23 @@
 import "server-only";
 
-import { User as Profile, UserInput } from "@/lib/api-types";
+import type { User as Profile, UserInput } from "@/lib/api-types";
 import { User } from "@/server/database/entities";
 import { getDatabase } from "@/server/database/database.souce";
 import { ApiError } from "@/server/http/errors";
 import { Not } from "typeorm";
 
-function normalizeNullableString(value: string | null | undefined): string | null | undefined {
-    if (value === undefined) return undefined;
-    if (value === null) return null;
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : null;
+function optionalText(value: unknown): string | null {
+    if (value == null) return null;
+    if (typeof value !== "string") throw new ApiError("VALIDATION_ERROR", "ข้อมูลโปรไฟล์ต้องเป็นข้อความ", 422);
+    return value.trim() || null;
 }
 
 export async function getMe(id: string): Promise<Profile> {
-    const repo = (await getDatabase()).getRepository(User);
+    const db = await getDatabase();
+    const repo = db.getRepository(User);
     const user = await repo.findOne({
         where: {
-            id: id,
+            id,
         },
         relations: {
             wallet: true,
@@ -37,12 +37,13 @@ export async function updateMe(id: string, input: UserInput): Promise<Profile> {
         throw new ApiError("VALIDATION_ERROR", "ไม่มีข้อมูลที่ต้องแก้ไข", 422);
     }
 
-    const repo = (await getDatabase()).getRepository(User);
+    const db = await getDatabase();
+    const repo = db.getRepository(User);
     const user = await repo.findOneBy({ id });
     if (!user) throw new ApiError("USER_NOT_FOUND", "ไม่พบข้อมูลผู้ใช้", 404);
 
     if (input.name !== undefined) {
-        const trimmedName = input.name.trim();
+        const trimmedName = optionalText(input.name);
         if (!trimmedName) {
             throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่อแสดงผล", 422);
         }
@@ -50,11 +51,9 @@ export async function updateMe(id: string, input: UserInput): Promise<Profile> {
     }
 
     if (input.username !== undefined) {
-        const username = normalizeNullableString(input.username) ?? null;
+        const username = optionalText(input.username);
         if (username) {
-            const exists = await repo.findOne({
-                where: { username, id: Not(id) },
-            });
+            const exists = await repo.existsBy({ username, id: Not(id) });
             if (exists) {
                 throw new ApiError("USERNAME_TAKEN", "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว", 409);
             }
@@ -63,7 +62,7 @@ export async function updateMe(id: string, input: UserInput): Promise<Profile> {
     }
 
     if (input.phone !== undefined) {
-        const rawPhone = normalizeNullableString(input.phone) ?? null;
+        const rawPhone = optionalText(input.phone);
         if (rawPhone === null) {
             user.phone = null;
         } else {
@@ -76,10 +75,11 @@ export async function updateMe(id: string, input: UserInput): Promise<Profile> {
     }
 
     if (input.graduationAt !== undefined) {
-        if (input.graduationAt === null || input.graduationAt.trim() === "") {
+        const graduationDate = optionalText(input.graduationAt);
+        if (!graduationDate) {
             user.graduationAt = null;
         } else {
-            const parsed = new Date(input.graduationAt);
+            const parsed = new Date(graduationDate);
             if (Number.isNaN(parsed.getTime())) {
                 throw new ApiError("VALIDATION_ERROR", "รูปแบบวันที่จบการศึกษาไม่ถูกต้อง", 422);
             }
@@ -88,11 +88,11 @@ export async function updateMe(id: string, input: UserInput): Promise<Profile> {
     }
 
     if (input.image !== undefined) {
-        user.image = normalizeNullableString(input.image) ?? null;
+        user.image = optionalText(input.image);
     }
 
     if (input.firstName !== undefined) {
-        const trimmedFirstName = input.firstName.trim();
+        const trimmedFirstName = optionalText(input.firstName);
         if (!trimmedFirstName) {
             throw new ApiError("VALIDATION_ERROR", "ชื่อไม่ควรว่าง", 422);
         }
@@ -100,7 +100,7 @@ export async function updateMe(id: string, input: UserInput): Promise<Profile> {
     }
 
     if (input.lastName !== undefined) {
-        const trimmedLastName = input.lastName.trim();
+        const trimmedLastName = optionalText(input.lastName);
         if (!trimmedLastName) {
             throw new ApiError("VALIDATION_ERROR", "นามสกุลไม่ควรว่าง", 422);
         }
@@ -108,14 +108,14 @@ export async function updateMe(id: string, input: UserInput): Promise<Profile> {
     }
 
     if (input.graduationInstitution !== undefined) {
-        user.graduationInstitution = normalizeNullableString(input.graduationInstitution) ?? null;
+        user.graduationInstitution = optionalText(input.graduationInstitution);
     }
 
     await repo.save(user);
     return getMe(id);
 }
 
-function toProfile(user: User): Profile {
+export function toProfile(user: User): Profile {
     return {
         id: user.id,
         name: user.name,
@@ -130,12 +130,12 @@ function toProfile(user: User): Profile {
         graduationInstitution: user.graduationInstitution,
         status: user.status,
         walletBalance: user.wallet?.total ?? "0.00",
-        roles: user.userRoles.map((r) => ({
-            id: r.id,
-            eventId: r.eventId,
-            storeId: r.storeId,
-            permissions: r.permissions.map((p) => p.permission),
-            role: r.role,
+        roles: user.userRoles.map((assignment) => ({
+            id: assignment.id,
+            eventId: assignment.eventId,
+            storeId: assignment.storeId,
+            permissions: assignment.permissions.map((grant) => grant.permission),
+            role: assignment.role,
         })),
         createdAt: user.createdAt.toISOString(),
         updatedAt: user.updatedAt.toISOString(),

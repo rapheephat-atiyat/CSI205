@@ -310,7 +310,7 @@ export default function Page() {
 
       {/* Footer */}
       <div className="flex justify-between items-center px-6 text-xs text-gray-400">
-        
+
       </div>
 
     </div>

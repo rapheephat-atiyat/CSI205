@@ -1,21 +1,23 @@
 import "server-only";
-import type { WalletDetail, WalletTransactionInput } from "@/lib/api-types";
+import type { WalletDetail, WalletHistoryItem, WalletTransactionInput } from "@/lib/api-types";
 import { getDatabase } from "@/server/database/database.souce";
-import { Wallet, WalletHistory } from "@/server/database/entities";
+import { User, Wallet, WalletHistory } from "@/server/database/entities";
 import { TRANSACTION_STATUSES, TRANSACTION_TYPES } from "@/server/database/enums/domain.enum";
 import { ApiError } from "@/server/http/errors";
+import type { EntityManager } from "typeorm";
+import { readMoney } from "./money";
 
 export async function getUserWallet(userId: string): Promise<WalletDetail> {
     const db = await getDatabase();
-    const repo = db.getRepository(Wallet);
-    let wallet = await repo.findOne({
+    const walletRepo = db.getRepository(Wallet);
+    let wallet = await walletRepo.findOne({
         where: { userId },
         relations: { walletHistories: true },
     });
 
     if (!wallet) {
-        wallet = await repo.save(repo.create({ userId, total: "0.00" }));
-        wallet.walletHistories = [];
+        await createMissingWallet(db.manager, userId);
+        wallet = await walletRepo.findOneOrFail({ where: { userId }, relations: { walletHistories: true } });
     }
 
     return {
@@ -24,19 +26,8 @@ export async function getUserWallet(userId: string): Promise<WalletDetail> {
         storeId: wallet.storeId,
         total: wallet.total,
         histories: (wallet.walletHistories ?? [])
-            .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-            .map((h) => ({
-                id: h.id,
-                walletId: h.walletId,
-                type: h.type,
-                status: h.status,
-                amount: h.amount,
-                before: h.before,
-                after: h.after,
-                ref: h.ref,
-                note: h.note,
-                createdAt: h.createdAt.toISOString(),
-            })),
+            .toSorted((first, second) => second.createdAt.getTime() - first.createdAt.getTime())
+            .map(toWalletHistoryItem),
         createdAt: wallet.createdAt.toISOString(),
         updatedAt: wallet.updatedAt.toISOString(),
     };
@@ -47,8 +38,10 @@ export async function adjustUserWallet(
     type: "TOPUP" | "REFUND",
     input: WalletTransactionInput
 ): Promise<WalletDetail> {
-    const amount = Number(input.amount);
-    if (Number.isNaN(amount) || amount <= 0) throw new ApiError("VALIDATION_ERROR", "จำนวนเงินต้องมากกว่า 0", 422);
+    const amount = readMoney(input.amount);
+    if (typeof input.userId !== "string" || !input.userId) {
+        throw new ApiError("VALIDATION_ERROR", "กรุณาระบุรหัสผู้ใช้", 422);
+    }
 
     const db = await getDatabase();
     await db.transaction(async (manager) => {
@@ -57,7 +50,11 @@ export async function adjustUserWallet(
             lock: { mode: "pessimistic_write" },
         });
         if (!wallet) {
-            wallet = await manager.save(manager.create(Wallet, { userId: input.userId, total: "0.00" }));
+            await createMissingWallet(manager, input.userId);
+            wallet = await manager.findOneOrFail(Wallet, {
+                where: { userId: input.userId },
+                lock: { mode: "pessimistic_write" },
+            });
         }
 
         const before = Number(wallet.total);
@@ -69,7 +66,7 @@ export async function adjustUserWallet(
         wallet.total = after.toFixed(2);
         await manager.save(wallet);
 
-        const history = manager.create(WalletHistory, {
+        await manager.insert(WalletHistory, {
             walletId: wallet.id,
             type: type === "TOPUP" ? TRANSACTION_TYPES.TOPUP : TRANSACTION_TYPES.REFUND,
             status: TRANSACTION_STATUSES.COMPLETED,
@@ -79,8 +76,28 @@ export async function adjustUserWallet(
             ref: staffId,
             note: input.note ?? (type === "TOPUP" ? "เติมเงินเข้ากระเป๋า" : "คืนเงิน"),
         });
-        await manager.save(history);
     });
 
     return getUserWallet(input.userId);
+}
+
+async function createMissingWallet(manager: EntityManager, userId: string) {
+    if (!await manager.existsBy(User, { id: userId })) throw new ApiError("USER_NOT_FOUND", "ไม่พบผู้ใช้", 404);
+    // ถ้ามีอีกคำขอสร้างกระเป๋าพร้อมกัน ให้ใช้ใบที่สร้างสำเร็จก่อน
+    await manager.createQueryBuilder().insert().into(Wallet).values({ userId }).orIgnore().execute();
+}
+
+export function toWalletHistoryItem(history: WalletHistory): WalletHistoryItem {
+    return {
+        id: history.id,
+        walletId: history.walletId,
+        type: history.type,
+        status: history.status,
+        amount: history.amount,
+        before: history.before,
+        after: history.after,
+        ref: history.ref,
+        note: history.note,
+        createdAt: history.createdAt.toISOString(),
+    };
 }
