@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 // import icons
 import { ClipboardCheck, Pencil, Plus, Trash2 } from "lucide-react";
@@ -15,6 +16,7 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+
 import {
   Dialog,
   DialogClose,
@@ -257,10 +259,12 @@ export default function Page() {
           </div>
         </div>
         <div className="w-full flex items-center justify-end">
-          <Badge className="bg-brand text-[14px] p-4 flex items-center justify-center rounded-[10px] hover:bg-brand-hover [&>svg]:size-4! hover:cursor-pointer">
-            <ClipboardCheck />
-            ตรวจการชำระเงิน (24)
-          </Badge>
+          <Link href={"/admin/settings/pricing/payments"}>
+            <Badge className="bg-brand text-[14px] p-4 flex items-center justify-center rounded-[10px] hover:bg-brand-hover [&>svg]:size-4! hover:cursor-pointer">
+              <ClipboardCheck />
+              ตรวจการชำระเงิน (24)
+            </Badge>
+          </Link>
         </div>
 
         {/* ticket mobile */}
