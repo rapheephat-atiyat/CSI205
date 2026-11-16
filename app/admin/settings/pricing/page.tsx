@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 // import icons
 import { ClipboardCheck, Pencil, Plus } from "lucide-react";
 
@@ -26,7 +28,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 // data
 // ticket
@@ -106,6 +117,7 @@ export default function Page() {
     setDraftToken(String(ticket.tokenPerTicket));
   }
 
+  // save edit ticket
   function handleSaveTicket(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
@@ -163,8 +175,8 @@ export default function Page() {
           </Badge>
         </div>
 
-        {/* ticket */}
-        <div className="w-full flex flex-col">
+        {/* ticket mobile */}
+        <div className="w-full flex flex-col md:hidden">
           <Badge
             variant={"outline"}
             className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
@@ -223,6 +235,77 @@ export default function Page() {
                 );
               })}
             </div>
+          </Badge>
+        </div>
+
+        {/* ticket desktop */}
+        <div className="hidden w-full md:flex flex-col">
+          <Badge
+            variant={"outline"}
+            className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
+          >
+            {/* หัวเรื่อง */}
+            <div className="w-full flex flex-col items-start justify-center gap-1">
+              <div className="w-full flex flex-row items-center justify-between">
+                <div className="text-lg font-semibold text-black">
+                  ระดับราคาบัตรเข้างาน
+                </div>
+                <Badge
+                  variant={"outline"}
+                  className="w-fit text-[14px] p-4 flex items-center justify-center border border-brand rounded-[10px] text-brand hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
+                >
+                  <Plus />
+                  เพิ่มบัตร
+                </Badge>
+              </div>
+            </div>
+            <Table>
+              <TableCaption>ระดับราคาบัตรเข้างาน</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ประเภทบัตร</TableHead>
+                  <TableHead>ราคาบัตร</TableHead>
+                  <TableHead>จำนวน Token</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tickets.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={4}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      ยังไม่มีบัตร
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  tickets.map((ticket) => {
+                    return (
+                      <TableRow key={ticket.id}>
+                        <TableCell>{ticket.name}</TableCell>
+                        <TableCell>
+                          {ticket.price.toLocaleString("th-TH")} บาท
+                        </TableCell>
+                        <TableCell>
+                          {ticket.tokenPerTicket} token / ใบ
+                        </TableCell>
+                        <TableCell className="flex items-center justify-end">
+                          <Badge
+                            onClick={() => openEditTicket(ticket)}
+                            variant={"outline"}
+                            className="w-fit text-[14px] p-4 flex items-center justify-center rounded-[10px] hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
+                          >
+                            <Pencil />
+                            แก้ไขบัตร
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
           </Badge>
         </div>
 
