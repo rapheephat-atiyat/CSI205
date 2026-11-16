@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 // import icons
-import { ClipboardCheck, Pencil, Plus } from "lucide-react";
+import { ClipboardCheck, Pencil, Plus, Trash2 } from "lucide-react";
 
 // import ui
 import { Badge } from "@/components/ui/badge";
@@ -48,6 +48,7 @@ type Ticket = {
   tokenPerTicket: number;
 };
 
+// initial tickets
 const initialTickets: Ticket[] = [
   {
     id: "ticket-1",
@@ -71,34 +72,24 @@ type Shirt = {
   price: number;
 };
 
-const shirts: Shirt[] = [
-  {
-    id: "shirt-s",
-    size: "S",
-    chest: 36,
-    price: 300,
-  },
-  {
-    id: "shirt-m",
-    size: "M",
-    chest: 38,
-    price: 300,
-  },
-  {
-    id: "shirt-l",
-    size: "L",
-    chest: 40,
-    price: 300,
-  },
-  {
-    id: "shirt-xl",
-    size: "XL",
-    chest: 42,
-    price: 300,
-  },
+// draft shirt
+type ShirtDraft = {
+  id: string;
+  size: string;
+  chest: string;
+  price: string;
+};
+
+// initial shirts
+const initialShirts: Shirt[] = [
+  { id: "shirt-s", size: "S", chest: 36, price: 300 },
+  { id: "shirt-m", size: "M", chest: 38, price: 300 },
+  { id: "shirt-l", size: "L", chest: 40, price: 300 },
+  { id: "shirt-xl", size: "XL", chest: 42, price: 300 },
 ];
 
 export default function Page() {
+  // ---------- ticket ---------- //
   // dialog add ticket
   const [addOpen, setAddOpen] = useState(false);
   const [newName, setNewName] = useState("");
@@ -167,6 +158,76 @@ export default function Page() {
     setEditingTicket(null);
   }
 
+  // ---------- shirt ---------- //
+  const [shirts, setShirts] = useState<Shirt[]>(initialShirts);
+
+  // dialog edit shirt
+  const [shirtOpen, setShirtOpen] = useState(false);
+  const [draftShirts, setDraftShirts] = useState<ShirtDraft[]>([]);
+
+  // draft in dailog edit shirt
+  function openEditShirts() {
+    setDraftShirts(
+      shirts.map((s) => ({
+        id: s.id,
+        size: s.size,
+        chest: String(s.chest),
+        price: String(s.price),
+      })),
+    );
+    setShirtOpen(true);
+  }
+
+  function updateShirt(
+    id: string,
+    field: "size" | "chest" | "price",
+    value: string,
+  ) {
+    setDraftShirts((pre) => {
+      return pre.map((shirt) => {
+        if (shirt.id === id) {
+          return {
+            ...shirt,
+            [field]: value,
+          };
+        }
+        return shirt;
+      });
+    });
+  }
+
+  function addDraftShirt() {
+    const newShirt: ShirtDraft = {
+      id: crypto.randomUUID(),
+      size: "",
+      chest: "",
+      price: "",
+    };
+    setDraftShirts((pre) => [...pre, newShirt]);
+  }
+
+  function deleteShirt(id: string) {
+    setDraftShirts((pre) => {
+      return pre.filter((shirt) => {
+        return shirt.id !== id;
+      });
+    });
+  }
+
+  function handleSaveShirt(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setShirts(
+      draftShirts.map((shirt) => ({
+        id: shirt.id,
+        size: shirt.size.trim().toUpperCase(),
+        chest: Number(shirt.chest),
+        price: Number(shirt.price),
+      })),
+    );
+
+    setShirtOpen(false);
+  }
+
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
       {/* Breadcrumbs */}
@@ -216,6 +277,7 @@ export default function Page() {
             </div>
             <div className="w-full flex items-center justify-end">
               <Badge
+                onClick={openAddTicket}
                 variant={"outline"}
                 className="text-[14px] p-4 flex items-center justify-center rounded-[10px] border border-brand hover:bg-brand-hover hover:text-on-brand hover:font-bold [&>svg]:size-4! transition hover:cursor-pointer"
               >
@@ -475,21 +537,24 @@ export default function Page() {
             className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
           >
             {/* หัวเรื่อง */}
-            <div className="w-full flex flex-col items-start justify-center gap-1">
+            <div className="w-full flex flex-row items-center justify-between gap-1">
               <div className="text-lg font-semibold text-black">
                 เสื้อที่ระลึก
               </div>
+              <div className="flex items-center justify-end">
+                <Badge
+                  onClick={openEditShirts}
+                  variant={"outline"}
+                  className="w-fit text-[14px] p-4 flex items-center justify-center border border-brand rounded-[10px] text-brand hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
+                >
+                  <Plus />
+                  แก้ไขเสื้อ
+                </Badge>
+              </div>
             </div>
-            <div className="w-full flex items-center justify-end">
-              <Badge
-                variant={"outline"}
-                className="w-full text-[14px] p-4 flex items-center justify-center rounded-[10px] border hover:border-brand-hover hover:text-brand [&>svg]:size-4! hover:cursor-pointer"
-              >
-                <Plus />
-                แก้ไขเสื้อ
-              </Badge>
-            </div>
-            <div className="w-full flex flex-col items-start justify-center p-2 gap-3">
+
+            {/* render shirts mobile */}
+            <div className="w-full flex flex-col items-start justify-center p-2 gap-3 md:hidden">
               {shirts.map((shirt) => {
                 return (
                   <div
@@ -520,6 +585,121 @@ export default function Page() {
                 );
               })}
             </div>
+
+            {/* redder shirts desktop */}
+            <div className="w-full hidden flex-col items-start justify-center p-2 gap-3 md:flex">
+              <Table className="w-full">
+                <TableCaption>รายละเอียดเสื้อ</TableCaption>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>ขนาด</TableHead>
+                    <TableHead>รอบอก</TableHead>
+                    <TableHead>ราคา / ตัว</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {shirts.map((shirt) => {
+                    return (
+                      <TableRow key={shirt.id}>
+                        <TableCell>{shirt.size}</TableCell>
+                        <TableCell>{shirt.chest} นิ้ว</TableCell>
+                        <TableCell>{shirt.price} บาท</TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            {/* dialog edit shirts */}
+            <Dialog open={shirtOpen} onOpenChange={setShirtOpen}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>แก้ไขเสื้อที่ระลึก</DialogTitle>
+                  <DialogDescription>
+                    แก้ไข เพิ่ม หรือลบไซซ์ แล้วกดบันทึกครั้งเดียว
+                  </DialogDescription>
+                </DialogHeader>
+
+                <form className="w-full" onSubmit={handleSaveShirt}>
+                  <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-sm text-muted-foreground">
+                    <div>ไซซ์</div>
+                    <div>รอบอก (นิ้ว)</div>
+                    <div>ราคา (บาท)</div>
+                    <div className="w-9" />
+                  </div>
+
+                  <div className="mt-2 flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
+                    {draftShirts.map((shirt) => (
+                      <div
+                        key={shirt.id}
+                        className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2"
+                      >
+                        <Input
+                          value={shirt.size}
+                          onChange={(e) => {
+                            updateShirt(shirt.id, "size", e.target.value);
+                          }}
+                          required
+                          placeholder="M"
+                        />
+                        <Input
+                          value={shirt.chest}
+                          onChange={(e) => {
+                            updateShirt(shirt.id, "chest", e.target.value);
+                          }}
+                          type="number"
+                          min="0"
+                          required
+                        />
+                        <Input
+                          value={shirt.price}
+                          onChange={(e) => {
+                            updateShirt(shirt.id, "price", e.target.value);
+                          }}
+                          type="number"
+                          min="0"
+                          required
+                        />
+                        <Button
+                          onClick={() => deleteShirt(shirt.id)}
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label="ลบไซซ์"
+                        >
+                          <Trash2 />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <Button
+                    onClick={addDraftShirt}
+                    type="button"
+                    variant="outline"
+                    className="mt-3 w-full"
+                  >
+                    <Plus />
+                    เพิ่มไซซ์
+                  </Button>
+
+                  <DialogFooter className="mt-4">
+                    <DialogClose asChild>
+                      <Button type="button" variant="outline">
+                        ยกเลิก
+                      </Button>
+                    </DialogClose>
+                    <Button
+                      type="submit"
+                      className="bg-brand hover:bg-brand-hover"
+                    >
+                      บันทึก
+                    </Button>
+                  </DialogFooter>
+                </form>
+              </DialogContent>
+            </Dialog>
           </Badge>
         </div>
       </div>
