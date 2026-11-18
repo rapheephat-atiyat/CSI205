@@ -118,7 +118,7 @@ export default function Navabr() {
 
                                     <DropdownMenuGroup>
                                         <DropdownMenuItem asChild className="py-2 cursor-pointer">
-                                            <Link href="/profile">
+                                            <Link href="/account">
                                                 <User />
                                                 โปรไฟล์ของฉัน
                                             </Link>
