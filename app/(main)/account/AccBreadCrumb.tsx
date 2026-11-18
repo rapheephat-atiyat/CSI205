@@ -14,7 +14,7 @@ const PAGES: Record<string, string> = {
 }
 
 const accountLinks = [
-    { href: "/profile", label: "โปรไฟล์ของฉัน", icon: User, exact: false },
+    { href: "/account", label: "โปรไฟล์ของฉัน", icon: User, exact: true },
     { href: "/account/orders", label: "ประวัติคำสั่งซื้อ", icon: ReceiptText, exact: false },
     { href: "/account/tickets", label: "บัตรของฉัน", icon: Ticket, exact: false },
     { href: "/account/wallet", label: "กระเป๋าเงิน", icon: Wallet, exact: false },
