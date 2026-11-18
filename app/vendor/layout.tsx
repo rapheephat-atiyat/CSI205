@@ -6,8 +6,11 @@ import { VendorStoreProvider } from "@/components/vendor/vendor-store-context";
 import { requirePageUser } from "@/server/auth/page-user";
 import { getMyStore } from "@/server/services/store.service";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
+import { Award } from "lucide-react";
 
 async function VendorStoreLoader({ children }: { children: React.ReactNode }) {
+  await connection()
   const user = await requirePageUser("/vendor");
 
   // ดึง storeId ทั้งหมดที่ผูกกับบัญชีผู้ใช้คนนี้จากฐานข้อมูล
