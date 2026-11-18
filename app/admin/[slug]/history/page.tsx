@@ -120,7 +120,7 @@ const auditLog: AuditLog[] = [
   },
 ];
 
-export default function Page() {
+export default function Page({ slug }: { slug: string }) {
   const [search, setSearch] = useState<string>("");
 
   useEffect(() => {
@@ -135,7 +135,7 @@ export default function Page() {
           <Breadcrumb>
             <BreadcrumbList>
               <BreadcrumbItem>
-                <BreadcrumbLink href="/admin">ภาพรวมงาน</BreadcrumbLink>
+                <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
               </BreadcrumbItem>
               <BreadcrumbSeparator />
               <BreadcrumbItem>

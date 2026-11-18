@@ -90,7 +90,7 @@ const initialShirts: Shirt[] = [
   { id: "shirt-xl", size: "XL", chest: 42, price: 300 },
 ];
 
-export default function Page() {
+export default function Page( { slug }: { slug: string }) {
   // ---------- ticket ---------- //
   // dialog add ticket
   const [addOpen, setAddOpen] = useState(false);
@@ -237,7 +237,7 @@ export default function Page() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/admin">ภาพรวมงาน</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

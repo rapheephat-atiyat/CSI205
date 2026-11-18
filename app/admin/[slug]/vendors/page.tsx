@@ -33,9 +33,9 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Plus, SearchIcon, Trash2, UserRoundPlus } from "lucide-react";
 
 // data
-import { vendors, type Vendor } from "@/app/admin/page";
+import { vendors, type Vendor } from "@/app/admin/[slug]/page";
 
-export default function Page() {
+export default function Page({ slug }: { slug: string }) {
   const [search, setSearch] = useState<string>("");
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -44,7 +44,7 @@ export default function Page() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/admin">ภาพรวมงาน</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

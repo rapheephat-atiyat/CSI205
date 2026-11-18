@@ -44,6 +44,8 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { useRouter } from "next/navigation";
 import { addDays } from "date-fns";
+import { EventInput } from "@/lib/api-types";
+import { api } from "@/lib/api-client";
 
 function formatDate(d?: Date) {
   if (!d) return "";
@@ -104,21 +106,20 @@ export default function EventDetailForm() {
       eventTimeTo=> ${eventTimeTo}`);
   }, [dateRange]);
 
-  function handleCreate(e: React.FormEvent<HTMLFormElement>) {
+  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (!dateRange) return alert("กรุณาเลือกวันที่จัดงาน");
-    if (new Date(buyEndAt) <= new Date(buyAt)) {
+    if (!dateRange?.from || !dateRange?.to)
+      return alert("กรุณาเลือกวันที่จัดงาน");
+    if (new Date(buyEndAt) <= new Date(buyAt))
       return alert("วันปิดขายต้องมากกว่าวันเปิดขาย");
-    }
+
     const minQ = Number(minTicketQTY);
     const maxQ = Number(maxTicketQTY);
-    if (!(minQ >= 1) || !(maxQ >= minQ)) {
+    if (!(minQ >= 1) || !(maxQ >= minQ))
       return alert("จำนวนบัตรสูงสุดต้องไม่น้อยกว่าขั้นต่ำ");
-    }
 
-    const newEvent = {
-      id: crypto.randomUUID(),
+    const payload: EventInput = {
       slug: slugify(title),
       title,
       subTitle,
@@ -134,20 +135,19 @@ export default function EventDetailForm() {
       buyEndAt: new Date(buyEndAt).toISOString(),
       minTicketQTY: minQ,
       maxTicketQTY: maxQ,
-      dateRange: dateRange,
-      eventTimeFrom,
-      eventTimeTo,
     };
 
-    const localEvnts = localStorage.getItem("events");
-    if (!localEvnts) {
-      localStorage.setItem("events", JSON.stringify([newEvent]));
-    } else {
-      const events = JSON.parse(localEvnts);
-      localStorage.setItem("events", JSON.stringify([newEvent, ...events]));
+    try {
+      setSubmitting(true);
+      const created = await api.events.create(payload);
+      console.log("created", created);
+      router.push("/admin/settings/event");
+    } catch (err) {
+      console.error(err);
+      alert("สร้างงานไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
     }
-
-    router.push("/admin/settings/event");
   }
 
   return (
@@ -157,13 +157,7 @@ export default function EventDetailForm() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/admin">ภาพรวมงาน</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/admin/settings/event">
-                จัดการงงาน
-              </BreadcrumbLink>
+              <BreadcrumbLink href="/admin">จัดการงาน</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -186,7 +180,10 @@ export default function EventDetailForm() {
         </div>
 
         {/* ข้อมูลงาน */}
-        <form className="w-full flex flex-col items-start justify-center gap-3" onSubmit={handleCreate}>
+        <form
+          className="w-full flex flex-col items-start justify-center gap-3"
+          onSubmit={handleCreate}
+        >
           <div className="w-full flex flex-col">
             <Badge
               variant={"outline"}

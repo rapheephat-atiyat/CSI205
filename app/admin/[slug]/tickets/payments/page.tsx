@@ -262,7 +262,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function Page() {
+export default function Page({ slug }: { slug: string }) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [keyword, setKeyword] = useState("");
   const [index, setIndex] = useState(0);
@@ -307,11 +307,13 @@ export default function Page() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/admin">ส่วนกลาง</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}`}>ส่วนกลาง</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href="/admin/settings/pricing">บัตรและเสื้อ</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}/settings/pricing`}>
+                บัตรและเสื้อ
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

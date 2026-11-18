@@ -26,7 +26,7 @@ import {
 import { Download, Equal } from "lucide-react";
 
 // data
-import { vendors } from "@/app/admin/page";
+import { vendors, type Vendor } from "@/app/admin/[slug]/page";
 type ReportItem = {
   id: string;
   title: string;
@@ -66,7 +66,7 @@ export const reports: ReportItem[] = [
   },
 ];
 
-export default function Page() {
+export default function Page({ slug }: { slug: string }) {
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
       <div className="w-full flex items-center justify-start">
@@ -74,7 +74,7 @@ export default function Page() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/admin">ภาพรวมงาน</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -153,7 +153,9 @@ export default function Page() {
                 className="p-4 w-full h-full flex-1 flex flex-col gap-2 rounded-[10px]"
               >
                 <div className="w-full flex flex-col items-start justify-center gap-0.5">
-                  <div className="text-lg font-semibold">ยอดเงินรับที่ยืนยันแล้ว</div>
+                  <div className="text-lg font-semibold">
+                    ยอดเงินรับที่ยืนยันแล้ว
+                  </div>
                   <div className="text-sm font-medium text-muted-foreground">
                     บัตร, เสื้อ และการเติม Token
                   </div>
