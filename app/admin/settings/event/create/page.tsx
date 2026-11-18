@@ -13,6 +13,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { type DateRange } from "react-day-picker";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
@@ -39,8 +40,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
+import { Textarea } from "@/components/ui/textarea";
 
 import { useRouter } from "next/navigation";
+import { addDays } from "date-fns";
 
 function formatDate(d?: Date) {
   if (!d) return "";
@@ -79,12 +82,12 @@ export default function EventDetailForm() {
   const [token, setToken] = useState("1");
 
   // date evnet
-  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [eventTimeFrom, setEventTimeFrom] = useState("00:00");
   const [eventTimeTo, setEventTimeTo] = useState("00:00");
 
   // draft in dialog b4 submit
-  const [draftDate, setDraftDate] = useState<Date | undefined>(undefined);
+  const [draftDate, setDraftDate] = useState<DateRange | undefined>(undefined);
   const [draftEventTimeFrom, setDraftEventTimeFrom] = useState("00:00");
   const [draftEventTimeTo, setDraftEventTimeTo] = useState("00:00");
 
@@ -92,19 +95,19 @@ export default function EventDetailForm() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    setDraftDate((date) => date ?? new Date());
+    setDraftDate({ from: new Date(), to: addDays(new Date(), 3) });
   }, []);
 
   useEffect(() => {
-    console.log(`Date=> ${date}
+    console.log(`Date=> ${dateRange?.from} – ${dateRange?.to}
       eventTimeFrom=> ${eventTimeFrom}
       eventTimeTo=> ${eventTimeTo}`);
-  }, [date, eventTimeFrom, eventTimeTo]);
+  }, [dateRange]);
 
   function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (!date) return alert("กรุณาเลือกวันที่จัดงาน");
+    if (!dateRange) return alert("กรุณาเลือกวันที่จัดงาน");
     if (new Date(buyEndAt) <= new Date(buyAt)) {
       return alert("วันปิดขายต้องมากกว่าวันเปิดขาย");
     }
@@ -131,7 +134,7 @@ export default function EventDetailForm() {
       buyEndAt: new Date(buyEndAt).toISOString(),
       minTicketQTY: minQ,
       maxTicketQTY: maxQ,
-      eventDate: date.toISOString(),
+      dateRange: dateRange,
       eventTimeFrom,
       eventTimeTo,
     };
@@ -183,7 +186,7 @@ export default function EventDetailForm() {
         </div>
 
         {/* ข้อมูลงาน */}
-        <form className="w-full" onSubmit={handleCreate}>
+        <form className="w-full flex flex-col items-start justify-center gap-3" onSubmit={handleCreate}>
           <div className="w-full flex flex-col">
             <Badge
               variant={"outline"}
@@ -202,7 +205,7 @@ export default function EventDetailForm() {
               {/* form */}
               <div className="w-full flex flex-col items-start justify-center">
                 <div className="w-full">
-                  <FieldGroup>
+                  <FieldGroup className="w-full grid grid-cols-2 gap-4">
                     {/* ชื่องาน */}
                     <Field>
                       <FieldLabel htmlFor="event-name" className="text-[16px]">
@@ -246,14 +249,12 @@ export default function EventDetailForm() {
                       >
                         รายละเอียดงาน *
                       </FieldLabel>
-                      <Input
+                      <Textarea
                         id="event-description"
-                        type="text"
                         placeholder="รายละเอียดเกี่ยวกับงาน"
-                        required
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
-                        className="py-3 w-full h-auto font-light"
+                        className="py-3 w-full h-auto min-h-30 font-light"
                       />
                     </Field>
 
@@ -325,11 +326,11 @@ export default function EventDetailForm() {
                             type="text"
                             readOnly
                             placeholder={"dd / mm / year"}
-                            value={formatDate(date)}
+                            value={`${formatDate(dateRange?.from)} – ${formatDate(dateRange?.to)}`}
                             className="py-3 w-full h-auto font-light cursor-pointer"
                           />
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-sm">
+                        <DialogContent className="w-fit max-w-[calc(100vw-2rem)]  sm:max-w-2xl">
                           <DialogHeader>
                             <DialogTitle>เลือกวันและเวลาจัดงาน</DialogTitle>
                             <DialogDescription>
@@ -337,13 +338,14 @@ export default function EventDetailForm() {
                             </DialogDescription>
                           </DialogHeader>
 
-                          <Card size="sm" className="mx-auto w-fit">
+                          <Card className="mx-auto w-fit max-w-[calc(100vw-2rem)]">
                             <CardContent>
                               <Calendar
-                                mode="single"
+                                mode="range"
+                                defaultMonth={dateRange?.from}
                                 selected={draftDate}
                                 onSelect={setDraftDate}
-                                className="p-0"
+                                numberOfMonths={2}
                               />
                             </CardContent>
                             <CardFooter className="border-t bg-card">
@@ -399,7 +401,7 @@ export default function EventDetailForm() {
                             <Button
                               type="button"
                               onClick={() => {
-                                setDate(draftDate);
+                                setDateRange(draftDate);
                                 setEventTimeFrom(draftEventTimeFrom);
                                 setEventTimeTo(draftEventTimeTo);
                                 setOpen(false);
