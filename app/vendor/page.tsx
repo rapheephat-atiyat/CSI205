@@ -1,6 +1,6 @@
-
 "use client";
 
+import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
   ChartContainer,
@@ -9,6 +9,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import {
+  ArrowLeftRight,
   ChartNoAxesCombined,
   Coffee,
   Coins,
@@ -23,6 +24,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useVendorStore } from "@/components/vendor/vendor-store-context";
+
 
 const chartData = [
   { day: "15 ต.ค.", sales: 1980 },
@@ -69,47 +72,65 @@ const transactions = [
     amount: 70,
   },
 ];
+  
+
 
 export default function Page() {
+  const { selectedStore, clearStore } = useVendorStore();
+
+  const todaySales = selectedStore?.todaySales ?? 3241;
+  const todayOrders = selectedStore?.todayOrders ?? 42;
+  const avgOrder = todayOrders > 0 ? (todaySales / todayOrders).toFixed(1) : "0.0";
+
   return (
     <div className="w-full flex flex-col gap-10 pb-8">
 
       {/* ส่วนหัว */}
-      <div className="flex items-center justify-between p-4">
-        <div className="text-4xl font-bold">
+      <div className="flex flex-wrap items-center justify-between gap-4 p-4">
+        <div className="text-3xl md:text-4xl font-bold">
           Vendor Dashboard
-          <div className="text-sm text-gray-500">
-            ภาพรวมยอดขายของ Good Day Café · ร้านค้า VND-008
+          <div className="text-sm font-normal text-gray-500 mt-1 flex flex-wrap items-center gap-2">
+            <span>
+              ภาพรวมยอดขายของ <strong className="text-slate-800">{selectedStore?.name}</strong> · ร้านค้า {selectedStore?.code}
+            </span>
+            <button
+              onClick={clearStore}
+              className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline cursor-pointer"
+            >
+              <ArrowLeftRight className="size-3" /> เปลี่ยนร้าน
+            </button>
           </div>
         </div>
 
-        <Badge
-          className="hover:cursor-pointer rounded-3xl p-5 bg-brand text-white text-sm"
-          variant="secondary"
-        >
-          แสกนจ่ายสินค้า
-        </Badge>
+        <Link href="/vendor/scan">
+          <Badge
+            className="hover:cursor-pointer rounded-3xl px-6 py-3 bg-brand text-white text-sm"
+            variant="secondary"
+          >
+            แสกนจ่ายสินค้า
+          </Badge>
+        </Link>
       </div>
 
       {/* การ์ดสรุป 3 ใบ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5 px-4 md:px-10">
         <div className="border border-black/10 rounded-xl relative p-6 flex flex-col gap-5">
           <h6>ยอดขายวันนี้</h6>
-          <div className="text-5xl text-brand font-bold">3241 T</div>
+          <div className="text-5xl text-brand font-bold">{todaySales.toLocaleString()} T</div>
           <Coins className="text-brand size-10 absolute top-6 right-5" />
           <div>12.3% จากเมื่อวาน</div>
         </div>
 
         <div className="border border-black/10 rounded-xl relative p-6 flex flex-col gap-5">
           <h6>รายการชำระเงิน</h6>
-          <div className="text-5xl text-brand font-bold">42</div>
+          <div className="text-5xl text-brand font-bold">{todayOrders}</div>
           <Receipt className="text-brand size-10 absolute top-6 right-5" />
-          <div>ชำระสำเร็จทั้งหมด 42</div>
+          <div>ชำระสำเร็จทั้งหมด {todayOrders}</div>
         </div>
 
         <div className="border border-black/10 rounded-xl relative p-6 flex flex-col gap-5">
           <h6>ยอดเฉลี่ยต่อรายการ</h6>
-          <div className="text-5xl text-brand font-bold">28.6</div>
+          <div className="text-5xl text-brand font-bold">{avgOrder}</div>
           <ChartNoAxesCombined className="text-brand size-10 absolute top-6 right-5" />
           <div>1 Token = 1 บาท</div>
         </div>
@@ -221,8 +242,6 @@ export default function Page() {
           </div>
 
           <div className="w-full flex flex-col gap-2">
-
-            {/* ชื่อสินค้า */}
             <div className="flex justify-between items-center text-sm">
               <span className="font-medium flex items-center gap-2">
                 <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-brand">
@@ -236,7 +255,6 @@ export default function Page() {
               </span>
             </div>
 
-            {/* Progress Bar */}
             <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
               <div className="h-full w-[60%] bg-[#e0313f] rounded-full" />
             </div>
@@ -247,8 +265,6 @@ export default function Page() {
 
       {/* ตารางรายการรับชำระล่าสุด */}
       <div className="w-full border border-black/10 rounded-xl p-6 mx-auto max-w-full">
-
-        {/* หัวข้อตาราง */}
         <div className="flex justify-between items-center mb-5">
           <h2 className="text-lg font-bold">
             รายการรับชำระล่าสุด
@@ -259,10 +275,8 @@ export default function Page() {
           </button>
         </div>
 
-        {/* ตาราง */}
         <div className="w-full overflow-x-auto">
           <table className="w-full text-sm text-left">
-
             <thead className="bg-gray-50 text-gray-400 text-xs">
               <tr>
                 <th className="px-3 py-3 font-medium">หมายเลขรายการ</th>
@@ -303,16 +317,9 @@ export default function Page() {
                 </tr>
               ))}
             </tbody>
-
           </table>
         </div>
       </div>
-
-      {/* Footer */}
-      <div className="flex justify-between items-center px-6 text-xs text-gray-400">
-
-      </div>
-
     </div>
   );
 }
