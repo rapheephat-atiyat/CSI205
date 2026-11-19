@@ -62,6 +62,22 @@ export class Order {
     @Column({ type: "timestamptz", nullable: true })
     paidAt!: Date | null;
 
+    @Column({ name: "review_decision", type: "varchar", length: 10, nullable: true })
+    reviewDecision!: "APPROVE" | "REJECT" | null;
+
+    @Column({ name: "reviewed_by_id", type: "uuid", nullable: true })
+    reviewedById!: string | null;
+
+    @ManyToOne(() => User, { onDelete: "SET NULL", nullable: true })
+    @JoinColumn({ name: "reviewed_by_id", foreignKeyConstraintName: "fk_orders_reviewer" })
+    reviewedBy!: Relation<User> | null;
+
+    @Column({ name: "reviewed_at", type: "timestamptz", nullable: true })
+    reviewedAt!: Date | null;
+
+    @Column({ name: "review_reason", type: "varchar", length: 500, nullable: true })
+    reviewReason!: string | null;
+
     @OneToMany(() => Ticket, (ticket) => ticket.order)
     tickets!: Relation<Ticket[]>;
 

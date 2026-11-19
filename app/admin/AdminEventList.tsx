@@ -35,7 +35,7 @@ const headEv: HeadEv = {
   place: "สถานที่",
 };
 
-export default function AdminEventList() {
+export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,7 +43,7 @@ export default function AdminEventList() {
 
   useEffect(() => {
     async function load() {
-      const res = await api.events.list();
+      const res = await api.events.listManageable();
       if (res.success) {
         setEvents(res.data);
       } else setError(res.error.message);
@@ -79,7 +79,7 @@ export default function AdminEventList() {
               <div className="text-[24px] font-semibold text-black">
                 ค้นหางาน
               </div>
-              <Badge
+              {canCreate && <Badge
                 asChild
                 className="p-3 bg-brand text-on-brand  text-sm flex items-center justify-center rounded-[10px] hover:cursor-pointer hover:bg-brand-hover! hover:scale-110 hover:font-bold ease-in-out [&>svg]:size-4!"
               >
@@ -87,7 +87,7 @@ export default function AdminEventList() {
                   <Plus />
                   เพิ่มงาน
                 </Link>
-              </Badge>
+              </Badge>}
             </div>
             <div className="w-full">
               <div className="w-full">

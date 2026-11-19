@@ -185,7 +185,7 @@ export async function submitOrderPayment(userId: string, id: string, proof: unkn
     return getMyOrder(userId, id);
 }
 
-async function cancelPendingOrders(manager: EntityManager, ids: string[]) {
+export async function cancelPendingOrders(manager: EntityManager, ids: string[]) {
     const tickets = await manager.findBy(Ticket, { orderId: In(ids), status: TICKET_STATUSES.PENDING });
     const counts = new Map<string, number>();
     for (const ticket of tickets) counts.set(ticket.eventTicketId, (counts.get(ticket.eventTicketId) ?? 0) + 1);
@@ -246,7 +246,7 @@ export async function getMyTickets(userId: string): Promise<TicketItem[]> {
     return tickets.map(toTicketItem);
 }
 
-function toOrderDetail(order: Order): OrderDetail {
+export function toOrderDetail(order: Order): OrderDetail {
     const shipping = order.shipping;
     const waitingForPayment = order.status === ORDER_STATUSES.PENDING && !order.paymentSlip;
     return {

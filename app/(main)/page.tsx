@@ -23,7 +23,7 @@ function formatThaiDate(dateString: string): string {
     return `${dayName} ${formatted}`;
 }
 
-function EventCard({ event }: { event: EventSummary }) {
+function EventCard({ event, eager = false }: { event: EventSummary; eager?: boolean }) {
     return (
         <Link
             href={`/e/${encodeURIComponent(event.slug)}`}
@@ -36,6 +36,7 @@ function EventCard({ event }: { event: EventSummary }) {
                             src={event.thumbnail}
                             alt={event.title}
                             fill
+                            loading={eager ? "eager" : "lazy"}
                             sizes="(max-width: 640px) 192px, 224px"
                             className="object-cover transition-transform duration-300 group-hover/card:scale-105"
                             unoptimized={!event.thumbnail.includes("images.unsplash.com")}
@@ -136,8 +137,8 @@ async function EventSections() {
                 </h2>
                 {activeEvents.length > 0 ? (
                     <HorizontalScroll>
-                        {activeEvents.map((event) => (
-                            <EventCard key={event.id} event={event} />
+                        {activeEvents.map((event, index) => (
+                            <EventCard key={event.id} event={event} eager={index === 0} />
                         ))}
                     </HorizontalScroll>
                 ) : (
@@ -153,8 +154,8 @@ async function EventSections() {
                 </h2>
                 {upcomingEvents.length > 0 ? (
                     <HorizontalScroll>
-                        {upcomingEvents.map((event) => (
-                            <EventCard key={event.id} event={event} />
+                        {upcomingEvents.map((event, index) => (
+                            <EventCard key={event.id} event={event} eager={activeEvents.length === 0 && index === 0} />
                         ))}
                     </HorizontalScroll>
                 ) : (

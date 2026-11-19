@@ -5,6 +5,8 @@ import { Events, EventSouvenir, EventTicket, SouvenirTicketType } from "@/server
 import { ApiError } from "@/server/http/errors";
 import type { EntityManager } from "typeorm";
 import { readMoney } from "./money";
+import { readUuid } from "@/server/http/validation";
+import { recordAdminActivity } from "./admin-activity";
 
 export async function getEventSouvenirs(manager: EntityManager, eventId: string): Promise<EventSouvenirItem[]> {
     const souvenirs = await manager.find(EventSouvenir, {
@@ -17,6 +19,7 @@ export async function getEventSouvenirs(manager: EntityManager, eventId: string)
 }
 
 export async function getSouvenir(eventId: string, souvenirId: string): Promise<EventSouvenirItem> {
+    readUuid(eventId, "รหัสงาน"); readUuid(souvenirId, "รหัสของที่ระลึก");
     const db = await getDatabase();
     const souvenir = await db.manager.findOne(EventSouvenir, {
         where: { id: souvenirId, eventId },
@@ -26,19 +29,22 @@ export async function getSouvenir(eventId: string, souvenirId: string): Promise<
     return toSouvenirItem(souvenir);
 }
 
-export async function createSouvenir(eventId: string, input: EventSouvenirInput): Promise<EventSouvenirItem> {
+export async function createSouvenir(eventId: string, input: EventSouvenirInput, actorId?: string): Promise<EventSouvenirItem> {
+    readUuid(eventId, "รหัสงาน");
     const db = await getDatabase();
     if (!await db.manager.existsBy(Events, { id: eventId })) {
         throw new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
     }
-    return saveSouvenir(eventId, input);
+    return saveSouvenir(eventId, input, undefined, actorId);
 }
 
-export async function updateSouvenir(eventId: string, souvenirId: string, input: Partial<EventSouvenirInput>): Promise<EventSouvenirItem> {
-    return saveSouvenir(eventId, input, souvenirId);
+export async function updateSouvenir(eventId: string, souvenirId: string, input: Partial<EventSouvenirInput>, actorId?: string): Promise<EventSouvenirItem> {
+    readUuid(eventId, "รหัสงาน"); readUuid(souvenirId, "รหัสของที่ระลึก");
+    return saveSouvenir(eventId, input, souvenirId, actorId);
 }
 
-async function saveSouvenir(eventId: string, input: Partial<EventSouvenirInput>, souvenirId?: string): Promise<EventSouvenirItem> {
+async function saveSouvenir(eventId: string, input: Partial<EventSouvenirInput>, souvenirId?: string, actorId?: string): Promise<EventSouvenirItem> {
+    if ((input.allowDecline !== undefined && typeof input.allowDecline !== "boolean") || (input.allTicketTypes !== undefined && typeof input.allTicketTypes !== "boolean") || (input.image != null && typeof input.image !== "string")) throw new ApiError("VALIDATION_ERROR", "การตั้งค่าของที่ระลึกไม่ถูกต้อง", 422);
     const db = await getDatabase();
     return db.transaction(async (manager) => {
         const souvenir = souvenirId
@@ -87,14 +93,19 @@ async function saveSouvenir(eventId: string, input: Partial<EventSouvenirInput>,
             }
         }
         savedSouvenir.ticketTypeLinks = await manager.findBy(SouvenirTicketType, { souvenirId: savedSouvenir.id });
+        await recordAdminActivity(manager, actorId, eventId, souvenirId ? "souvenir.update" : "souvenir.create", savedSouvenir.id);
         return toSouvenirItem(savedSouvenir);
     });
 }
 
-export async function deleteSouvenir(eventId: string, souvenirId: string): Promise<{ id: string }> {
+export async function deleteSouvenir(eventId: string, souvenirId: string, actorId?: string): Promise<{ id: string }> {
+    readUuid(eventId, "รหัสงาน"); readUuid(souvenirId, "รหัสของที่ระลึก");
     const db = await getDatabase();
-    const result = await db.manager.delete(EventSouvenir, { id: souvenirId, eventId });
-    if (!result.affected) throw new ApiError("SOUVENIR_NOT_FOUND", "ไม่พบของที่ระลึกในงานนี้", 404);
+    await db.transaction(async (manager) => {
+        const result = await manager.delete(EventSouvenir, { id: souvenirId, eventId });
+        if (!result.affected) throw new ApiError("SOUVENIR_NOT_FOUND", "ไม่พบของที่ระลึกในงานนี้", 404);
+        await recordAdminActivity(manager, actorId, eventId, "souvenir.delete", souvenirId);
+    });
     return { id: souvenirId };
 }
 

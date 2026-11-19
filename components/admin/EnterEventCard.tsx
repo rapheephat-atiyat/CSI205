@@ -9,16 +9,6 @@ import {
 } from "@/components/ui/chart";
 import { type ChartConfig } from "@/components/ui/chart";
 
-// data
-const chartData = [
-  { time: "16:00", attendees: 78 },
-  { time: "16:30", attendees: 210 },
-  { time: "17:00", attendees: 396 },
-  { time: "17:30", attendees: 564 },
-  { time: "18:00", attendees: 642 },
-  { time: "18:42", attendees: 684 },
-];
-
 const chartConfig = {
   attendees: {
     label: "ผู้เข้างาน",
@@ -26,13 +16,15 @@ const chartConfig = {
   },
 } satisfies ChartConfig;
 
-export function EnterEventCard() {
+export function EnterEventCard({ data }: { data: { time: string; attendees: number }[] }) {
+  if (!data.length) return <p className="flex h-60 items-center justify-center text-sm text-muted-foreground">ยังไม่มีข้อมูลเช็กอิน</p>;
   return (
     <ChartContainer config={chartConfig} className="h-60 w-full">
-      <BarChart accessibilityLayer data={chartData}>
+      <BarChart accessibilityLayer data={data}>
         <CartesianGrid vertical={false} />
         <XAxis
           dataKey="time"
+          tickFormatter={(time: string) => time.slice(-5)}
           tickLine={false}
           tickMargin={10}
           axisLine={false}

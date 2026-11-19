@@ -5,8 +5,10 @@ import { Events, Product, Store, Wallet, WalletHistory, type User } from "@/serv
 import { TRANSACTION_STATUSES, TRANSACTION_TYPES } from "@/server/database/enums/domain.enum";
 import { ApiError } from "@/server/http/errors";
 import { readMoney } from "./money";
+import { recordAdminActivity } from "./admin-activity";
+import { readUuid } from "@/server/http/validation";
 
-function toStoreDetail(s: Store): StoreDetail {
+export function toStoreDetail(s: Store): StoreDetail {
     return {
         id: s.id,
         eventId: s.eventId,
@@ -32,7 +34,9 @@ function toStoreDetail(s: Store): StoreDetail {
     };
 }
 
-export async function createStore(input: StoreInput): Promise<StoreDetail> {
+export async function createStore(input: StoreInput, actorId?: string): Promise<StoreDetail> {
+    readUuid(input.eventId, "รหัสงาน");
+    if (input.description != null && (typeof input.description !== "string" || input.description.length > 5000)) throw new ApiError("VALIDATION_ERROR", "รายละเอียดร้านค้าไม่ถูกต้อง", 422);
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!name || name.length > 255 || typeof input.eventId !== "string" || !input.eventId) {
         throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่องานและชื่อร้านค้า", 422);
@@ -51,6 +55,7 @@ export async function createStore(input: StoreInput): Promise<StoreDetail> {
         });
         const savedStore = await manager.save(store);
         savedStore.wallet = await manager.save(Wallet, { storeId: savedStore.id, total: "0.00" });
+        await recordAdminActivity(manager, actorId, input.eventId, "store.create", savedStore.id);
         return toStoreDetail(savedStore);
     });
 }

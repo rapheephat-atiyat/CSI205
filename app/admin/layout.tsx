@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
@@ -30,6 +31,8 @@ async function AuthenticatedAdminLayout({
 }: {
   children: React.ReactNode;
 }) {
+  // Auth helpers (and development instrumentation) must run after the request boundary.
+  await connection();
   const user = await requirePageUser("/admin");
   const isAdmin = user.userRoles.some((r) => r.role === "ADMIN");
 

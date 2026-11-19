@@ -14,6 +14,7 @@
     "test:db": "ts-node -r tsconfig-paths/register --project tsconfig.typeorm.json server/database/tests/memberships.test.ts",
     "test:db:integration": "ts-node -r tsconfig-paths/register --project tsconfig.typeorm.json server/database/tests/user-role-permissions.integration.test.ts",
     "test:faq": "ts-node -r tsconfig-paths/register --project tsconfig.typeorm.json server/database/tests/faq-api.integration.test.ts",
+    "test:admin": "ts-node -r tsconfig-paths/register --project tsconfig.typeorm.json server/database/tests/admin-api.integration.test.ts",
     "typeorm": "ts-node -r tsconfig-paths/register --project tsconfig.typeorm.json ./node_modules/typeorm/cli.js",
     "migration:generate": "npm run typeorm -- migration:generate -d server/database/data-source.cli.ts",
     "migration:run": "npm run typeorm -- migration:run -d server/database/data-source.cli.ts",
