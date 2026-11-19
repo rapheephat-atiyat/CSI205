@@ -1,7 +1,15 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { addDays, format } from "date-fns";
+import { type DateRange } from "react-day-picker";
+
+import { api } from "@/lib/api-client";
+import { EventDetail, EventInput } from "@/lib/api-types";
+
 // import icon
-import { Clock2Icon } from "lucide-react";
+import { Clock2Icon, Save } from "lucide-react";
 
 // import ui
 import { Badge } from "@/components/ui/badge";
@@ -13,6 +21,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
@@ -30,7 +39,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useEffect, useState } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -39,8 +47,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-
-import { useRouter } from "next/navigation";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
+import { Skeleton } from "@/components/ui/skeleton";
 
 function formatDate(d?: Date) {
   if (!d) return "";
@@ -51,16 +59,20 @@ function formatDate(d?: Date) {
   });
 }
 
-function slugify(text: string) {
-  const s = text
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-  return s || `event-${Date.now()}`;
+// ISO -> ค่าสำหรับ datetime-local
+function toLocalInput(iso?: string) {
+  if (!iso) return "";
+  return format(new Date(iso), "yyyy-MM-dd'T'HH:mm");
 }
 
-export default function EventDetailForm() {
+export default function Page() {
+  const { slug } = useParams<{ slug: string }>();
+  const router = useRouter();
+
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
   // open dialog
   const [open, setOpen] = useState(false);
 
@@ -79,44 +91,79 @@ export default function EventDetailForm() {
   const [token, setToken] = useState("1");
 
   // date evnet
-  const [date, setDate] = useState<Date | undefined>(undefined);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [eventTimeFrom, setEventTimeFrom] = useState("00:00");
   const [eventTimeTo, setEventTimeTo] = useState("00:00");
 
   // draft in dialog b4 submit
-  const [draftDate, setDraftDate] = useState<Date | undefined>(undefined);
+  const [draftDate, setDraftDate] = useState<DateRange | undefined>(undefined);
   const [draftEventTimeFrom, setDraftEventTimeFrom] = useState("00:00");
   const [draftEventTimeTo, setDraftEventTimeTo] = useState("00:00");
 
-  const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
+  // โหลดข้อมูลงาน
   useEffect(() => {
-    setDraftDate((date) => date ?? new Date());
-  }, []);
-
-  useEffect(() => {
-    console.log(`Date=> ${date}
-      eventTimeFrom=> ${eventTimeFrom}
-      eventTimeTo=> ${eventTimeTo}`);
-  }, [date, eventTimeFrom, eventTimeTo]);
-
-  function handleCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-
-    if (!date) return alert("กรุณาเลือกวันที่จัดงาน");
-    if (new Date(buyEndAt) <= new Date(buyAt)) {
-      return alert("วันปิดขายต้องมากกว่าวันเปิดขาย");
+    async function load() {
+      const res = await api.events.get(`${slug}`);
+      if (res.success) setEvent(res.data);
+      else setError(res.error.message);
+      setLoading(false);
     }
+    load();
+  }, [slug]);
+
+  useEffect(() => {
+    if (!event) return;
+
+    setTitle(event.title ?? "");
+    setSubTitle(event.subTitle ?? "");
+    setDescription(event.description ?? "");
+    setThumbnail(event.thumbnail ?? "");
+    setBanner(event.banner ?? "");
+    setTagsText((event.tags ?? []).join(", "));
+    setVenue(event.venue ?? "");
+    setBuyAt(toLocalInput(event.buyAt));
+    setBuyEndAt(toLocalInput(event.buyEndAt));
+    setMinTicketQTY(String(event.minTicketQTY ?? 1));
+    setMaxTicketQTY(String(event.maxTicketQTY ?? 10));
+
+    const dated = (event.sessions ?? []).filter((s) => s.startsAt);
+    if (dated.length) {
+      const first = dated[0];
+      const last = dated[dated.length - 1];
+      const from = new Date(first.startsAt!);
+      const to = new Date(last.endsAt ?? last.startsAt!);
+      const range = { from, to };
+      const tFrom = format(from, "HH:mm");
+      const tTo = format(new Date(first.endsAt ?? first.startsAt!), "HH:mm");
+      setDateRange(range);
+      setDraftDate(range);
+      setEventTimeFrom(tFrom);
+      setEventTimeTo(tTo);
+      setDraftEventTimeFrom(tFrom);
+      setDraftEventTimeTo(tTo);
+    } else {
+      setDraftDate({ from: new Date(), to: addDays(new Date(), 3) });
+    }
+  }, [event]);
+
+  async function handleSave(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!event) return;
+
+    if (!description.trim()) return alert("กรุณากรอกรายละเอียดงาน");
+    if (!dateRange?.from || !dateRange?.to)
+      return alert("กรุณาเลือกวันที่จัดงาน");
+    if (new Date(buyEndAt) <= new Date(buyAt))
+      return alert("วันปิดขายต้องมากกว่าวันเปิดขาย");
+
     const minQ = Number(minTicketQTY);
     const maxQ = Number(maxTicketQTY);
-    if (!(minQ >= 1) || !(maxQ >= minQ)) {
+    if (!(minQ >= 1) || !(maxQ >= minQ))
       return alert("จำนวนบัตรสูงสุดต้องไม่น้อยกว่าขั้นต่ำ");
-    }
 
-    const newEvent = {
-      id: crypto.randomUUID(),
-      slug: slugify(title),
+    const payload: Partial<EventInput> = {
       title,
       subTitle,
       banner,
@@ -131,21 +178,43 @@ export default function EventDetailForm() {
       buyEndAt: new Date(buyEndAt).toISOString(),
       minTicketQTY: minQ,
       maxTicketQTY: maxQ,
-      eventDate: date.toISOString(),
-      eventTimeFrom,
-      eventTimeTo,
     };
 
-    const localEvnts = localStorage.getItem("events");
-    if (!localEvnts) {
-      localStorage.setItem("events", JSON.stringify([newEvent]));
-    } else {
-      const events = JSON.parse(localEvnts);
-      localStorage.setItem("events", JSON.stringify([newEvent, ...events]));
+    try {
+      setSubmitting(true);
+      await api.events.update(event.id, payload);
+    } catch (err) {
+      console.error(err);
+      alert("บันทึกไม่สำเร็จ");
+    } finally {
+      setSubmitting(false);
     }
-
-    router.push("/admin/settings/event");
   }
+
+  if (loading)
+    return (
+      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+        {/* breadcrumb */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24 bg-on-brand" />
+          <Skeleton className="h-4 w-4 bg-on-brand" />
+          <Skeleton className="h-4 w-32 bg-on-brand" />
+        </div>
+        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 bg-on-brand" />
+            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
+          </div>
+
+          {/* การ์ด 1 ใบ */}
+          <div className="w-full flex flex-col items-center justify-center gap-4">
+            <Skeleton className="h-240 w-full rounded-[10px] bg-on-brand" />
+          </div>
+        </div>
+      </div>
+    );
+  if (error || !event) return <div className="p-4">{error ?? "ไม่พบงาน"}</div>;
 
   return (
     <div className="p-4 mx-auto w-full flex flex-col items-center justify-start">
@@ -154,17 +223,13 @@ export default function EventDetailForm() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/admin">ภาพรวมงาน</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href="/admin/settings/event">
-                จัดการงงาน
+              <BreadcrumbLink href={`/admin/${slug}`}>
+                {event.title}
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>สร้างงาน</BreadcrumbPage>
+              <BreadcrumbPage>ตั้งค่างาน</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -174,16 +239,17 @@ export default function EventDetailForm() {
       <div className="p-4 mx-auto w-full max-w-7xl flex flex-col items-start justify-center gap-4">
         {/* หัวเรื่อง */}
         <div className="flex flex-col items-start justify-center">
-          <div className="text-[24px] font-semibold text-black">
-            สร้างงานใหม่
-          </div>
+          <div className="text-[24px] font-semibold text-black">ตั้งค่างาน</div>
           <div className="text-[14px] font-medium text-muted-foreground">
-            ระบุข้อมูลหลักของงาน
+            แก้ไขข้อมูลหลักของงาน
           </div>
         </div>
 
         {/* ข้อมูลงาน */}
-        <form className="w-full" onSubmit={handleCreate}>
+        <form
+          className="w-full flex flex-col items-start justify-center gap-3"
+          onSubmit={handleSave}
+        >
           <div className="w-full flex flex-col">
             <Badge
               variant={"outline"}
@@ -202,7 +268,7 @@ export default function EventDetailForm() {
               {/* form */}
               <div className="w-full flex flex-col items-start justify-center">
                 <div className="w-full">
-                  <FieldGroup>
+                  <FieldGroup className="w-full grid grid-cols-2 gap-4">
                     {/* ชื่องาน */}
                     <Field>
                       <FieldLabel htmlFor="event-name" className="text-[16px]">
@@ -239,21 +305,13 @@ export default function EventDetailForm() {
                     </Field>
 
                     {/* รายละเอียดงาน */}
-                    <Field>
-                      <FieldLabel
-                        htmlFor="event-description"
-                        className="text-[16px]"
-                      >
+                    <Field className="col-span-2">
+                      <FieldLabel className="text-[16px]">
                         รายละเอียดงาน *
                       </FieldLabel>
-                      <Input
-                        id="event-description"
-                        type="text"
-                        placeholder="รายละเอียดเกี่ยวกับงาน"
-                        required
+                      <RichTextEditor
                         value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="py-3 w-full h-auto font-light"
+                        onChange={setDescription}
                       />
                     </Field>
 
@@ -319,17 +377,21 @@ export default function EventDetailForm() {
                         วันที่จัดงาน *
                       </FieldLabel>
                       <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogTrigger asChild onClick={() => setOpen(true)}>
+                        <DialogTrigger asChild>
                           <Input
                             id="event-date"
                             type="text"
                             readOnly
-                            placeholder={"dd / mm / year"}
-                            value={formatDate(date)}
+                            placeholder={"เลือกระยะเวลาจัดงาน"}
+                            value={
+                              dateRange?.from
+                                ? `${formatDate(dateRange.from)} – ${formatDate(dateRange.to)}`
+                                : ""
+                            }
                             className="py-3 w-full h-auto font-light cursor-pointer"
                           />
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-sm">
+                        <DialogContent className="w-fit max-w-[calc(100vw-2rem)]  sm:max-w-2xl">
                           <DialogHeader>
                             <DialogTitle>เลือกวันและเวลาจัดงาน</DialogTitle>
                             <DialogDescription>
@@ -337,13 +399,14 @@ export default function EventDetailForm() {
                             </DialogDescription>
                           </DialogHeader>
 
-                          <Card size="sm" className="mx-auto w-fit">
+                          <Card className="mx-auto w-fit max-w-[calc(100vw-2rem)]">
                             <CardContent>
                               <Calendar
-                                mode="single"
+                                mode="range"
+                                defaultMonth={draftDate?.from}
                                 selected={draftDate}
                                 onSelect={setDraftDate}
-                                className="p-0"
+                                numberOfMonths={2}
                               />
                             </CardContent>
                             <CardFooter className="border-t bg-card">
@@ -399,7 +462,7 @@ export default function EventDetailForm() {
                             <Button
                               type="button"
                               onClick={() => {
-                                setDate(draftDate);
+                                setDateRange(draftDate);
                                 setEventTimeFrom(draftEventTimeFrom);
                                 setEventTimeTo(draftEventTimeTo);
                                 setOpen(false);
@@ -445,24 +508,12 @@ export default function EventDetailForm() {
                         className="py-3 w-full h-auto font-light"
                       />
                     </Field>
-                    {/* อีเมลติดต่อผู้จัดงาน */}
-                    <Field>
-                      <FieldLabel htmlFor="event-email" className="text-[16px]">
-                        อีเมลติดต่อผู้จัดงาน *
-                      </FieldLabel>
-                      <Input
-                        id="event-email"
-                        type="email"
-                        placeholder="event@gmail.com"
-                        required
-                        className="py-3 w-full h-auto font-light"
-                      />
-                    </Field>
+
                     {/* ช่วงขายบัตร */}
                     {/* เปิดขายบัตร */}
                     <Field>
                       <FieldLabel
-                        htmlFor="event-buy-end-at"
+                        htmlFor="event-buy-start-at"
                         className="text-[16px]"
                       >
                         วันและเวลาเปิดขายบัตร *
@@ -534,126 +585,17 @@ export default function EventDetailForm() {
               </div>
             </Badge>
           </div>
-          {/* บัญชีเจ้าของงาน */}
-          <div className="w-full flex flex-col">
-            <Badge
-              variant={"outline"}
-              className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
+
+          <div className="w-full mt-4 flex flex-col">
+            <Button
+              type="submit"
+              variant={"brand"}
+              className="p-3 flex-1 cursor-pointer"
+              disabled={submitting}
             >
-              {/* หัวเรื่อง */}
-              <div className="w-full flex flex-col items-start justify-center gap-1">
-                <div className="text-lg font-semibold text-black">
-                  บัญชีรับเงินของเจ้าของงาน
-                </div>
-                <div className="text-sm text-muted-foreground text-wrap">
-                  บัญชีเจ้าของงานสำหรับรับชำระเงินและตรวจสอบยอดโอน
-                </div>
-              </div>
-
-              {/* form bank account */}
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="bank-account" className="text-[16px]">
-                    เลขที่บัญชีรับเงิน *
-                  </FieldLabel>
-                  <Input
-                    id="bank-account"
-                    placeholder="กรอกเลขที่บัญชีรับเงินของเจ้าของงาน"
-                    className="py-3 w-full h-auto font-light"
-                    required
-                  />
-                  <FieldDescription className="text-wrap">
-                    ใช้เฉพาะเลขบัญชีจริงของเจ้าของงาน
-                    หรือเลขบัญชีที่เจ้าของงานอนุญาตเท่านั้น
-                  </FieldDescription>
-                </Field>
-                <Field>
-                  <FieldLabel
-                    htmlFor="bank-account-name"
-                    className="text-[16px]"
-                  >
-                    ชื่อบัญชี *
-                  </FieldLabel>
-                  <Input
-                    id="bank-account-name"
-                    placeholder="กรอกชื่อบัญชีตามที่ธนาคารระบุ"
-                    className="py-3 w-full h-auto font-light"
-                    required
-                  />
-                  <FieldDescription className="text-wrap">
-                    ใช้ชื่อบัญชีจริงที่ปรากฏในสมุดบัญชีธนาคาร
-                  </FieldDescription>
-                </Field>
-              </FieldGroup>
-            </Badge>
-          </div>
-          {/* token */}
-          <div className="w-full flex flex-col">
-            <Badge
-              variant={"outline"}
-              className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
-            >
-              {/* หัวเรื่อง */}
-              <div className="w-full flex flex-col items-start justify-center gap-1">
-                <div className="text-lg font-semibold text-black">
-                  ตั้งค่าอัตราแลกเปลี่ยน Token
-                </div>
-                <div className="text-sm text-muted-foreground text-wrap">
-                  กำหนดอัตราเงินบาทต่อ Token สำหรับการเติมหน้างาน
-                </div>
-              </div>
-
-              {/* taken rate */}
-              <div className="w-full flex flex-col items-start justify-center">
-                <FieldGroup>
-                  <Field>
-                    <FieldLabel htmlFor="token-rate" className="text-[16px]">
-                      จำนวนเงินบาทต่อ 1 Token *
-                    </FieldLabel>
-                    <Input
-                      id="token-rate"
-                      placeholder="1"
-                      type="number"
-                      min="1"
-                      required
-                      value={token}
-                      onChange={(e) => setToken(e.target.value)}
-                      className="py-3 w-full h-auto font-light"
-                    />
-                    <FieldDescription className="text-wrap">
-                      หน่วย: บาท / Token ระบุเป็นค่ามากกว่า 0
-                    </FieldDescription>
-                  </Field>
-                  <Badge
-                    variant={"outline"}
-                    className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
-                  >
-                    <div className="flex flex-col items-start justify-center gap-1.5">
-                      <div className="text-lg font-semibold">
-                        1 Token = {token} บาท
-                      </div>
-                    </div>
-                    <div className="w-full border border-b-muted-foreground"></div>
-                    <div className="flex flex-col items-start justify-center gap-1.5">
-                      <div className="text-lg font-semibold">
-                        300 บาท ÷ {token} = {300 / Number(token)} Token
-                      </div>
-                    </div>
-                  </Badge>
-                </FieldGroup>
-              </div>
-            </Badge>
-
-            <div className="w-full mt-4 flex flex-col">
-              <Button
-                type="submit"
-                variant={"brand"}
-                className="p-3 flex-1"
-                disabled={submitting}
-              >
-                {submitting ? "กำลังสร้าง..." : "สร้างงาน"}
-              </Button>
-            </div>
+              <Save />
+              {submitting ? "กำลังบันทึก..." : "บันทึก"}
+            </Button>
           </div>
         </form>
       </div>

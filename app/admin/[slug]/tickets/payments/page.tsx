@@ -250,7 +250,6 @@ function StatusBadge({ status }: { status: OrderStatus }) {
   );
 }
 
-// แถว "ชื่อ — ค่า" ที่ใช้ซ้ำหลายที่
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex w-full items-start justify-between gap-4">
@@ -262,7 +261,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function Page() {
+export default function Page({ slug }: { slug: string }) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [keyword, setKeyword] = useState("");
   const [index, setIndex] = useState(0);
@@ -281,7 +280,6 @@ export default function Page() {
 
   const pendingCount = orders.filter((o) => o.status === "pending").length;
 
-  // กัน index เกินช่วงเมื่อผลค้นหาเปลี่ยน
   const safeIndex =
     filtered.length === 0 ? 0 : Math.min(index, filtered.length - 1);
   const current: Order | undefined = filtered[safeIndex];
@@ -307,11 +305,15 @@ export default function Page() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href="/admin">ส่วนกลาง</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}`}>
+                {/* {event?.title} */}
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href="/admin/settings/pricing">บัตรและเสื้อ</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}/settings/pricing`}>
+                บัตรและเสื้อ
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
