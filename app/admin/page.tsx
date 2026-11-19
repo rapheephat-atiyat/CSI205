@@ -17,7 +17,9 @@ export default async function AdminPage() {
 
   const assignedEventId = assignedAdminRoles[0]?.eventId;
 
-  const isGlobalAdmin = user.userRoles.some((role) => role.role === Role.ADMIN && role.eventId === null && role.storeId === null);
+  const isGlobalAdmin = user.userRoles.some(
+    (role) => role.role === Role.ADMIN && role.eventId === null && role.storeId === null,
+  );
   if (!isGlobalAdmin && assignedAdminRoles.length === 1 && assignedEventId) {
     const event = await (await getDatabase()).getRepository(Events).findOne({
       where: { id: assignedEventId },
@@ -29,5 +31,7 @@ export default async function AdminPage() {
     }
   }
 
-  return <AdminEventList canCreate={hasPermission(user, PERMISSIONS.EVENT_CREATE)} />;
+  return (
+    <AdminEventList canCreate={hasPermission(user, PERMISSIONS.EVENT_CREATE)} />
+  );
 }

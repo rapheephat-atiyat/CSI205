@@ -45,7 +45,7 @@ async function AuthorizedEvent({ children, params }: { children: React.ReactNode
   return (
     <AdminAccessProvider eventId={event.id} eventTitle={event.title} slug={event.slug} userId={user.id} permissions={permissions}>
       <TooltipProvider>
-        <SidebarProvider defaultOpen={false}>
+        <SidebarProvider defaultOpen>
           <AdminNav />
           <main className="bg-[#F5F5F5] w-full">
             <TopBar />

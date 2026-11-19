@@ -1,6 +1,5 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { connection } from "next/server";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
@@ -21,18 +20,12 @@ export default function AdminLayout({
         </div>
       }
     >
-      <AuthenticatedAdminLayout>{children}</AuthenticatedAdminLayout>
+      <AdminGate>{children}</AdminGate>
     </Suspense>
   );
 }
 
-async function AuthenticatedAdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  // Auth helpers (and development instrumentation) must run after the request boundary.
-  await connection();
+async function AdminGate({ children }: { children: React.ReactNode }) {
   const user = await requirePageUser("/admin");
   const isAdmin = user.userRoles.some((r) => r.role === "ADMIN");
 

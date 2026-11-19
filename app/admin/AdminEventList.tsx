@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { EventSummary } from "@/lib/api-types";
 import { api } from "@/lib/api-client";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // head
 type HeadEv = {
@@ -29,7 +30,7 @@ type HeadEv = {
   place: string;
 };
 const headEv: HeadEv = {
-  caption: "รายการงานทั้งหมด",
+  caption: "รายการงานที่จัดการได้",
   name: "ชื่องาน",
   date: "วันเวลา",
   place: "สถานที่",
@@ -51,6 +52,24 @@ export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
     }
     load();
   }, []);
+
+  if (loading)
+    return (
+      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 bg-on-brand" />
+            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
+          </div>
+
+          {/* การ์ด 1 ใบ */}
+          <div className="w-full flex flex-col items-center justify-center gap-4">
+            <Skeleton className="h-240 w-full rounded-[10px] bg-on-brand" />
+          </div>
+        </div>
+      </div>
+    );
 
   const filteredEvents = events.filter((event) => {
     const searchLower = search.toLowerCase();
@@ -113,7 +132,7 @@ export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
           {/* หัวเรื่อง */}
           <div className="flex flex-col items-start justify-center">
             <div className="text-[18px] font-semibold text-black">
-              รายการงาน
+              งานที่จัดการได้
             </div>
           </div>
           <div className="w-full mt-4">
@@ -157,7 +176,9 @@ export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
                         colSpan={3}
                         className="py-6 text-center text-muted-foreground"
                       >
-                        ไม่พบรายการงานที่ค้นหา
+                        {events.length === 0
+                          ? "บัญชีนี้ยังไม่มีงานที่จัดการได้"
+                          : "ไม่พบรายการงานที่ค้นหา"}
                       </TableCell>
                     </TableRow>
                   ) : (

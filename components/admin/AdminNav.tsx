@@ -21,8 +21,10 @@ import {
 import {
   CalendarDays,
   FileText,
+  FolderUsers,
   History,
   LayoutDashboard,
+  ListClock,
   LucideIcon,
   Store,
   TicketPercent,
@@ -30,16 +32,11 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 import Brand from "@/components/core/Brand";
-import { useEffect } from "react";
-import { ClipboardCheck } from "lucide-react";
-import { useAdminAccess } from "./AdminAccess";
-import { PERMISSIONS, type Permission } from "@/lib/permissions";
 
 type NavItem = {
   icon: LucideIcon;
   href: string;
   label: string;
-  permission?: Permission;
 };
 
 type NavGroup = {
@@ -48,8 +45,7 @@ type NavGroup = {
 };
 
 export default function AdminNav() {
-  const { can } = useAdminAccess();
-  const { setOpen, state, setOpenMobile } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
   const { slug } = useParams<{ slug: string }>();
   const pathname = usePathname();
   const groups = getNavGroups(slug);
@@ -62,35 +58,27 @@ export default function AdminNav() {
       {
         label: "พื้นที่ผู้ดูแลส่วนกลาง",
         items: [
-          { icon: LayoutDashboard, href: base, label: "ภาพรวม", permission: PERMISSIONS.REPORT_READ },
-          { icon: CalendarDays, href: `${base}/settings`, label: "ตั้งค่างาน", permission: PERMISSIONS.EVENT_UPDATE },
-          { icon: ClipboardCheck, href: `${base}/tickets/payments`, label: "ตรวจชำระเงิน", permission: PERMISSIONS.ORDER_REVIEW },
+          { icon: LayoutDashboard, href: base, label: "ภาพรวม" },
+          { icon: CalendarDays, href: `${base}/settings`, label: "ตั้งค่างาน" },
           {
             icon: TicketPercent,
             href: `${base}/tickets`,
             label: "บัตรและเสื้อ",
-            permission: PERMISSIONS.EVENT_UPDATE,
           },
-          { icon: Users, href: `${base}/users`, label: "ผู้ใช้และสิทธิ์", permission: PERMISSIONS.PERMISSION_MANAGE },
-          { icon: Store, href: `${base}/vendors`, label: "ร้านค้า", permission: PERMISSIONS.STORE_MANAGE },
-          { icon: FileText, href: `${base}/reports`, label: "รายงานและส่งออก", permission: PERMISSIONS.REPORT_EXPORT },
-          { icon: History, href: `${base}/history`, label: "ประวัติแก้ไข", permission: PERMISSIONS.REPORT_READ },
-        ].filter((item) => !item.permission || can(item.permission)),
+          { icon: Users, href: `${base}/users`, label: "ผู้ใช้และสิทธิ์" },
+          { icon: Store, href: `${base}/vendors`, label: "ร้านค้า" },
+          { icon: FileText, href: `${base}/reports`, label: "รายงานและส่งออก" },
+          { icon: History, href: `${base}/history`, label: "ประวัติแก้ไข" },
+        ],
       },
     ];
   }
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname, setOpen]);
 
   return (
     <Sidebar collapsible="icon" className="flex items-center justify-center">
       <SidebarHeader className="flex items-center justify-center">
         {sidebarState && (
-          <Link href="/admin" className="border border-brand">
-            <Brand />
-          </Link>
+          <Brand href="/admin" />
         )}
       </SidebarHeader>
       <SidebarContent>
