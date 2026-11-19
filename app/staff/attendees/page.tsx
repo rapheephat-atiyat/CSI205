@@ -33,7 +33,7 @@ export default function AttendeeSearchPage() {
             id: item.id,
             name: item.name,
             ticketId: item.ticketId,
-            ticketType: (item.ticketType as Attendee["ticketType"]) || "General",
+            ticketType: (item.ticketType as Attendee["ticketType"]) || "ทั่วไป",
             status: item.status,
             tokens: item.tokens,
             lastActionAt: item.lastActionAt,
@@ -52,7 +52,7 @@ export default function AttendeeSearchPage() {
     return list.filter(
       (a) =>
         (filter === "all" || a.status === filter) &&
-        (!q || a.name.toLowerCase().includes(q) || a.ticketId.toLowerCase().includes(q))
+        (!q || a.name.toLowerCase().includes(q) || a.ticketId.toLowerCase().includes(q) || a.ticketType.toLowerCase().includes(q))
     );
   }, [list, query, filter]);
 
@@ -128,7 +128,7 @@ export default function AttendeeSearchPage() {
                 <div className="min-w-0">
                   <p className="truncate font-medium">{a.name}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    <span className="font-mono">{a.ticketId}</span> · บัตร {a.ticketType}
+                    <span className="font-mono">{a.ticketId}</span> · {a.ticketType.startsWith("บัตร") ? a.ticketType : `บัตร${a.ticketType}`}
                   </p>
                 </div>
                 <AttendeeStatusBadge status={a.status} />

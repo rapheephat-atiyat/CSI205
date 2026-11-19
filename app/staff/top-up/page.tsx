@@ -36,7 +36,7 @@ function TokenTopUpContent() {
             id: item.id,
             name: item.name,
             ticketId: item.ticketId,
-            ticketType: (item.ticketType as (typeof seed)[0]["ticketType"]) || "General",
+            ticketType: (item.ticketType as (typeof seed)[0]["ticketType"]) || "ทั่วไป",
             status: item.status,
             tokens: item.tokens,
             lastActionAt: item.lastActionAt,

@@ -17,7 +17,7 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
 import { StaffSidebarNav } from "@/components/staff/staff-nav";
-import { eventInfo, staffProfile } from "@/lib/staff-mock";
+import { eventInfo } from "@/lib/staff-mock";
 
 export const metadata: Metadata = {
   title: "Staff & Check-in | TuaTua",
@@ -56,11 +56,6 @@ export default function StaffLayout({
                     </BreadcrumbItem>
                   </BreadcrumbList>
                 </Breadcrumb>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{staffProfile.name}</span>
-                <span className="hidden sm:inline">·</span>
-                <span className="hidden sm:inline">{staffProfile.role}</span>
               </div>
             </header>
             <div className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8">

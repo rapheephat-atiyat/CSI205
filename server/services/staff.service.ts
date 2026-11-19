@@ -163,7 +163,7 @@ export async function getStaffAttendees(
             id: t.id,
             name,
             ticketId: t.ticketCode,
-            ticketType: t.eventTicket?.name ?? "General",
+            ticketType: t.eventTicket?.name ?? "ทั่วไป",
             status: isCheckedIn ? "checked-in" : "not-arrived",
             tokens: walletMap.get(t.userId) ?? 0,
             userId: t.userId,

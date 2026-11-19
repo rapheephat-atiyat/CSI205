@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ArrowRight, Coins, LogIn, ScanLine, Search, Users } from "lucide-react";
+import { ArrowRight, Coins, LogIn, ScanLine, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { OutcomeBadge } from "@/components/staff/status-badge";
@@ -10,11 +10,10 @@ import {
   attendees as seedAttendees,
   eventInfo as defaultEventInfo,
   formatTokens,
-  staffProfile as defaultStaffProfile,
   type ScanRecord,
 } from "@/lib/staff-mock";
 import { api } from "@/lib/api-client";
-import { getStoredScans, getStoredTopUpQuota } from "@/lib/staff-storage";
+import { getStoredScans } from "@/lib/staff-storage";
 
 export default function StaffDashboardPage() {
   const [total, setTotal] = useState(seedAttendees.length);
@@ -26,7 +25,6 @@ export default function StaffDashboardPage() {
   );
   const [waiting, setWaiting] = useState(total - checkedIn - checkedOut);
   const [eventData, setEventData] = useState(defaultEventInfo);
-  const [quotaData] = useState(() => getStoredTopUpQuota());
   const [recentScans, setRecentScans] = useState<ScanRecord[]>(() => getStoredScans().slice(0, 5));
 
   useEffect(() => {
@@ -69,8 +67,6 @@ export default function StaffDashboardPage() {
     }
     loadOverview();
   }, []);
-
-  const quotaLeft = defaultStaffProfile.topUpQuotaTotal - quotaData.used;
 
   const stats = [
     { label: "ผู้เข้าร่วมทั้งหมด", value: total, note: `ความจุงาน ${formatTokens(eventData.capacity)} คน` },
@@ -154,19 +150,6 @@ export default function StaffDashboardPage() {
                 </Button>
               ))}
             </div>
-          </div>
-          <div className="rounded-xl border bg-brand-soft p-4 sm:p-5">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Users className="size-4 text-brand" aria-hidden />
-              โควตาเติม Token ของคุณ
-            </div>
-            <p className="mt-2 text-2xl font-semibold tabular-nums">
-              {formatTokens(Math.max(quotaLeft, 0))}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">
-                / {formatTokens(defaultStaffProfile.topUpQuotaTotal)} Token
-              </span>
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">คงเหลือสำหรับวันนี้</p>
           </div>
         </section>
       </div>

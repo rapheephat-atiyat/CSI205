@@ -31,7 +31,7 @@ export default function CheckInPage() {
             id: item.id,
             name: item.name,
             ticketId: item.ticketId,
-            ticketType: (item.ticketType as Attendee["ticketType"]) || "General",
+            ticketType: (item.ticketType as Attendee["ticketType"]) || "ทั่วไป",
             status: item.status,
             tokens: item.tokens,
             lastActionAt: item.lastActionAt,
@@ -147,7 +147,7 @@ export default function CheckInPage() {
                 <Ticket className="size-3.5" aria-hidden />
                 ประเภทบัตร
               </dt>
-              <dd className="mt-1 font-medium">{selected.ticketType}</dd>
+              <dd className="mt-1 font-medium">{selected.ticketType.startsWith("บัตร") ? selected.ticketType : `บัตร${selected.ticketType}`}</dd>
             </div>
             <div className="rounded-lg bg-muted/60 p-3">
               <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
