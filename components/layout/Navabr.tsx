@@ -5,9 +5,11 @@ import Brand from "@/components/core/Brand";
 import MobileNavigation from "@/components/layout/MNavbar";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { ChevronDown, LogOut, ShoppingCart, Ticket, User } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronDown, LogOut, ScanLine, ShieldCheck, ShoppingCart, Store, Ticket, User } from "lucide-react";
 import { authClient } from "@/lib/auth-client";
+import { api } from "@/lib/api-client";
+import type { User as UserProfile } from "@/lib/api-types";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
@@ -19,9 +21,14 @@ export interface NavbarLink {
 const NAVBARLINKS: readonly NavbarLink[] = [
     { label: "หน้าหลัก", href: "/" },
     { label: "งานทั้งหมด", href: "/events" },
-    { label: "วิธีใช้งาน", href: "/how-it-works" },
     { label: "ช่วยเหลือ", href: "/help" },
 ]
+
+const PORTAL_LINKS = [
+    { role: "ADMIN", label: "Admin Portal", href: "/admin", icon: ShieldCheck },
+    { role: "VENDOR", label: "Vendor Portal", href: "/vendor", icon: Store },
+    { role: "STAFF", label: "Staff Portal", href: "/staff", icon: ScanLine },
+] as const;
 
 export default function Navabr() {
     const pathname = usePathname();
@@ -29,11 +36,26 @@ export default function Navabr() {
     const { data: session, isPending } = authClient.useSession();
     const [mobileOpen, setMobileOpen] = useState<boolean>(false);
     const [isSigningOut, setIsSigningOut] = useState(false);
+    const [profile, setProfile] = useState<Pick<UserProfile, "id" | "roles"> | null>(null);
     const isActive = (href: string) => pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
 
     const user = session?.user;
+    const userId = user?.id;
     const displayName = user?.firstName || user?.name || "User";
     const init = displayName.trim().charAt(0).toUpperCase();
+
+    useEffect(() => {
+        if (isPending || !userId) return;
+        let active = true;
+        void api.me.get().then((result) => {
+            if (active) setProfile(result.success ? result.data : null);
+        });
+        return () => { active = false; };
+    }, [isPending, userId]);
+
+    const portalLinks = !isPending && userId && profile?.id === userId
+        ? PORTAL_LINKS.filter((portal) => profile.roles.some((assignment) => assignment.role === portal.role))
+        : [];
 
     const handleSignOut = async () => {
         if (isSigningOut) return;
@@ -131,6 +153,23 @@ export default function Navabr() {
                                         </DropdownMenuItem>
                                     </DropdownMenuGroup>
 
+                                    {portalLinks.length > 0 && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuLabel>พื้นที่ทำงาน</DropdownMenuLabel>
+                                            <DropdownMenuGroup>
+                                                {portalLinks.map(({ href, label, icon: Icon }) => (
+                                                    <DropdownMenuItem key={href} asChild className="min-h-11 cursor-pointer">
+                                                        <Link href={href} prefetch={false}>
+                                                            <Icon aria-hidden="true" />
+                                                            {label}
+                                                        </Link>
+                                                    </DropdownMenuItem>
+                                                ))}
+                                            </DropdownMenuGroup>
+                                        </>
+                                    )}
+
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                         variant="destructive"
@@ -169,6 +208,7 @@ export default function Navabr() {
 
                     <MobileNavigation
                         links={NAVBARLINKS}
+                        portalLinks={portalLinks}
                         isActive={isActive}
                         open={mobileOpen}
                         onOpenChange={setMobileOpen}

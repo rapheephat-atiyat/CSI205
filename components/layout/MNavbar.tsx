@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Link from "next/link";
-import { ChevronRight, LogOut, Menu, Ticket, User, X } from "lucide-react";
+import { ChevronRight, LogOut, Menu, Ticket, User, X, type LucideIcon } from "lucide-react";
 import Brand from "@/components/core/Brand";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 
 interface MobileNavigationProps {
     links: readonly { label: string; href: string }[];
+    portalLinks: readonly { label: string; href: string; icon: LucideIcon }[];
     isActive: (href: string) => boolean;
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -29,7 +30,7 @@ const accountLinks = [
 ] as const;
 
 export default function MobileNavigation({
-    links, isActive, open, onOpenChange, user, isPending, isSigningOut, onSignOut,
+    links, portalLinks, isActive, open, onOpenChange, user, isPending, isSigningOut, onSignOut,
 }: MobileNavigationProps) {
     const displayName = user?.firstName || user?.name || "User";
 
@@ -77,6 +78,21 @@ export default function MobileNavigation({
                             </DrawerClose>
                         ))}
                     </nav>
+
+                    {!isPending && user && portalLinks.length > 0 && (
+                        <nav aria-label="Portal ของฉัน" className="mx-4 space-y-2 border-t border-border/60 py-5">
+                            <p className="px-3 text-xs text-muted-foreground">พื้นที่ทำงาน</p>
+                            {portalLinks.map(({ href, label, icon: Icon }) => (
+                                <DrawerClose asChild key={href}>
+                                    <Link href={href} prefetch={false} className="flex min-h-12 items-center gap-3 rounded-lg bg-brand-soft px-3 text-sm font-medium text-brand outline-none hover:bg-brand hover:text-on-brand focus-visible:ring-2 focus-visible:ring-brand">
+                                        <Icon aria-hidden="true" className="size-4" strokeWidth={1.5} />
+                                        <span className="flex-1">{label}</span>
+                                        <ChevronRight aria-hidden="true" className="size-4" />
+                                    </Link>
+                                </DrawerClose>
+                            ))}
+                        </nav>
+                    )}
 
                     {!isPending && user && (
                         <div className="mx-4 border-t border-border/60 py-5">
