@@ -1,6 +1,6 @@
 # Performance audit — 2026-11-19
 
-Branch: `fix/site-performance`, based on `dev` at `4a5288d` after FAQ PR #73.
+Branch: `fix/site-performance`, initially based on `dev` at `4a5288d` after FAQ PR #73; merged current `dev` at `b33ec5b` before opening the performance PR. The upstream rear-camera selection/fallback fix is preserved alongside deferred loading and cancellation guards.
 Next.js 16.4.6 / React 19.3.0 / OpenNext Cloudflare 1.20.17 / Wrangler 4.165.0.
 
 ## Changes
@@ -49,7 +49,7 @@ Actual production `next start` on `127.0.0.1:3018`, anonymous requests, same mac
 | `/api/faq` | 182 / 110 (109–112) | 15 / 5 (4–5) |
 | `/e/checkout-demo-closed` | 671 / 336 (331–343) | 566 / 341 (331–356) |
 
-The event detail route was not optimized and showed no warm improvement. The remote public dataset changed from 28 to 29 events between measurements, so these are indicative latency comparisons, not a controlled payload-size experiment. No claim is made that every user or production region will see the same reduction. Removing the homepage banner also changes its content and resource requirements.
+The event detail route was not optimized and showed no warm improvement. The remote public dataset changed from 28 to 29 events between measurements, so these are indicative latency comparisons, not a controlled payload-size experiment. HTTP samples preceded the final camera-only upstream merge; public cache implementation was unchanged by that merge. No claim is made that every user or production region will see the same reduction. Removing the homepage banner also changes its content and resource requirements.
 
 Read-only diagnostics before changes found about 60 KB of event descriptions across 28 rows that the catalog query did not need. This is database query payload, not browser JavaScript savings.
 
@@ -60,6 +60,7 @@ Named snapshots, whole application (68 routes):
 1. `perf-before-20261119` → `perf-scanner-20261119`: defer camera library.
 2. `perf-scanner-20261119` → `perf-faq-icons-20261119`: server FAQ icons; exclude generated Cloudflare types from Tailwind scanning.
 3. `perf-faq-icons-20261119` → `perf-final-20261119`: remove hardcoded banner/demo fallbacks and unused order client state/logs; add event error/retry UI.
+4. `perf-final-20261119` → `perf-merged-20261119`: preserve upstream rear-camera fix. Final table below uses this merged capture; scanner UI smoke and Linux build/dry-run were repeated successfully.
 
 The scanner intermediate capture temporarily included 1,717 extra compressed CSS bytes from the generated binding declarations. The subsequent capture removes that noise. Every accepted capture is preserved, rather than replacing the initial baseline.
 
@@ -67,12 +68,12 @@ Metric: synchronous reachable **compressed build attribution** for client JS/CSS
 
 | Route | Before bytes | Final bytes | Difference |
 | --- | ---: | ---: | ---: |
-| `/` | 330174 | 322097 | -8077 (-2.4%) |
-| `/events` | 323391 | 323716 | +325 (+0.1%, error/retry UI) |
-| `/faq` | 348125 | 326451 | -21674 (-6.2%) |
-| `/vendor/scan` | 403091 | 288258 | -114833 (-28.5%) |
-| `/account` | 344280 | 344174 | -106 |
-| `/profile` | 215434 | 215352 | -82 |
+| `/` | 330174 | 322104 | -8070 (-2.4%) |
+| `/events` | 323391 | 323723 | +332 (+0.1%, error/retry UI) |
+| `/faq` | 348125 | 326458 | -21667 (-6.2%) |
+| `/vendor/scan` | 403091 | 288301 | -114790 (-28.5%) |
+| `/account` | 344280 | 344181 | -99 |
+| `/profile` | 215434 | 215359 | -75 |
 
 The scanner package remains available as an asynchronous import (~114,928 compressed attributed bytes) after a camera click. It was moved out of synchronous reachability, not removed. Public FAQ no longer imports `lucide-react/dynamic` on the client; saved icon names still render as server SVGs.
 
@@ -144,7 +145,7 @@ No possible server-only implementation leak was found in the scoped scan. Heuris
 - Rendered UI: FAQ search/categories/keyboard/empty state; orders with PAID filtering and two separate users (first user's order absent for second user); scanner manual UUID/confirmation/cancel/deferred open/close. Mobile 390×844 and desktop 1280×900: no document horizontal overflow observed on public homepage/FAQ.
 - `npm run cf-typegen`: passed using installed Wrangler schema; generated binding file ignored.
 - Native Windows OpenNext packaging encountered `EPERM` while creating a symlink. Re-tested in the existing official `node:24.15.0-bookworm-slim` Linux container, with isolated Linux dependencies/build output: **OpenNext build passed**. No Windows security settings or app dependencies changed to bypass this.
-- Linux `wrangler deploy --dry-run`: passed, no upload/deploy. Reported Worker gzip size 8,552.51 KiB, with expected KV/D1/DO bindings. Slim-image local runtime needed Debian CA certificates; TLS verification stayed enabled.
+- Linux `wrangler deploy --dry-run`: passed again after merging upstream, no upload/deploy. Final reported Worker gzip size 8,552.53 KiB, with expected KV/D1/DO bindings. Slim-image local runtime needed Debian CA certificates; TLS verification stayed enabled.
 - Local OpenNext/Workerd preview: populated 40 KV entries and the D1 cache table; `/api/events`, `/api/faq`, `/`, `/faq` all returned HTTP 200. Local KV inspection confirmed `.composable` cache writes. Bindings used local mode; no production cache content was written by this preview.
 - The older PR #73 optional `Workers Builds: csi205` check failed. Its logs require a Cloudflare Dashboard login not present in the test browser; the failure reason is not established. Its required `Cloudflare npm ci` check passed, and #73 was merged to dev before optimization. A successful local Linux build does not establish that the external build was repaired.
 
@@ -164,7 +165,7 @@ Existing OpenNext was preserved; no framework migration was performed.
 
 ## Reproducing the evidence
 
-Machine-local artifacts are under `C:/Users/raphe/.codex/visualizations/2026/11/18/01a1eef8-3324-74a3-bbe7-e032823873ff/`: `performance-before.json`, `performance-after.json`, `worker-smoke.json`, four analyzer JSONL gzip exports and summaries, `client-dependencies.json`, and real browser screenshots.
+Machine-local artifacts are under `C:/Users/raphe/.codex/visualizations/2026/11/18/01a1eef8-3324-74a3-bbe7-e032823873ff/`: `performance-before.json`, `performance-after.json`, `worker-smoke.json`, five analyzer JSONL gzip exports and summaries, `client-dependencies.json`, `client-dependencies-merged.json`, and real browser screenshots.
 
 Capture with the installed CLI:
 
