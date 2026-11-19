@@ -1,337 +1,100 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-import { SearchIcon } from "lucide-react";
-
-// UI
-import { Badge } from "@/components/ui/badge";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Spinner } from "@/components/ui/spinner";
-
-import { WalletHistoryItem } from "@/lib/api-types";
+import Link from "next/link";
+import { useAdminAccess } from "@/components/admin/AdminAccess";
+import { AdminFeedback, apiData } from "@/components/admin/AdminFeedback";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api-client";
-import { Skeleton } from "@/components/ui/skeleton";
+import type { AdminActivityItem } from "@/lib/api-types";
 
-// แปลง type เป็นภาษาไทย
-const typeLabel: Record<string, string> = {
-  TOPUP: "เติมเงิน",
-  PURCHASE: "ซื้อสินค้า",
-  REFUND: "คืนเงิน",
+const labels: Record<string, string> = {
+  "order.approve": "อนุมัติคำสั่งซื้อ",
+  "order.reject": "ไม่อนุมัติคำสั่งซื้อ",
+  "shipping.update": "อัปเดตจัดส่ง",
+  "event.create": "สร้างงาน",
+  "event.update": "แก้ไขงาน",
+  "ticket.create": "เพิ่มประเภทบัตร",
+  "ticket.update": "แก้ไขประเภทบัตร",
+  "ticket.delete": "ลบประเภทบัตร",
+  "souvenir.create": "เพิ่มของที่ระลึก",
+  "souvenir.update": "แก้ไขของที่ระลึก",
+  "souvenir.delete": "ลบของที่ระลึก",
+  "store.create": "สร้างร้านค้า",
+  "store.update": "แก้ไขร้านค้า",
+  "store.delete": "ลบร้านค้า",
+  "role.assign": "เพิ่มบทบาท",
+  "role.update": "แก้ไขสิทธิ์",
+  "role.revoke": "ถอนบทบาท",
+  "role.legacy-defaults": "เพิ่มสิทธิ์เริ่มต้นของผู้ดูแลงาน",
 };
 
-const statusLabel: Record<string, string> = {
-  COMPLETED: "สำเร็จ",
-  PENDING: "รอดำเนินการ",
-  REJECTED: "ถูกปฏิเสธ",
-};
-
-const statusColor: Record<string, string> = {
-  COMPLETED: "bg-green-100 text-green-800",
-  PENDING: "bg-yellow-100 text-yellow-800",
-  REJECTED: "bg-red-100 text-red-800",
-};
-
-export default function Page() {
-  const params = useParams();
-  const slug = params.slug as string;
-
-  const [search, setSearch] = useState("");
-  const [logs, setLogs] = useState<WalletHistoryItem[]>([]);
+export default function ActivityPage() {
+  const { eventId, eventTitle, slug } = useAdminAccess();
+  const [items, setItems] = useState<AdminActivityItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [revision, setRevision] = useState(0);
 
   useEffect(() => {
-    async function fetchLog() {
-      try {
-        setLoading(true);
-        const res = await api.admin.reports.auditLog();
-        if (res.success) {
-          setLogs(res.data);
-        } else {
-          setError(res.error.message);
-        }
-      } catch (err) {
-        setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchLog();
-  }, []);
-
-  // Filter
-  const filteredLogs = logs.filter((log) => {
-    const q = search.toLowerCase();
-    return (
-      log.note?.toLowerCase().startsWith(q.trim()) ||
-      log.type.toLowerCase().startsWith(q.trim()) ||
-      log.ref?.toLowerCase().startsWith(q.trim()) ||
-      typeLabel[log.type]?.startsWith(search)
-    );
-  });
-
-  // จัดรูปแบบวันที่
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString("th-TH", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+    let cancelled = false;
+    api.admin.activities(eventId).then(apiData).then((data) => {
+      if (!cancelled) setItems(data);
+    }).catch((cause: unknown) => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : "โหลดประวัติไม่สำเร็จ");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
     });
-  };
+    return () => { cancelled = true; };
+  }, [eventId, revision]);
 
-  // จัดรูปแบบเงิน
-  const formatMoney = (value: string) => {
-    return Number(value).toLocaleString("th-TH", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
+  function reload() {
+    setLoading(true);
+    setError(null);
+    setRevision((value) => value + 1);
+  }
 
-  if (loading)
-    return (
-      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
-        {/* breadcrumb */}
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-4 w-24 bg-on-brand" />
-          <Skeleton className="h-4 w-4 bg-on-brand" />
-          <Skeleton className="h-4 w-32 bg-on-brand" />
-        </div>
-        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
-          {/* หัวเรื่อง */}
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-7 w-48 bg-on-brand" />
-            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
-          </div>
-
-          {/* การ์ด 1 ใบ */}
-          <div className="w-full flex flex-col items-center justify-center gap-4">
-            <Skeleton className="h-140 w-full rounded-[10px] bg-on-brand" />
-          </div>
-        </div>
-      </div>
-    );
+  const query = search.trim().toLowerCase();
+  const filtered = items.filter((item) => [labels[item.action] ?? item.action, item.actorName, item.note, item.targetId]
+    .some((value) => value?.toLowerCase().includes(query)));
 
   return (
-    <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
-      {/* Breadcrumbs */}
-      <div className="w-full flex items-center justify-start">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>ประวัติ Wallet</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      </div>
-
-      <div className="p-4 mx-auto w-full max-w-7xl flex flex-col items-start justify-center gap-4">
-        {/* หัวเรื่อง */}
-        <div className="flex flex-col items-start justify-center">
-          <div className="text-[24px] font-semibold text-black">
-            ประวัติ Wallet
-          </div>
-          <div className="text-[14px] font-medium text-muted-foreground">
-            รายการเติมเงิน / ซื้อสินค้า ทั้งหมด
-          </div>
+    <div className="mx-auto w-full max-w-7xl space-y-5 p-4 md:p-6">
+      <Link className="text-sm text-muted-foreground hover:text-foreground" href={`/admin/${encodeURIComponent(slug)}`}>{eventTitle}</Link>
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold">ประวัติแก้ไข</h1>
+          <p className="mt-2 text-sm text-muted-foreground">ประวัติการจัดการงานและตรวจชำระเงินล่าสุด 200 รายการ</p>
         </div>
-
-        {/* Container */}
-        <Badge
-          variant="outline"
-          className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5"
-        >
-          {/* Search */}
-          <div className="flex w-full flex-col items-start justify-center gap-1">
-            <FieldGroup className="flex lg:flex-row w-full">
-              <Field className="lg:flex-2 w-full">
-                <FieldLabel
-                  htmlFor="search-wallet-history"
-                  className="text-sm text-muted-foreground"
-                >
-                  ค้นหา
-                </FieldLabel>
-                <InputGroup className="w-full h-auto flex p-2">
-                  <InputGroupInput
-                    placeholder="ค้นหาหมายเหตุ, ประเภท, เลขที่อ้างอิง..."
-                    className="text-sm"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  <InputGroupAddon>
-                    <SearchIcon className="text-muted-foreground" />
-                  </InputGroupAddon>
-                </InputGroup>
-              </Field>
-            </FieldGroup>
-          </div>
-
-          {/* Content */}
-          <Badge
-            variant="outline"
-            className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5 mt-2"
-          >
-            {loading ? (
-              <div className="w-full flex justify-center py-12">
-                <Spinner className="size-8 text-brand" />
-              </div>
-            ) : error ? (
-              <div className="w-full text-center py-8 text-red-600">
-                {error}
-              </div>
-            ) : filteredLogs.length === 0 ? (
-              <div className="w-full text-center py-8 text-muted-foreground">
-                ไม่พบรายการ
-              </div>
-            ) : (
-              <>
-                {/* ===== Mobile View ===== */}
-                <div className="flex w-full flex-col gap-3 md:hidden">
-                  {filteredLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="flex flex-col gap-2 p-4 rounded-lg border bg-white"
-                    >
-                      <div className="flex justify-between items-start">
-                        <div className="text-xs text-muted-foreground">
-                          {formatDate(log.createdAt)}
-                        </div>
-                        <span
-                          className={`text-xs px-2 py-0.5 rounded-full ${statusColor[log.status]}`}
-                        >
-                          {statusLabel[log.status] || log.status}
-                        </span>
-                      </div>
-
-                      <div className="font-semibold text-base">
-                        {typeLabel[log.type] || log.type}
-                      </div>
-
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">จำนวน: </span>
-                        <span className="font-medium">
-                          {formatMoney(log.amount)} บาท
-                        </span>
-                      </div>
-
-                      <div className="text-sm">
-                        <span className="text-muted-foreground">
-                          ก่อน → หลัง:{" "}
-                        </span>
-                        <span className="font-medium">
-                          {formatMoney(log.before)} → {formatMoney(log.after)}
-                        </span>
-                      </div>
-
-                      {log.note && (
-                        <div className="text-sm text-muted-foreground">
-                          {log.note}
-                        </div>
-                      )}
-
-                      <div className="text-xs text-muted-foreground mt-1">
-                        Ref: {log.ref}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* ===== Desktop View ===== */}
-                <div className="hidden w-full max-h-[600px] overflow-y-auto md:block">
-                  <Table>
-                    <TableHeader className="bg-[#FAFAFA]">
-                      <TableRow className="text-[15px]">
-                        <TableHead className="text-muted-foreground font-normal w-[180px]">
-                          วันเวลา
-                        </TableHead>
-                        <TableHead className="text-muted-foreground font-normal w-[100px]">
-                          ประเภท
-                        </TableHead>
-                        <TableHead className="text-muted-foreground font-normal w-[120px]">
-                          สถานะ
-                        </TableHead>
-                        <TableHead className="text-muted-foreground font-normal text-right w-[130px]">
-                          จำนวนเงิน
-                        </TableHead>
-                        <TableHead className="text-muted-foreground font-normal w-auto">
-                          ก่อน → หลัง
-                        </TableHead>
-                        <TableHead className="text-muted-foreground font-normal w-[330px]">
-                          หมายเหตุ
-                        </TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {filteredLogs.map((log) => (
-                        <TableRow key={log.id} className="text-sm">
-                          <TableCell className="text-muted-foreground whitespace-nowrap">
-                            {formatDate(log.createdAt)}
-                          </TableCell>
-
-                          <TableCell className="font-medium">
-                            {typeLabel[log.type] || log.type}
-                          </TableCell>
-
-                          <TableCell>
-                            <Badge
-                              className={`p-2 text-xs px-2 py-0.5 rounded-full ${statusColor[log.status]}`}
-                            >
-                              {statusLabel[log.status] || log.status}
-                            </Badge>
-                          </TableCell>
-
-                          <TableCell className="text-right font-medium">
-                            {formatMoney(log.amount)}
-                          </TableCell>
-
-                          <TableCell className="text-xs">
-                            {formatMoney(log.before)} → {formatMoney(log.after)}
-                          </TableCell>
-
-                          <TableCell className="max-w-[280px]">
-                            <div className="truncate">{log.note || "-"}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">
-                              {log.ref}
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </>
-            )}
-          </Badge>
-        </Badge>
+        <Button variant="outline" className="min-h-11" onClick={reload}>รีเฟรชข้อมูล</Button>
+      </header>
+      <div className="space-y-2">
+        <label htmlFor="activity-search" className="text-sm font-medium">ค้นหาประวัติ</label>
+        <Input id="activity-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="การดำเนินการ ผู้ดูแล หรือเหตุผล" />
       </div>
+      <AdminFeedback loading={loading} error={error} retry={reload} />
+      {!loading && !error && (
+        <div className="rounded-xl border bg-background p-4">
+          <Table>
+            <TableHeader><TableRow><TableHead>วันเวลา</TableHead><TableHead>การดำเนินการ</TableHead><TableHead>ผู้ดูแล</TableHead><TableHead>หมายเหตุ / รายการ</TableHead></TableRow></TableHeader>
+            <TableBody>
+              {filtered.length === 0 ? (
+                <TableRow><TableCell colSpan={4} className="h-32 text-center text-muted-foreground">ยังไม่มีประวัติที่ตรงกัน</TableCell></TableRow>
+              ) : filtered.map((item) => (
+                <TableRow key={item.id}>
+                  <TableCell className="whitespace-nowrap">{new Date(item.createdAt).toLocaleString("th-TH", { timeZone: "Asia/Bangkok" })}</TableCell>
+                  <TableCell>{labels[item.action] ?? item.action}</TableCell>
+                  <TableCell>{item.actorName ?? "ระบบ"}</TableCell>
+                  <TableCell><p className="max-w-md whitespace-pre-wrap wrap-break-word">{item.note ?? "—"}</p><p className="mt-1 text-xs text-muted-foreground">{item.targetId}</p></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }

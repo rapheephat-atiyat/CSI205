@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useAdminAccess } from "@/components/admin/AdminAccess";
+import { AdminFeedback, apiData } from "@/components/admin/AdminFeedback";
+import { makeAdminCsv, type ExportCell } from "@/lib/admin-export";
 
 // ui
 import { Badge } from "@/components/ui/badge";
@@ -30,83 +32,54 @@ import { toast } from "sonner";
 import { Download } from "lucide-react";
 
 import { api } from "@/lib/api-client";
-import type {
-  EventDetail,
-  EventTicketItem,
-  OverviewReport,
-  StoreDetail,
-  WalletHistoryItem,
-} from "@/lib/api-types";
-
-type Cell = string | number | null | undefined;
+import type { AdminExportReport } from "@/lib/api-types";
 
 const num = (v?: string | number | null) =>
   v === null || v === undefined ? "-" : Number(v).toLocaleString("th-TH");
 
 export default function Page() {
-  const [downLoadFinish, setDownLoadFinish] = useState(false);
-  const { slug } = useParams<{ slug: string }>();
+  const { eventId, eventTitle, slug } = useAdminAccess();
 
-  const [event, setEvent] = useState<EventDetail | null>(null);
-  const [tickets, setTickets] = useState<EventTicketItem[]>([]);
-  const [stores, setStores] = useState<
-    { id: string; name: string; detail: StoreDetail | null }[]
-  >([]);
-  const [overview, setOverview] = useState<OverviewReport | null>(null);
-  const [auditLog, setAuditLog] = useState<WalletHistoryItem[]>([]);
+  const [report, setReport] = useState<AdminExportReport | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
+
+  function reload() {
+    setLoading(true);
+    setError(null);
+    setRevision((value) => value + 1);
+  }
 
   useEffect(() => {
-    async function load() {
-      const eventRes = await api.events.get(slug);
-      if (!eventRes.success) {
-        setError(eventRes.error.message);
-        setLoading(false);
-        return;
-      }
-      const ev = eventRes.data;
-      setEvent(ev);
+    let cancelled = false;
+    api.admin.exportReport(eventId).then(apiData).then((data) => {
+      if (!cancelled) setReport(data);
+    }).catch((cause: unknown) => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : "โหลดรายงานไม่สำเร็จ");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [eventId, revision]);
 
-      const [ticketsRes, storeRes, overviewRes, auditRes] = await Promise.all([
-        api.events.tickets.list(ev.id),
-        Promise.all(ev.stores.map((s) => api.store.getMy(s.id))),
-        api.admin.reports.overview(),
-        api.admin.reports.auditLog(),
-      ]);
-
-      if (ticketsRes.success) setTickets(ticketsRes.data);
-      setStores(
-        ev.stores.map((s, i) => ({
-          id: s.id,
-          name: s.name,
-          detail: storeRes[i].success ? storeRes[i].data : null,
-        })),
-      );
-      if (overviewRes.success) setOverview(overviewRes.data);
-      if (auditRes.success) setAuditLog(auditRes.data);
-      setLoading(false);
-    }
-    load();
-  }, [slug]);
-
-  const ticketRows = tickets.map((t) => ({
+  const ticketRows = (report?.tickets ?? []).map((t) => ({
     id: t.id,
     name: t.name,
     price: Number(t.price),
-    sold: t.sold,
+    sold: t.paidTickets,
     quota: t.quota,
-    revenue: Number(t.price) * t.sold,
+    revenue: Number(t.paidRevenue),
   }));
   const totalSold = ticketRows.reduce((s, r) => s + r.sold, 0);
   const totalRevenue = ticketRows.reduce((s, r) => s + r.revenue, 0);
 
-  const storeRows = stores.map((s) => ({
+  const storeRows = (report?.stores ?? []).map((s) => ({
     id: s.id,
     name: s.name,
-    product: s.detail?.product?.title ?? null,
-    price: s.detail?.product ? Number(s.detail.product.price) : null,
-    balance: s.detail ? Number(s.detail.walletBalance) : null,
+    product: s.product?.title ?? null,
+    price: s.product ? Number(s.product.price) : null,
+    balance: Number(s.walletBalance),
   }));
   const totalStoreBalance = storeRows.reduce((s, r) => s + (r.balance ?? 0), 0);
 
@@ -122,7 +95,7 @@ export default function Page() {
       rows: [
         ["ประเภทบัตร", "ราคา (บาท)", "ขายแล้ว", "จำนวนทั้งหมด", "รายได้ (บาท)"],
         ...ticketRows.map((r) => [r.name, r.price, r.sold, r.quota, r.revenue]),
-      ] as Cell[][],
+      ] as ExportCell[][],
     },
     {
       id: "stores",
@@ -134,59 +107,24 @@ export default function Page() {
       rows: [
         ["ร้านค้า", "สินค้า", "ราคา (Token)", "ยอด Token คงเหลือ"],
         ...storeRows.map((r) => [r.name, r.product, r.price, r.balance]),
-      ] as Cell[][],
+      ] as ExportCell[][],
     },
     {
-      id: "audit",
-      title: "ความเคลื่อนไหวกระเป๋า Token",
-      description: "วันเวลา / ประเภท / สถานะ / จำนวน / ก่อน/หลัง / หมายเหตุ",
-      total: auditLog.length,
+      id: "transactions",
+      title: "ธุรกรรมกระเป๋าร้านค้า",
+      description: "รายการล่าสุด 100 รายการในงานนี้",
+      total: report?.auditLog.length ?? 0,
       unit: "รายการ",
-      file: `${slug}-wallet-audit`,
+      file: `${slug}-store-transactions`,
       rows: [
-        [
-          "วันเวลา",
-          "ประเภท",
-          "สถานะ",
-          "จำนวน",
-          "ก่อน",
-          "หลัง",
-          "อ้างอิง",
-          "หมายเหตุ",
-        ],
-        ...auditLog.map((h) => [
-          h.createdAt,
-          h.type,
-          h.status,
-          Number(h.amount),
-          Number(h.before),
-          Number(h.after),
-          h.ref,
-          h.note,
-        ]),
-      ] as Cell[][],
+        ["วันเวลา", "ประเภท", "สถานะ", "จำนวน Token", "ยอดก่อน", "ยอดหลัง", "อ้างอิง", "หมายเหตุ"],
+        ...(report?.auditLog ?? []).map((item) => [item.createdAt, item.type, item.status, Number(item.amount), Number(item.before), Number(item.after), item.ref, item.note]),
+      ] as ExportCell[][],
     },
   ];
 
-  useEffect(() => {
-    if (!downLoadFinish) return;
-
-    toast.success("โหลดไฟล์สำเร็จ", {
-      position: "bottom-right",
-      className: "text-green-400!",
-    });
-
-    setDownLoadFinish(false);
-  }, [downLoadFinish]);
-
-  function downloadCsv(filename: string, rows: Cell[][]) {
-    const esc = (v: Cell) => {
-      if (v === null || v === undefined) return "";
-      let s = String(v);
-      if (typeof v === "string" && /^[=+\-@]/.test(s)) s = `'${s}`;
-      return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-    };
-    const csv = "\uFEFF" + rows.map((r) => r.map(esc).join(",")).join("\r\n");
+  function downloadCsv(filename: string, rows: ExportCell[][]) {
+    const csv = makeAdminCsv(rows);
     const url = URL.createObjectURL(
       new Blob([csv], { type: "text/csv;charset=utf-8;" }),
     );
@@ -195,14 +133,12 @@ export default function Page() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    setTimeout(() => {
-      setDownLoadFinish(true);
-    }, 3000);
+    toast.success("ดาวน์โหลดไฟล์ CSV สำเร็จ");
   }
 
   async function downloadXlsx(
     filename: string,
-    rows: Cell[][],
+    rows: ExportCell[][],
     sheetName: string,
   ) {
     const ExcelJS = (await import("exceljs")).default;
@@ -232,7 +168,7 @@ export default function Page() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    setDownLoadFinish(true);
+    toast.success("ดาวน์โหลดไฟล์ Excel สำเร็จ");
   }
 
   if (loading) {
@@ -267,8 +203,8 @@ export default function Page() {
     );
   }
 
-  if (error || !event) {
-    return <div className="p-4">{error ?? "ไม่พบงาน"}</div>;
+  if (error || !report) {
+    return <div className="p-4"><AdminFeedback loading={false} error={error ?? "ไม่พบรายงาน"} retry={reload} /></div>;
   }
 
   return (
@@ -279,7 +215,7 @@ export default function Page() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink href={`/admin/${slug}`}>
-                {event?.title}
+                {eventTitle}
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />

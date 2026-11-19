@@ -7,8 +7,11 @@ import { hasPermission } from "@/server/auth/permission";
 import { ATTENDEE_FIELDS, TICKET_STATUSES } from "@/server/database/enums/domain.enum";
 import { ApiError } from "@/server/http/errors";
 import { readMoney } from "./money";
+import { readUuid } from "@/server/http/validation";
+import { recordAdminActivity } from "./admin-activity";
 
 export async function getEventTickets(eventId: string): Promise<EventTicketItem[]> {
+    readUuid(eventId, "รหัสงาน");
     const db = await getDatabase();
     const ticketTypes = await db.getRepository(EventTicket).find({
         where: { eventId },
@@ -18,13 +21,15 @@ export async function getEventTickets(eventId: string): Promise<EventTicketItem[
 }
 
 export async function getEventTicket(eventId: string, ticketId: string): Promise<EventTicketItem> {
+    readUuid(eventId, "รหัสงาน"); readUuid(ticketId, "รหัสประเภทบัตร");
     const db = await getDatabase();
     const ticketType = await db.getRepository(EventTicket).findOneBy({ id: ticketId, eventId });
     if (!ticketType) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบประเภทบัตรในงานนี้", 404);
     return toEventTicketItem(ticketType);
 }
 
-export async function createEventTicket(eventId: string, input: EventTicketInput): Promise<EventTicketItem> {
+export async function createEventTicket(eventId: string, input: EventTicketInput, actorId?: string): Promise<EventTicketItem> {
+    readUuid(eventId, "รหัสงาน");
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!name) throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่อบัตร", 422);
 
@@ -47,11 +52,15 @@ export async function createEventTicket(eventId: string, input: EventTicketInput
         requiredFields: input.requiredFields ?? [],
     });
     validateTicketType(ticketType);
-    const savedTicketType = await ticketRepo.save(ticketType);
-    return toEventTicketItem(savedTicketType);
+    return db.transaction(async (manager) => {
+        const savedTicketType = await manager.save(ticketType);
+        await recordAdminActivity(manager, actorId, eventId, "ticket.create", savedTicketType.id);
+        return toEventTicketItem(savedTicketType);
+    });
 }
 
-export async function updateEventTicket(eventId: string, ticketId: string, input: Partial<EventTicketInput>): Promise<EventTicketItem> {
+export async function updateEventTicket(eventId: string, ticketId: string, input: Partial<EventTicketInput>, actorId?: string): Promise<EventTicketItem> {
+    readUuid(eventId, "รหัสงาน"); readUuid(ticketId, "รหัสประเภทบัตร");
     const db = await getDatabase();
     return db.transaction(async (manager) => {
         const ticketRepo = manager.getRepository(EventTicket);
@@ -75,11 +84,13 @@ export async function updateEventTicket(eventId: string, ticketId: string, input
         });
         validateTicketType(ticketType);
         const savedTicketType = await ticketRepo.save(ticketType);
+        await recordAdminActivity(manager, actorId, eventId, "ticket.update", ticketId);
         return toEventTicketItem(savedTicketType);
     });
 }
 
-export async function deleteEventTicket(eventId: string, ticketId: string): Promise<{ id: string }> {
+export async function deleteEventTicket(eventId: string, ticketId: string, actorId?: string): Promise<{ id: string }> {
+    readUuid(eventId, "รหัสงาน"); readUuid(ticketId, "รหัสประเภทบัตร");
     const db = await getDatabase();
     return db.transaction(async (manager) => {
         const ticketType = await manager.findOne(EventTicket, {
@@ -91,11 +102,13 @@ export async function deleteEventTicket(eventId: string, ticketId: string): Prom
             throw new ApiError("TICKET_HAS_SOLD", "บัตรประเภทนี้มีประวัติการจองแล้ว ให้ปิดขายแทน", 409);
         }
         await manager.delete(EventTicket, { id: ticketId, eventId });
+        await recordAdminActivity(manager, actorId, eventId, "ticket.delete", ticketId);
         return { id: ticketId };
     });
 }
 
 function validateTicketType(ticketType: EventTicket) {
+    if (typeof ticketType.isActive !== "boolean" || !Number.isSafeInteger(ticketType.sortOrder) || ticketType.sortOrder < 0 || (ticketType.description !== null && (typeof ticketType.description !== "string" || ticketType.description.length > 5000))) throw new ApiError("VALIDATION_ERROR", "การตั้งค่าประเภทบัตรไม่ถูกต้อง", 422);
     if (typeof ticketType.name !== "string" || !ticketType.name || ticketType.name.length > 255) {
         throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่อบัตรไม่เกิน 255 ตัวอักษร", 422);
     }

@@ -431,6 +431,33 @@ export type OverviewReport = {
     totalStoreVolume: string;
 };
 
+export type OrderReviewInput = { decision: "APPROVE" | "REJECT"; reason?: string };
+export type OrderShippingUpdate = { status: ShippingStatus; carrier?: string | null; trackingNumber?: string | null };
+export type AdminOrderSummary = {
+    id: string; orderNo: string; eventId: string; userId: string;
+    buyerName: string; buyerEmail: string; total: string; status: OrderStatus;
+    hasPaymentSlip: boolean; ticketCount: number; createdAt: string;
+    reviewDecision: "APPROVE" | "REJECT" | null; reviewedAt: string | null;
+};
+export type AdminOrderDetail = OrderDetail & {
+    buyer: { id: string; name: string; email: string; phone: string | null };
+    review: { decision: "APPROVE" | "REJECT"; actorId: string | null; at: string; reason: string | null } | null;
+};
+export type Paginated<T> = { items: T[]; total: number; page: number; pageSize: number };
+export type AdminOrderFilters = { status?: OrderStatus; review?: "pending"; query?: string; page?: number };
+export type AdminUser = Pick<User, "id" | "name" | "email" | "graduationAt" | "status" | "roles">;
+export type AdminStore = StoreDetail & { managers: { id: string; name: string; email: string }[] };
+export type AdminActivityItem = {
+    id: string; eventId: string | null; actorId: string | null; actorName: string | null;
+    action: string; targetId: string; note: string | null; createdAt: string;
+};
+export type EventOverviewReport = OverviewReport & {
+    paidOrders: number; pendingOrders: number; pendingTickets: number; pendingAmount: string;
+    checkIns: { time: string; attendees: number }[];
+};
+export type AdminExportTicket = EventTicketItem & { paidTickets: number; paidRevenue: string };
+export type AdminExportReport = { overview: EventOverviewReport; tickets: AdminExportTicket[]; stores: AdminStore[]; auditLog: WalletHistoryItem[] };
+
 
 export type FaqQuestionItem = {
     id: string;

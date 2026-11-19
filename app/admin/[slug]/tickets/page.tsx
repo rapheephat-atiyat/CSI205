@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useAdminAccess } from "@/components/admin/AdminAccess";
+import { AdminFeedback, apiData } from "@/components/admin/AdminFeedback";
 
 // import icons
 import { ClipboardCheck, Pencil, Plus, Trash2 } from "lucide-react";
@@ -41,7 +42,6 @@ import {
 
 import { api } from "@/lib/api-client";
 import type {
-  EventDetail,
   EventSouvenirInput,
   EventSouvenirItem,
   EventTicketInput,
@@ -51,37 +51,37 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Page() {
-  const { slug } = useParams<{ slug: string }>();
+  const { eventId, eventTitle, slug } = useAdminAccess();
 
-  const [event, setEvent] = useState<EventDetail | null>(null);
   const [tickets, setTickets] = useState<EventTicketItem[]>([]);
   const [souvenirs, setSouvenirs] = useState<EventSouvenirItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [revision, setRevision] = useState(0);
 
-  async function load() {
-    const res = await api.events.get(slug);
-    if (!res.success) {
-      setError(res.error.message);
-      setLoading(false);
-      return;
-    }
-    setEvent(res.data);
-
-    const [t, s] = await Promise.all([
-      api.events.tickets.list(res.data.id),
-      api.events.souvenirs.list(res.data.id),
-    ]);
-    if (t.success) setTickets(t.data);
-    else setError(t.error.message);
-    if (s.success) setSouvenirs(s.data);
-    else setError(s.error.message);
-    setLoading(false);
+  function reload() {
+    setLoading(true);
+    setError(null);
+    setRevision((value) => value + 1);
   }
 
   useEffect(() => {
-    load();
-  }, [slug]);
+    let cancelled = false;
+    Promise.all([
+      api.events.tickets.list(eventId).then(apiData),
+      api.events.souvenirs.list(eventId).then(apiData),
+    ]).then(([ticketData, souvenirData]) => {
+      if (cancelled) return;
+      setTickets(ticketData);
+      setSouvenirs(souvenirData);
+      setError(null);
+    }).catch((cause: unknown) => {
+      if (!cancelled) setError(cause instanceof Error ? cause.message : "โหลดข้อมูลบัตรไม่สำเร็จ");
+    }).finally(() => {
+      if (!cancelled) setLoading(false);
+    });
+    return () => { cancelled = true; };
+  }, [eventId, revision]);
 
   // ---------- ticket ---------- //
   const [ticketOpen, setTicketOpen] = useState(false);
@@ -104,8 +104,6 @@ export default function Page() {
 
   async function handleSaveTicket(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!event) return;
-
     const input: EventTicketInput = {
       name: tName.trim(),
       price: Number(tPrice).toFixed(2),
@@ -114,27 +112,26 @@ export default function Page() {
     };
 
     const res = editingTicket
-      ? await api.events.tickets.update(event.id, editingTicket.id, input)
-      : await api.events.tickets.create(event.id, input);
+      ? await api.events.tickets.update(eventId, editingTicket.id, input)
+      : await api.events.tickets.create(eventId, input);
 
-    if (!res.success) return alert(res.error.message);
+    if (!res.success) return toast.error(res.error.message);
     setTicketOpen(false);
     toast.success("เพิ่มบัตรสำเร็จ", {
       position: "top-center",
       className: "text-green-800!",
     });
-    load();
+    reload();
   }
 
   async function handleDeleteTicket(ticket: EventTicketItem) {
-    if (!event) return;
-    const res = await api.events.tickets.drop(event.id, ticket.id);
-    if (!res.success) return alert(res.error.message);
+    const res = await api.events.tickets.drop(eventId, ticket.id);
+    if (!res.success) return toast.error(res.error.message);
     toast.success("ลบสำเร็จ", {
       position: "top-center",
       className: "text-green-800!",
     });
-    load();
+    reload();
   }
 
   // ---------- souvenir ---------- //
@@ -169,9 +166,8 @@ export default function Page() {
 
   async function handleSaveSouvenir(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!event) return;
     if (!sAllTypes && sEligible.length === 0)
-      return alert("กรุณาเลือกประเภทบัตรที่รับได้อย่างน้อย 1 ประเภท");
+      return toast.error("กรุณาเลือกประเภทบัตรที่รับได้อย่างน้อย 1 ประเภท");
 
     const input: EventSouvenirInput = {
       name: sName.trim(),
@@ -186,23 +182,22 @@ export default function Page() {
     };
 
     const res = editingSouvenir
-      ? await api.events.souvenirs.update(event.id, editingSouvenir.id, input)
-      : await api.events.souvenirs.create(event.id, input);
+      ? await api.events.souvenirs.update(eventId, editingSouvenir.id, input)
+      : await api.events.souvenirs.create(eventId, input);
 
-    if (!res.success) return alert(res.error.message);
+    if (!res.success) return toast.error(res.error.message);
     setSouvenirOpen(false);
     toast.success("เพิ่มของที่ระลึกสำเร็จ", {
       position: "top-center",
       className: "text-green-800!",
     });
-    load();
+    reload();
   }
 
   async function handleDeleteSouvenir(souvenir: EventSouvenirItem) {
-    if (!event) return;
-    const res = await api.events.souvenirs.drop(event.id, souvenir.id);
-    if (!res.success) return alert(res.error.message);
-    load();
+    const res = await api.events.souvenirs.drop(eventId, souvenir.id);
+    if (!res.success) return toast.error(res.error.message);
+    reload();
     toast.success("ลบสำเร็จ", {
       position: "top-center",
       className: "text-green-800!",
@@ -234,7 +229,7 @@ export default function Page() {
         </div>
       </div>
     );
-  if (error && !event) return <div className="p-4">{error}</div>;
+  if (error) return <div className="p-4"><AdminFeedback loading={false} error={error} retry={reload} /></div>;
 
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -244,7 +239,7 @@ export default function Page() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink href={`/admin/${slug}`}>
-                {event?.title ?? "ภาพรวมงาน"}
+                {eventTitle}
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />

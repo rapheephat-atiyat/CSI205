@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import { EventSummary } from "@/lib/api-types";
 import { api } from "@/lib/api-client";
 import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // head
 type HeadEv = {
@@ -29,13 +30,13 @@ type HeadEv = {
   place: string;
 };
 const headEv: HeadEv = {
-  caption: "รายการงานทั้งหมด",
+  caption: "รายการงานที่จัดการได้",
   name: "ชื่องาน",
   date: "วันเวลา",
   place: "สถานที่",
 };
 
-export default function AdminEventList() {
+export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
   const [events, setEvents] = useState<EventSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -43,7 +44,7 @@ export default function AdminEventList() {
 
   useEffect(() => {
     async function load() {
-      const res = await api.events.list();
+      const res = await api.events.listManageable();
       if (res.success) {
         setEvents(res.data);
       } else setError(res.error.message);
@@ -51,6 +52,24 @@ export default function AdminEventList() {
     }
     load();
   }, []);
+
+  if (loading)
+    return (
+      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 bg-on-brand" />
+            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
+          </div>
+
+          {/* การ์ด 1 ใบ */}
+          <div className="w-full flex flex-col items-center justify-center gap-4">
+            <Skeleton className="h-240 w-full rounded-[10px] bg-on-brand" />
+          </div>
+        </div>
+      </div>
+    );
 
   const filteredEvents = events.filter((event) => {
     const searchLower = search.toLowerCase();
@@ -79,7 +98,7 @@ export default function AdminEventList() {
               <div className="text-[24px] font-semibold text-black">
                 ค้นหางาน
               </div>
-              <Badge
+              {canCreate && <Badge
                 asChild
                 className="p-3 bg-brand text-on-brand  text-sm flex items-center justify-center rounded-[10px] hover:cursor-pointer hover:bg-brand-hover! hover:scale-110 hover:font-bold ease-in-out [&>svg]:size-4!"
               >
@@ -87,7 +106,7 @@ export default function AdminEventList() {
                   <Plus />
                   เพิ่มงาน
                 </Link>
-              </Badge>
+              </Badge>}
             </div>
             <div className="w-full">
               <div className="w-full">
@@ -113,7 +132,7 @@ export default function AdminEventList() {
           {/* หัวเรื่อง */}
           <div className="flex flex-col items-start justify-center">
             <div className="text-[18px] font-semibold text-black">
-              รายการงาน
+              งานที่จัดการได้
             </div>
           </div>
           <div className="w-full mt-4">
@@ -157,7 +176,9 @@ export default function AdminEventList() {
                         colSpan={3}
                         className="py-6 text-center text-muted-foreground"
                       >
-                        ไม่พบรายการงานที่ค้นหา
+                        {events.length === 0
+                          ? "บัญชีนี้ยังไม่มีงานที่จัดการได้"
+                          : "ไม่พบรายการงานที่ค้นหา"}
                       </TableCell>
                     </TableRow>
                   ) : (
