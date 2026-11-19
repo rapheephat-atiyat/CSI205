@@ -17,11 +17,9 @@ import {
 } from "typeorm";
 
 @Entity({ name: "user_roles", schema: "public" })
-@Index(
-    "uq_user_roles_user_role_scope",
-    ["userId", "role", "eventId", "storeId"],
-    { unique: true },
-)
+@Index("uq_user_roles_global", ["userId", "role"], { unique: true, where: `"event_id" IS NULL AND "store_id" IS NULL` })
+@Index("uq_user_roles_event", ["userId", "role", "eventId"], { unique: true, where: `"event_id" IS NOT NULL AND "store_id" IS NULL` })
+@Index("uq_user_roles_store", ["userId", "role", "storeId"], { unique: true, where: `"store_id" IS NOT NULL` })
 export class UserRole {
     @PrimaryGeneratedColumn("uuid")
     id!: string;

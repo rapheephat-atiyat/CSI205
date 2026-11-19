@@ -1,82 +1,187 @@
 import "server-only";
 import { getDatabase } from "@/server/database/database.souce";
-import { EventTicket } from "@/server/database/entities";
-import { EventTicketInput, EventTicketItem } from "@/lib/api-types";
+import { Events, EventTicket, Ticket, type User } from "@/server/database/entities";
+import type { EventTicketInput, EventTicketItem, TicketItem } from "@/lib/api-types";
+import { PERMISSIONS } from "@/lib/permissions";
+import { hasPermission } from "@/server/auth/permission";
+import { ATTENDEE_FIELDS, TICKET_STATUSES } from "@/server/database/enums/domain.enum";
 import { ApiError } from "@/server/http/errors";
+import { readMoney } from "./money";
 
 export async function getEventTickets(eventId: string): Promise<EventTicketItem[]> {
     const db = await getDatabase();
-    const list = await db.getRepository(EventTicket).find({
+    const ticketTypes = await db.getRepository(EventTicket).find({
         where: { eventId },
         order: { sortOrder: "ASC", createdAt: "ASC" },
     });
-    return list.map(toEventTicketItem);
+    return ticketTypes.map(toEventTicketItem);
+}
+
+export async function getEventTicket(eventId: string, ticketId: string): Promise<EventTicketItem> {
+    const db = await getDatabase();
+    const ticketType = await db.getRepository(EventTicket).findOneBy({ id: ticketId, eventId });
+    if (!ticketType) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบประเภทบัตรในงานนี้", 404);
+    return toEventTicketItem(ticketType);
 }
 
 export async function createEventTicket(eventId: string, input: EventTicketInput): Promise<EventTicketItem> {
-    if (!input.name?.trim()) throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่อบัตร", 422);
+    const name = typeof input.name === "string" ? input.name.trim() : "";
+    if (!name) throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่อบัตร", 422);
+
     const db = await getDatabase();
-    const repo = db.getRepository(EventTicket);
-    const entity = repo.create({
+    const eventExists = await db.getRepository(Events).existsBy({ id: eventId });
+    if (!eventExists) throw new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
+
+    const ticketRepo = db.getRepository(EventTicket);
+    const ticketType = ticketRepo.create({
         eventId,
-        name: input.name.trim(),
+        name,
         description: input.description ?? null,
-        price: Number(input.price || 0).toFixed(2),
+        price: input.price,
         quota: input.quota,
+        sold: 0,
         minTicketQTY: input.minTicketQTY ?? 1,
         maxTicketQTY: input.maxTicketQTY ?? 1,
         sortOrder: input.sortOrder ?? 0,
         isActive: input.isActive ?? true,
-        includesSouvenir: input.includesSouvenir ?? true,
         requiredFields: input.requiredFields ?? [],
     });
-    return toEventTicketItem(await repo.save(entity));
+    validateTicketType(ticketType);
+    const savedTicketType = await ticketRepo.save(ticketType);
+    return toEventTicketItem(savedTicketType);
 }
 
 export async function updateEventTicket(eventId: string, ticketId: string, input: Partial<EventTicketInput>): Promise<EventTicketItem> {
     const db = await getDatabase();
-    const repo = db.getRepository(EventTicket);
-    const ticket = await repo.findOneBy({ id: ticketId, eventId });
-    if (!ticket) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบประเภทบัตรที่ต้องการแก้ไข", 404);
-    if (input.name !== undefined) ticket.name = input.name.trim();
-    if (input.description !== undefined) ticket.description = input.description;
-    if (input.price !== undefined) ticket.price = Number(input.price).toFixed(2);
-    if (input.quota !== undefined) ticket.quota = input.quota;
-    if (input.minTicketQTY !== undefined) ticket.minTicketQTY = input.minTicketQTY;
-    if (input.maxTicketQTY !== undefined) ticket.maxTicketQTY = input.maxTicketQTY;
-    if (input.sortOrder !== undefined) ticket.sortOrder = input.sortOrder;
-    if (input.isActive !== undefined) ticket.isActive = input.isActive;
-    if (input.includesSouvenir !== undefined) ticket.includesSouvenir = input.includesSouvenir;
-    if (input.requiredFields !== undefined) ticket.requiredFields = input.requiredFields;
-    return toEventTicketItem(await repo.save(ticket));
+    return db.transaction(async (manager) => {
+        const ticketRepo = manager.getRepository(EventTicket);
+        const ticketType = await ticketRepo.findOne({
+            where: { id: ticketId, eventId },
+            lock: { mode: "pessimistic_write" },
+        });
+        if (!ticketType) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบประเภทบัตรที่ต้องการแก้ไข", 404);
+
+        // merge ใช้เฉพาะช่องที่ส่งมา ค่าเดิมของช่องอื่นจะยังอยู่
+        ticketRepo.merge(ticketType, {
+            name: typeof input.name === "string" ? input.name.trim() : input.name,
+            description: input.description,
+            price: input.price,
+            quota: input.quota,
+            minTicketQTY: input.minTicketQTY,
+            maxTicketQTY: input.maxTicketQTY,
+            sortOrder: input.sortOrder,
+            isActive: input.isActive,
+            requiredFields: input.requiredFields,
+        });
+        validateTicketType(ticketType);
+        const savedTicketType = await ticketRepo.save(ticketType);
+        return toEventTicketItem(savedTicketType);
+    });
 }
 
 export async function deleteEventTicket(eventId: string, ticketId: string): Promise<{ id: string }> {
     const db = await getDatabase();
-    const repo = db.getRepository(EventTicket);
-    const ticket = await repo.findOneBy({ id: ticketId, eventId });
-    if (!ticket) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบประเภทบัตร", 404);
-    if (ticket.sold > 0) throw new ApiError("TICKET_HAS_SOLD", "ไม่สามารถลบบัตรที่มีการซื้อไปแล้วได้", 400);
-    await repo.remove(ticket);
-    return { id: ticketId };
+    return db.transaction(async (manager) => {
+        const ticketType = await manager.findOne(EventTicket, {
+            where: { id: ticketId, eventId },
+            lock: { mode: "pessimistic_write" },
+        });
+        if (!ticketType) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบประเภทบัตร", 404);
+        if (ticketType.sold > 0 || await manager.existsBy(Ticket, { eventTicketId: ticketId })) {
+            throw new ApiError("TICKET_HAS_SOLD", "บัตรประเภทนี้มีประวัติการจองแล้ว ให้ปิดขายแทน", 409);
+        }
+        await manager.delete(EventTicket, { id: ticketId, eventId });
+        return { id: ticketId };
+    });
 }
 
-function toEventTicketItem(t: EventTicket): EventTicketItem {
+function validateTicketType(ticketType: EventTicket) {
+    if (typeof ticketType.name !== "string" || !ticketType.name || ticketType.name.length > 255) {
+        throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่อบัตรไม่เกิน 255 ตัวอักษร", 422);
+    }
+    ticketType.price = readMoney(ticketType.price, true).toFixed(2);
+    if (!Number.isInteger(ticketType.quota) || ticketType.quota < ticketType.sold) {
+        throw new ApiError("VALIDATION_ERROR", "โควตาบัตรต้องไม่ต่ำกว่าจำนวนที่จองไปแล้ว", 422);
+    }
+    if (!Number.isInteger(ticketType.minTicketQTY) || !Number.isInteger(ticketType.maxTicketQTY)
+        || ticketType.minTicketQTY < 1 || ticketType.minTicketQTY > ticketType.maxTicketQTY) {
+        throw new ApiError("VALIDATION_ERROR", "ตรวจจำนวนบัตรขั้นต่ำและสูงสุดต่อคำสั่งซื้อ", 422);
+    }
+    if (!Array.isArray(ticketType.requiredFields) || ticketType.requiredFields.some((field) => !Object.values(ATTENDEE_FIELDS).includes(field))) {
+        throw new ApiError("VALIDATION_ERROR", "ช่องข้อมูลผู้เข้าร่วมไม่ถูกต้อง", 422);
+    }
+}
+
+export async function scanTicket(staff: User, qrToken: string): Promise<TicketItem> {
+    if (typeof qrToken !== "string" || !qrToken.trim()) {
+        throw new ApiError("VALIDATION_ERROR", "กรุณาระบุ QR ของบัตร", 422);
+    }
+
+    const db = await getDatabase();
+    return db.transaction(async (manager) => {
+        const ticket = await manager.findOne(Ticket, {
+            where: { qrToken: qrToken.trim() },
+            lock: { mode: "pessimistic_write" },
+        });
+        if (!ticket) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบบัตรในระบบ", 404);
+        if (!hasPermission(staff, PERMISSIONS.TICKET_SCAN, { eventId: ticket.eventId })) {
+            throw new ApiError("FORBIDDEN", "คุณไม่มีสิทธิ์สแกนบัตรในงานนี้", 403);
+        }
+        if (ticket.status === TICKET_STATUSES.USED) {
+            throw new ApiError("TICKET_ALREADY_USED", "บัตรนี้ถูกสแกนเข้างานไปแล้ว", 409);
+        }
+        if (ticket.status !== TICKET_STATUSES.ACTIVE) {
+            throw new ApiError("TICKET_NOT_ACTIVE", "บัตรยังไม่ได้ชำระเงินหรือถูกยกเลิก", 400);
+        }
+
+        ticket.status = TICKET_STATUSES.USED;
+        ticket.checkedInAt = new Date();
+        ticket.checkedInById = staff.id;
+        return toTicketItem(await manager.save(ticket));
+    });
+}
+
+export function toEventTicketItem(ticketType: EventTicket): EventTicketItem {
     return {
-        id: t.id,
-        eventId: t.eventId,
-        name: t.name,
-        description: t.description,
-        price: t.price,
-        quota: t.quota,
-        sold: t.sold,
-        minTicketQTY: t.minTicketQTY,
-        maxTicketQTY: t.maxTicketQTY,
-        sortOrder: t.sortOrder,
-        isActive: t.isActive,
-        includesSouvenir: t.includesSouvenir,
-        requiredFields: t.requiredFields,
-        createdAt: t.createdAt.toISOString(),
-        updatedAt: t.updatedAt.toISOString(),
+        id: ticketType.id,
+        eventId: ticketType.eventId,
+        name: ticketType.name,
+        description: ticketType.description,
+        price: ticketType.price,
+        quota: ticketType.quota,
+        sold: ticketType.sold,
+        minTicketQTY: ticketType.minTicketQTY,
+        maxTicketQTY: ticketType.maxTicketQTY,
+        sortOrder: ticketType.sortOrder,
+        isActive: ticketType.isActive,
+        requiredFields: ticketType.requiredFields,
+        createdAt: ticketType.createdAt.toISOString(),
+        updatedAt: ticketType.updatedAt.toISOString(),
+    };
+}
+
+export function toTicketItem(ticket: Ticket): TicketItem {
+    const canShowQr = ticket.status === TICKET_STATUSES.ACTIVE || ticket.status === TICKET_STATUSES.USED;
+    return {
+        id: ticket.id,
+        orderId: ticket.orderId,
+        eventId: ticket.eventId,
+        eventTicketId: ticket.eventTicketId,
+        ticketTypeName: ticket.eventTicket?.name,
+        userId: ticket.userId,
+        unitPrice: ticket.unitPrice,
+        ticketCode: ticket.ticketCode,
+        qrToken: canShowQr ? ticket.qrToken : "",
+        status: ticket.status,
+        firstName: ticket.firstName,
+        lastName: ticket.lastName,
+        phone: ticket.phone,
+        email: ticket.email,
+        graduationYear: ticket.graduationYear,
+        checkedInAt: ticket.checkedInAt ? ticket.checkedInAt.toISOString() : null,
+        checkedInById: ticket.checkedInById,
+        souvenirItems: ticket.souvenirItems,
+        createdAt: ticket.createdAt.toISOString(),
+        updatedAt: ticket.updatedAt.toISOString(),
     };
 }

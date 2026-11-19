@@ -1,26 +1,33 @@
-import { EventInput } from "@/lib/api-types";
+import type { EventInput } from "@/lib/api-types";
 import { PERMISSIONS } from "@/lib/permissions";
 import { requirePermission } from "@/server/auth/permission";
-import { withHandler } from "@/server/http/handler"
+import { withHandler } from "@/server/http/handler";
+import { readJson } from "@/server/http/request";
 import { success } from "@/server/http/response";
-import { dropEvnet, getEventById, updateEvent } from "@/server/services/event.service";
+import { deleteEvent, getEventById, updateEvent } from "@/server/services/event.service";
+import { invalidatePublicEvents } from "@/server/cache/tags";
 
-export const GET = withHandler(async (req, { params }: { params: Promise<{ id: string }> }) => {
+type Context = { params: Promise<{ id: string }> };
+
+export const GET = withHandler(async (req, { params }: Context) => {
     const { id } = await params;
     await requirePermission(req, PERMISSIONS.EVENT_UPDATE, { eventId: id });
-    return success(await getEventById(id))
+    return success(await getEventById(id));
 });
 
-export const DELETE = withHandler(async (req, { params }: { params: Promise<{ id: string }> }) => {
+export const DELETE = withHandler(async (req, { params }: Context) => {
     const { id } = await params;
     await requirePermission(req, PERMISSIONS.EVENT_CREATE);
-    return success(await dropEvnet(id))
-})
+    const result = await deleteEvent(id);
+    invalidatePublicEvents();
+    return success(result);
+});
 
-export const PATCH = withHandler(async (req, { params }: { params: Promise<{ id: string }> }) => {
+export const PATCH = withHandler(async (req, { params }: Context) => {
     const { id } = await params;
     await requirePermission(req, PERMISSIONS.EVENT_UPDATE, { eventId: id });
-    const input = await req.json() as Partial<EventInput>;
+    const input = await readJson<Partial<EventInput>>(req);
     const event = await updateEvent(id, input);
-    return success(event)
-})
+    invalidatePublicEvents();
+    return success(event);
+});

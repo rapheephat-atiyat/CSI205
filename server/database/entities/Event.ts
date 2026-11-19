@@ -1,9 +1,11 @@
 import { EventSession } from "@/server/database/entities/EventSession";
+import { EventSouvenir } from "@/server/database/entities/EventSouvenir";
 import { EventTicket } from "@/server/database/entities/EventTicket";
 import { Order } from "@/server/database/entities/Order";
 import { Store } from "@/server/database/entities/Store";
 import { UserRole } from "@/server/database/entities/UserRole";
 import {
+    Check,
     Column,
     CreateDateColumn,
     Entity,
@@ -16,6 +18,9 @@ import {
 
 @Entity({ name: "events", schema: "public" })
 @Index("uq_events_slug", ["slug"], { unique: true })
+@Check("chk_events_sales_dates", `"buyAt" < "buyEndAt"`)
+@Check("chk_events_ticket_limits", `"minTicketQTY" >= 1 AND "maxTicketQTY" >= "minTicketQTY"`)
+@Check("chk_events_shipping_fee", `"shipping_fee" >= 0`)
 export class Events {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
@@ -44,21 +49,6 @@ export class Events {
     @Column({ type: "varchar", array: true, default: [] })
     tags!: string[];
 
-    @Column({ type: "boolean", default: false })
-    hasSouvenir!: boolean;
-
-    @Column({ type: "varchar", length: 255, nullable: true })
-    souvenirName!: string | null;
-
-    @Column({ type: "text", nullable: true })
-    souvenirImage!: string | null;
-
-    @Column({ type: "varchar", array: true, default: [] })
-    souvenirSizes!: string[];
-
-    @Column({ type: "boolean", default: true })
-    souvenirAllowDecline!: boolean;
-
     @Column({ name: "allow_shipping", type: "boolean", default: false })
     allowShipping!: boolean;
 
@@ -67,6 +57,9 @@ export class Events {
 
     @OneToMany(() => EventTicket, (et) => et.event)
     tickets!: Relation<EventTicket[]>;
+
+    @OneToMany(() => EventSouvenir, (souvenir) => souvenir.event)
+    souvenirs!: Relation<EventSouvenir[]>;
 
     @OneToMany(() => EventSession, (es) => es.event)
     sessions!: Relation<EventSession[]>;

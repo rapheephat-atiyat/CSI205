@@ -1,42 +1,13 @@
 import HorizontalScroll from "@/components/core/HorizontalScroll";
+import ContentLoadError from "@/components/core/ContentLoadError";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type EventSummary } from "@/lib/api-types";
-import { getEvents } from "@/server/services/event.service";
-import { cn } from "cn";
+import { getPublicEvents } from "@/server/cache/public-content";
 import Image from "next/image";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
-
-interface BannerSlide {
-    id: string;
-    alt: string;
-    src: string;
-    objectPosition?: string;
-}
-
-const BANNERS: readonly BannerSlide[] = [
-    {
-        id: "concert-stage",
-        alt: "บรรยากาศคอนเสิร์ตและแสงสีบนเวที",
-        src: "https://images.unsplash.com/photo-1459749411175-04bf5292ceea?w=1600&q=80",
-        objectPosition: "object-[50%_72%]",
-    },
-    {
-        id: "festival-celebration",
-        alt: "งานเทศกาลและปาร์ตี้เฉลิมฉลอง",
-        src: "https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1600&q=80",
-        objectPosition: "object-[50%_78%]",
-    },
-    {
-        id: "live-music-crowd",
-        alt: "ผู้ชมในฮอลล์แสดงดนตรีสด",
-        src: "https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=1600&q=80",
-        objectPosition: "object-[50%_52%]",
-    },
-];
 
 const THAI_DAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."] as const;
 
@@ -132,11 +103,13 @@ function EventSectionsSkeleton() {
 async function EventSections() {
     await connection();
     let events: EventSummary[] = [];
+    let loadFailed = false;
     try {
-        events = await getEvents();
+        events = await getPublicEvents();
     } catch {
-        events = [];
+        loadFailed = true;
     }
+    if (loadFailed) return <ContentLoadError message="โหลดข้อมูลงานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" />;
 
     const now = new Date();
 
@@ -198,27 +171,6 @@ export default function Home() {
     return (
         <div className="m-5 xl:mx-0">
             <div className="container mx-auto flex max-w-7xl flex-col gap-5">
-                <Carousel opts={{ loop: true }}>
-                    <CarouselContent>
-                        {BANNERS.map((banner, index) => (
-                            <CarouselItem key={banner.id}>
-                                <div className="relative h-44 overflow-hidden rounded-xl sm:h-60 lg:h-72">
-                                    <Image
-                                        src={banner.src}
-                                        alt={banner.alt}
-                                        fill
-                                        preload={index === 0}
-                                        sizes="(max-width: 1280px) 100vw, 1280px"
-                                        className={cn("object-cover object-center", banner.objectPosition)}
-                                    />
-                                </div>
-                            </CarouselItem>
-                        ))}
-                    </CarouselContent>
-                    <CarouselPrevious className="left-4" />
-                    <CarouselNext className="right-4" />
-                </Carousel>
-
                 <Suspense fallback={<EventSectionsSkeleton />}>
                     <EventSections />
                 </Suspense>
