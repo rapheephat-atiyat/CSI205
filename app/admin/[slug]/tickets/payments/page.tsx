@@ -1,7 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { useParams } from "next/navigation";
+import { api } from "@/lib/api-client";
+import type { OrderDetail } from "@/lib/api-types";
 
 // import icons
 import {
@@ -44,7 +48,7 @@ import {
 } from "@/components/ui/table";
 
 // ---------- types ---------- //
-type OrderStatus = "pending" | "approved" | "rejected";
+type OrderStatus = OrderDetail["status"];
 
 type OrderItem = {
   name: string;
@@ -54,35 +58,33 @@ type OrderItem = {
 };
 
 type Participant = {
+  id: string;
   name: string;
-  gradYear: number;
-  phone: string;
-  email: string;
+  gradYear: string | null;
+  phone: string | null;
+  email: string | null;
   ticketName: string;
   ticketPrice: number;
 };
 
 type Slip = {
-  fileName: string;
-  attachedAt: string;
+  paymentSlip: string | null;
+  hasPaymentSlip: boolean;
   amount: number;
-  paidAt: string;
-  fromName: string;
-  fromAccount: string;
-  toName: string;
-  toAccount: string;
-  reference: string;
+  updatedAt: string;
 };
 
 type Order = {
   id: string;
   code: string;
   status: OrderStatus;
+  hasPaymentSlip: boolean;
+  total: number;
   createdAt: string;
   buyerName: string;
   buyerEmail: string;
-  buyerGradYear: number;
-  buyerPhone: string;
+  buyerGradYear: string | null;
+  buyerPhone: string | null;
   items: OrderItem[];
   participants: Participant[];
   shirtDelivery: string;
@@ -90,164 +92,148 @@ type Order = {
   slip: Slip;
 };
 
-// ---------- sample data ---------- //
-const initialOrders: Order[] = [
-  {
-    id: "order-1",
-    code: "RE2569-1048",
-    status: "pending",
-    createdAt: "28 พ.ย. 2569 เวลา 17:10 น.",
-    buyerName: "กิตติพงษ์ ใจดี",
-    buyerEmail: "kitti@example.com",
-    buyerGradYear: 2548,
-    buyerPhone: "081-234-5678",
-    items: [
-      { name: "บัตรสนับสนุน · รวม 50 Token", qty: 1, unit: "ใบ", total: 1000 },
-      { name: "บัตรสัมพันธ์ · รวม 10 Token", qty: 1, unit: "ใบ", total: 500 },
-      { name: "เสื้อที่ระลึก M × 1, L × 1", qty: 2, unit: "ตัว", total: 600 },
-    ],
-    participants: [
-      {
-        name: "กิตติพงษ์ ใจดี",
-        gradYear: 2548,
-        phone: "081-234-5678",
-        email: "kitti@example.com",
-        ticketName: "บัตรสนับสนุน",
-        ticketPrice: 1000,
-      },
-      {
-        name: "ณัฐพร วัฒนกุล",
-        gradYear: 2549,
-        phone: "089-456-1234",
-        email: "nattaporn@example.com",
-        ticketName: "บัตรสัมพันธ์",
-        ticketPrice: 500,
-      },
-    ],
-    shirtDelivery: "จัดส่งรวม • ใช้ที่อยู่ใหม่",
-    shirtAddress: "99/12 ซอยรัชดาภิเษก 3 แขวงสามเสนใน เขตพญาไท กรุงเทพฯ 10400",
-    slip: {
-      fileName: "slip-RE2569-1048.jpg",
-      attachedAt: "แนบ 17:14 น.",
-      amount: 2100,
-      paidAt: "28 พ.ย. 2569 เวลา 17:12 น.",
-      fromName: "กิตติพงษ์ ใจดี",
-      fromAccount: "xxx-x-x4321-x",
-      toName: "สมาคมศิษย์เก่า",
-      toAccount: "xxx-x-x6789-x",
-      reference: "SAMPLE-THQR-112801",
-    },
-  },
-  {
-    id: "order-2",
-    code: "RE2569-1049",
-    status: "pending",
-    createdAt: "28 พ.ย. 2569 เวลา 18:02 น.",
-    buyerName: "ปวีณา สุขใจ",
-    buyerEmail: "paweena@example.com",
-    buyerGradYear: 2551,
-    buyerPhone: "086-111-2233",
-    items: [
-      { name: "บัตรสัมพันธ์ · รวม 10 Token", qty: 2, unit: "ใบ", total: 1000 },
-    ],
-    participants: [
-      {
-        name: "ปวีณา สุขใจ",
-        gradYear: 2551,
-        phone: "086-111-2233",
-        email: "paweena@example.com",
-        ticketName: "บัตรสัมพันธ์",
-        ticketPrice: 500,
-      },
-      {
-        name: "ธนากร สุขใจ",
-        gradYear: 2551,
-        phone: "086-111-2244",
-        email: "thanakorn@example.com",
-        ticketName: "บัตรสัมพันธ์",
-        ticketPrice: 500,
-      },
-    ],
-    shirtDelivery: "ไม่มีเสื้อในคำสั่งซื้อนี้",
-    shirtAddress: "-",
-    slip: {
-      fileName: "slip-RE2569-1049.jpg",
-      attachedAt: "แนบ 18:05 น.",
-      amount: 1000,
-      paidAt: "28 พ.ย. 2569 เวลา 18:04 น.",
-      fromName: "ปวีณา สุขใจ",
-      fromAccount: "xxx-x-x1188-x",
-      toName: "สมาคมศิษย์เก่า",
-      toAccount: "xxx-x-x6789-x",
-      reference: "SAMPLE-THQR-112802",
-    },
-  },
-  {
-    id: "order-3",
-    code: "RE2569-1050",
-    status: "pending",
-    createdAt: "29 พ.ย. 2569 เวลา 09:40 น.",
-    buyerName: "สมชาย รักเรียน",
-    buyerEmail: "somchai@example.com",
-    buyerGradYear: 2545,
-    buyerPhone: "082-999-0000",
-    items: [
-      { name: "บัตรสนับสนุน · รวม 50 Token", qty: 1, unit: "ใบ", total: 1000 },
-      { name: "เสื้อที่ระลึก XL × 1", qty: 1, unit: "ตัว", total: 300 },
-    ],
-    participants: [
-      {
-        name: "สมชาย รักเรียน",
-        gradYear: 2545,
-        phone: "082-999-0000",
-        email: "somchai@example.com",
-        ticketName: "บัตรสนับสนุน",
-        ticketPrice: 1000,
-      },
-    ],
-    shirtDelivery: "รับหน้างาน",
-    shirtAddress: "-",
-    slip: {
-      fileName: "slip-RE2569-1050.jpg",
-      attachedAt: "แนบ 09:43 น.",
-      amount: 1300,
-      paidAt: "29 พ.ย. 2569 เวลา 09:41 น.",
-      fromName: "สมชาย รักเรียน",
-      fromAccount: "xxx-x-x7755-x",
-      toName: "สมาคมศิษย์เก่า",
-      toAccount: "xxx-x-x6789-x",
-      reference: "SAMPLE-THQR-112803",
-    },
-  },
-];
-
 // ---------- helpers ---------- //
 const money = (n: number) => n.toLocaleString("th-TH");
 
 const statusLabel: Record<OrderStatus, string> = {
-  pending: "รอตรวจสอบ",
-  approved: "อนุมัติแล้ว",
-  rejected: "ไม่อนุมัติ",
+  PENDING: "รอตรวจสอบ",
+  PAID: "ชำระแล้ว",
+  CANCELLED: "ยกเลิกแล้ว",
 };
 
 const statusClass: Record<OrderStatus, string> = {
-  pending: "border-orange-300 bg-orange-50 text-orange-700",
-  approved: "border-green-300 bg-green-50 text-green-700",
-  rejected: "border-red-300 bg-red-50 text-red-700",
+  PENDING: "border-orange-300 bg-orange-50 text-orange-700",
+  PAID: "border-green-300 bg-green-50 text-green-700",
+  CANCELLED: "border-red-300 bg-red-50 text-red-700",
 };
 
-function StatusBadge({ status }: { status: OrderStatus }) {
+function StatusBadge({ order }: { order: Order }) {
+  const { status, hasPaymentSlip } = order;
   return (
     <Badge
       variant="outline"
       className={`flex items-center justify-between gap-1 rounded-[10px] px-3 py-1.5 text-[14px] [&>svg]:size-4! ${statusClass[status]}`}
     >
-      {status === "pending" && <Clock />}
-      {status === "approved" && <Check />}
-      {status === "rejected" && <X />}
-      {statusLabel[status]}
+      {status === "PENDING" && <Clock />}
+      {status === "PAID" && <Check />}
+      {status === "CANCELLED" && <X />}
+      {status === "PENDING" && !hasPaymentSlip
+        ? "รอชำระเงิน"
+        : statusLabel[status]}
     </Badge>
   );
+}
+
+function formatDateTime(value: string) {
+  return new Date(value).toLocaleString("th-TH", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function toOrder(order: OrderDetail): Order {
+  const buyerTicket =
+    order.tickets.find((ticket) => ticket.userId === order.userId) ??
+    order.tickets[0];
+  const buyerName = buyerTicket
+    ? [buyerTicket.firstName, buyerTicket.lastName].filter(Boolean).join(" ")
+    : "";
+  const ticketItems = new Map<
+    string,
+    { name: string; qty: number; total: number }
+  >();
+
+  for (const ticket of order.tickets) {
+    const name = ticket.ticketTypeName ?? "บัตร";
+    const key = `${ticket.eventTicketId}:${ticket.unitPrice}`;
+    const item = ticketItems.get(key);
+    if (item) {
+      item.qty += 1;
+      item.total += Number(ticket.unitPrice);
+    } else {
+      ticketItems.set(key, {
+        name,
+        qty: 1,
+        total: Number(ticket.unitPrice),
+      });
+    }
+  }
+
+  const items: OrderItem[] = [...ticketItems.values()].map((item) => ({
+    ...item,
+    unit: "ใบ",
+  }));
+  for (const souvenir of order.souvenirItems) {
+    items.push({
+      name: souvenir.size
+        ? `${souvenir.name} (${souvenir.size})`
+        : souvenir.name,
+      qty: souvenir.quantity,
+      unit: "ชิ้น",
+      total: Number(souvenir.unitPrice) * souvenir.quantity,
+    });
+  }
+  if (Number(order.shippingFee) > 0) {
+    items.push({
+      name: "ค่าจัดส่ง",
+      qty: 1,
+      unit: "ครั้ง",
+      total: Number(order.shippingFee),
+    });
+  }
+
+  const shipping = order.shipping;
+  const address = shipping
+    ? [
+        shipping.recipientName,
+        shipping.recipientPhone,
+        shipping.addressLine,
+        shipping.subDistrict,
+        shipping.district,
+        shipping.province,
+        shipping.postalCode,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : "-";
+
+  return {
+    id: order.id,
+    code: order.orderNo,
+    status: order.status,
+    hasPaymentSlip: order.hasPaymentSlip,
+    total: Number(order.total),
+    createdAt: formatDateTime(order.createdAt),
+    buyerName: buyerName || "ผู้ซื้อ",
+    buyerEmail: buyerTicket?.email ?? "-",
+    buyerGradYear: buyerTicket?.graduationYear ?? null,
+    buyerPhone: buyerTicket?.phone ?? null,
+    items,
+    participants: order.tickets.map((ticket) => ({
+      id: ticket.id,
+      name:
+        [ticket.firstName, ticket.lastName].filter(Boolean).join(" ") ||
+        "ไม่ระบุชื่อ",
+      gradYear: ticket.graduationYear,
+      phone: ticket.phone,
+      email: ticket.email,
+      ticketName: ticket.ticketTypeName ?? "บัตร",
+      ticketPrice: Number(ticket.unitPrice),
+    })),
+    shirtDelivery:
+      order.deliveryMethod === "SHIPPING"
+        ? "จัดส่ง"
+        : order.deliveryMethod === "PICKUP"
+          ? "รับหน้างาน"
+          : "ไม่มีของที่ระลึก",
+    shirtAddress: address,
+    slip: {
+      paymentSlip: order.paymentSlip,
+      hasPaymentSlip: order.hasPaymentSlip,
+      amount: Number(order.total),
+      updatedAt: formatDateTime(order.paidAt ?? order.updatedAt),
+    },
+  };
 }
 
 function InfoRow({ label, value }: { label: string; value: string }) {
@@ -261,11 +247,53 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export default function Page({ slug }: { slug: string }) {
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+export default function Page() {
+  const { slug } = useParams<{ slug: string }>();
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [eventTitle, setEventTitle] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [keyword, setKeyword] = useState("");
   const [index, setIndex] = useState(0);
   const [slipOpen, setSlipOpen] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadOrders() {
+      setLoading(true);
+      setError(null);
+
+      const eventResult = await api.events.get(slug);
+      if (!active) return;
+      if (!eventResult.success) {
+        setError(eventResult.error.message);
+        setLoading(false);
+        return;
+      }
+
+      setEventTitle(eventResult.data.title);
+      const ordersResult = await api.orders.listMy();
+      if (!active) return;
+      if (!ordersResult.success) {
+        setError(ordersResult.error.message);
+        setLoading(false);
+        return;
+      }
+
+      setOrders(
+        ordersResult.data
+          .filter((order) => order.eventId === eventResult.data.id)
+          .map(toOrder),
+      );
+      setLoading(false);
+    }
+
+    void loadOrders();
+    return () => {
+      active = false;
+    };
+  }, [slug]);
 
   // กรองตามรหัสคำสั่งซื้อหรือชื่อผู้ซื้อ
   const filtered = useMemo(() => {
@@ -278,7 +306,9 @@ export default function Page({ slug }: { slug: string }) {
     );
   }, [orders, keyword]);
 
-  const pendingCount = orders.filter((o) => o.status === "pending").length;
+  const pendingCount = orders.filter(
+    (order) => order.status === "PENDING" && order.hasPaymentSlip,
+  ).length;
 
   const safeIndex =
     filtered.length === 0 ? 0 : Math.min(index, filtered.length - 1);
@@ -294,10 +324,6 @@ export default function Page({ slug }: { slug: string }) {
     setIndex((safeIndex + 1) % filtered.length);
   }
 
-  function setStatus(id: string, status: OrderStatus) {
-    setOrders((pre) => pre.map((o) => (o.id === id ? { ...o, status } : o)));
-  }
-
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
       {/* Breadcrumbs */}
@@ -306,12 +332,12 @@ export default function Page({ slug }: { slug: string }) {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink href={`/admin/${slug}`}>
-                {/* {event?.title} */}
+                {eventTitle}
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbLink href={`/admin/${slug}/settings/pricing`}>
+              <BreadcrumbLink href={`/admin/${slug}/tickets`}>
                 บัตรและเสื้อ
               </BreadcrumbLink>
             </BreadcrumbItem>
@@ -335,7 +361,7 @@ export default function Page({ slug }: { slug: string }) {
             </div>
           </div>
           <Button asChild variant="outline" className="rounded-[10px]">
-            <Link href="/admin/settings/pricing">
+            <Link href={`/admin/${slug}/tickets`}>
               <ArrowLeft />
               กลับไปคิวรายการ
             </Link>
@@ -349,11 +375,11 @@ export default function Page({ slug }: { slug: string }) {
             <Input
               value={keyword}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder="ค้นหารหัสคำสั่งซื้อ หรือชื่อผู้ซื้อ"
+              placeholder="ค้นหารหัสคำสั่งซื้อ หรือชื่อผู้ร่วมงาน"
               className="h-auto py-3 pl-9 font-light"
             />
           </div>
-          {current && <StatusBadge status={current.status} />}
+          {current && <StatusBadge order={current} />}
           <Button
             type="button"
             variant="outline"
@@ -366,10 +392,26 @@ export default function Page({ slug }: { slug: string }) {
           </Button>
         </div>
 
-        {/* ไม่พบรายการ */}
-        {!current && (
+        {loading && (
           <div className="w-full rounded-[10px] border p-10 text-center text-muted-foreground">
-            ไม่พบคำสั่งซื้อที่ค้นหา
+            กำลังโหลดคำสั่งซื้อ...
+          </div>
+        )}
+
+        {error && (
+          <div
+            role="alert"
+            className="w-full rounded-[10px] border border-destructive/30 bg-destructive/5 p-4 text-destructive"
+          >
+            โหลดคำสั่งซื้อไม่สำเร็จ: {error}
+          </div>
+        )}
+
+        {!loading && !error && !current && (
+          <div className="w-full rounded-[10px] border p-10 text-center text-muted-foreground">
+            {keyword
+              ? "ไม่พบคำสั่งซื้อที่ค้นหา"
+              : "บัญชีนี้ยังไม่มีคำสั่งซื้อในงานนี้"}
           </div>
         )}
 
@@ -390,40 +432,37 @@ export default function Page({ slug }: { slug: string }) {
               </div>
 
               <div className="w-full rounded-[10px] border bg-muted/30 p-5 flex flex-col items-center gap-3">
-                <FileCheck className="size-10 text-muted-foreground" />
-                <div className="text-lg font-semibold">หลักฐานตัวอย่าง</div>
-                <Badge
-                  variant="outline"
-                  className="rounded-[10px] bg-background px-3 py-1.5 text-[13px]"
-                >
-                  SAMPLE • ไม่ใช่สลิปจริง
-                </Badge>
-                <div className="text-4xl font-semibold tabular-nums">
+                {current.slip.paymentSlip ? (
+                  <Image
+                    src={current.slip.paymentSlip}
+                    alt={`หลักฐานการชำระเงิน ${current.code}`}
+                    width={960}
+                    height={720}
+                    unoptimized
+                    className="max-h-96 w-full rounded-md object-contain"
+                  />
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
+                    <FileCheck className="size-10" />
+                    <div className="font-medium">
+                      {current.slip.hasPaymentSlip
+                        ? "มีสลิปแนบ แต่ API ไม่ส่งรูปหลักฐานกลับมา"
+                        : "ยังไม่มีหลักฐานการชำระเงิน"}
+                    </div>
+                  </div>
+                )}
+                <div className="text-3xl font-semibold tabular-nums">
                   {current.slip.amount.toLocaleString("th-TH", {
                     minimumFractionDigits: 2,
-                  })}
+                  })}{" "}
+                  บาท
                 </div>
                 <div className="text-sm text-muted-foreground">
-                  บาท • {current.slip.paidAt}
+                  อัปเดตล่าสุด {current.slip.updatedAt}
                 </div>
-
-                <div className="my-1 w-full border-t" />
-
-                <InfoRow label="จาก" value={current.slip.fromName} />
-                <InfoRow label="บัญชีต้นทาง" value={current.slip.fromAccount} />
-                <InfoRow label="ถึง" value={current.slip.toName} />
-                <InfoRow label="บัญชีปลายทาง" value={current.slip.toAccount} />
-
-                <div className="my-1 w-full border-t" />
-
                 <div className="text-center text-xs text-muted-foreground">
-                  <div>อ้างอิง {current.slip.reference}</div>
-                  <div>ไม่ใช่ QR สำหรับชำระเงิน</div>
+                  ออเดอร์ {current.code}
                 </div>
-              </div>
-
-              <div className="text-sm text-muted-foreground">
-                {current.slip.fileName} • {current.slip.attachedAt}
               </div>
 
               <Button
@@ -431,9 +470,10 @@ export default function Page({ slug }: { slug: string }) {
                 variant="outline"
                 className="w-full rounded-[10px]"
                 onClick={() => setSlipOpen(true)}
+                disabled={!current.slip.paymentSlip}
               >
                 <Maximize2 />
-                ขยายหลักฐานตัวอย่าง
+                ขยายหลักฐาน
               </Button>
             </Badge>
 
@@ -451,17 +491,17 @@ export default function Page({ slug }: { slug: string }) {
                     สร้าง {current.createdAt}
                   </div>
                 </div>
-                <StatusBadge status={current.status} />
+                <StatusBadge order={current} />
               </div>
 
               <div className="w-full flex flex-col gap-2">
                 <InfoRow
-                  label="ผู้ซื้อ / อีเมลรับ QR"
+                  label="ผู้ร่วมงาน / อีเมล"
                   value={`${current.buyerName} / ${current.buyerEmail}`}
                 />
                 <InfoRow
-                  label="ปีที่เข้าศึกษา / โทรศัพท์"
-                  value={`${current.buyerGradYear} / ${current.buyerPhone}`}
+                  label="ปีการศึกษา / โทรศัพท์"
+                  value={`${current.buyerGradYear ?? "-"} / ${current.buyerPhone ?? "-"}`}
                 />
               </div>
 
@@ -481,8 +521,8 @@ export default function Page({ slug }: { slug: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {current.items.map((item) => (
-                    <TableRow key={item.name}>
+                  {current.items.map((item, itemIndex) => (
+                    <TableRow key={`${item.name}-${itemIndex}`}>
                       <TableCell>{item.name}</TableCell>
                       <TableCell className="text-right">
                         {item.qty} {item.unit}
@@ -500,8 +540,7 @@ export default function Page({ slug }: { slug: string }) {
                   ยอดที่ต้องชำระทั้งหมด
                 </div>
                 <div className="text-sm font-semibold tabular-nums md:text-[16px]">
-                  {money(current.items.reduce((sum, i) => sum + i.total, 0))}{" "}
-                  บาท
+                  {money(current.total)} บาท
                 </div>
               </div>
 
@@ -509,56 +548,28 @@ export default function Page({ slug }: { slug: string }) {
               <div className="w-full flex flex-col gap-3">
                 <div className="font-semibold">ผู้เข้าร่วมแยกตามบัตร</div>
                 {current.participants.map((p) => (
-                  <div key={p.email} className="flex flex-col gap-0.5">
+                  <div key={p.id} className="flex flex-col gap-0.5">
                     <div className="font-semibold">
-                      {p.name} • เข้าศึกษา พ.ศ. {p.gradYear}
+                      {p.name}
+                      {p.gradYear ? ` ปีการศึกษา ${p.gradYear}` : ""}
                     </div>
                     <div className="text-sm text-muted-foreground">
-                      {p.phone} • {p.email} • {p.ticketName}{" "}
+                      {p.phone ?? "-"} • {p.email ?? "-"} • {p.ticketName}{" "}
                       {money(p.ticketPrice)} บาท
                     </div>
                   </div>
                 ))}
               </div>
 
-              {/* การรับเสื้อ */}
+              {/* การรับของที่ระลึก */}
               <div className="w-full flex flex-col gap-2 border-t pt-3">
-                <InfoRow label="การรับเสื้อ" value={current.shirtDelivery} />
+                <InfoRow
+                  label="การรับของที่ระลึก"
+                  value={current.shirtDelivery}
+                />
                 <div className="text-sm font-medium">
                   {current.shirtAddress}
                 </div>
-              </div>
-
-              {/* อนุมัติ / ไม่อนุมัติ */}
-              <div className="w-full flex flex-col gap-2 pt-1 sm:flex-row sm:justify-end">
-                {current.status !== "pending" && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setStatus(current.id, "pending")}
-                  >
-                    ย้อนกลับเป็นรอตรวจสอบ
-                  </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={current.status === "rejected"}
-                  onClick={() => setStatus(current.id, "rejected")}
-                  className="rounded-[10px] border-red-300 text-red-700 hover:bg-red-50"
-                >
-                  <X />
-                  ไม่อนุมัติ
-                </Button>
-                <Button
-                  type="button"
-                  disabled={current.status === "approved"}
-                  onClick={() => setStatus(current.id, "approved")}
-                  className="rounded-[10px] bg-brand hover:bg-brand-hover"
-                >
-                  <Check />
-                  อนุมัติการชำระเงิน
-                </Button>
               </div>
             </Badge>
           </div>
@@ -568,31 +579,26 @@ export default function Page({ slug }: { slug: string }) {
         <Dialog open={slipOpen} onOpenChange={setSlipOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>หลักฐานตัวอย่าง</DialogTitle>
+              <DialogTitle>หลักฐานการชำระเงิน</DialogTitle>
               <DialogDescription>
-                {current?.slip.fileName} • ข้อมูลตัวอย่าง ไม่ใช่สลิปจริง
+                {current ? `ออเดอร์ ${current.code}` : ""}
               </DialogDescription>
             </DialogHeader>
 
-            {current && (
+            {current?.slip.paymentSlip ? (
               <div className="w-full flex flex-col items-center gap-3 py-2">
-                <FileCheck className="size-14 text-muted-foreground" />
-                <div className="text-4xl font-semibold tabular-nums">
-                  {current.slip.amount.toLocaleString("th-TH", {
-                    minimumFractionDigits: 2,
-                  })}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  บาท • {current.slip.paidAt}
-                </div>
-                <div className="my-1 w-full border-t" />
-                <InfoRow label="จาก" value={current.slip.fromName} />
-                <InfoRow label="บัญชีต้นทาง" value={current.slip.fromAccount} />
-                <InfoRow label="ถึง" value={current.slip.toName} />
-                <InfoRow label="บัญชีปลายทาง" value={current.slip.toAccount} />
-                <div className="text-xs text-muted-foreground">
-                  อ้างอิง {current.slip.reference}
-                </div>
+                <Image
+                  src={current.slip.paymentSlip}
+                  alt={`หลักฐานการชำระเงิน ${current.code}`}
+                  width={960}
+                  height={720}
+                  unoptimized
+                  className="max-h-[70vh] w-full rounded-md object-contain"
+                />
+              </div>
+            ) : (
+              <div className="py-8 text-center text-muted-foreground">
+                API ไม่ได้ส่งรูปหลักฐานกลับมา
               </div>
             )}
           </DialogContent>

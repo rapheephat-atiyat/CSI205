@@ -13,7 +13,6 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { type DateRange } from "react-day-picker";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import {
@@ -31,7 +30,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -40,11 +39,8 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { Textarea } from "@/components/ui/textarea";
-
 import { useRouter } from "next/navigation";
-import { addDays } from "date-fns";
-import { EventInput } from "@/lib/api-types";
+import { type EventInput, type EventSessionInput } from "@/lib/api-types";
 import { api } from "@/lib/api-client";
 import { RichTextEditor } from "@/components/admin/RichTextEditor";
 
@@ -55,6 +51,13 @@ function formatDate(d?: Date) {
     month: "2-digit",
     year: "numeric",
   });
+}
+
+function dateTimeOnDay(day: Date, time: string) {
+  const [hours, minutes] = time.split(":");
+  const date = new Date(day);
+  date.setHours(Number(hours), Number(minutes), 0, 0);
+  return date.toISOString();
 }
 
 function slugify(text: string) {
@@ -84,34 +87,30 @@ export default function EventDetailForm() {
   const [maxTicketQTY, setMaxTicketQTY] = useState("10");
   const [token, setToken] = useState("1");
 
-  // date evnet
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  // event dates
+  const [eventDates, setEventDates] = useState<Date[]>([]);
   const [eventTimeFrom, setEventTimeFrom] = useState("00:00");
   const [eventTimeTo, setEventTimeTo] = useState("00:00");
 
   // draft in dialog b4 submit
-  const [draftDate, setDraftDate] = useState<DateRange | undefined>(undefined);
+  const [draftEventDates, setDraftEventDates] = useState<Date[]>([]);
   const [draftEventTimeFrom, setDraftEventTimeFrom] = useState("00:00");
   const [draftEventTimeTo, setDraftEventTimeTo] = useState("00:00");
 
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    setDraftDate({ from: new Date(), to: addDays(new Date(), 3) });
-  }, []);
-
-  useEffect(() => {
-    console.log(`Date=> ${dateRange?.from} – ${dateRange?.to}
-      eventTimeFrom=> ${eventTimeFrom}
-      eventTimeTo=> ${eventTimeTo}`);
-  }, [dateRange]);
-
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
 
-    if (!dateRange?.from || !dateRange?.to)
+    if (eventDates.length === 0)
       return alert("กรุณาเลือกวันที่จัดงาน");
+    if (
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(eventTimeFrom) ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(eventTimeTo) ||
+      eventTimeTo <= eventTimeFrom
+    )
+      return alert("กรุณาตั้งเวลาเริ่มและเวลาสิ้นสุดให้ถูกต้อง");
     if (new Date(buyEndAt) <= new Date(buyAt))
       return alert("วันปิดขายต้องมากกว่าวันเปิดขาย");
 
@@ -119,6 +118,14 @@ export default function EventDetailForm() {
     const maxQ = Number(maxTicketQTY);
     if (!(minQ >= 1) || !(maxQ >= minQ))
       return alert("จำนวนบัตรสูงสุดต้องไม่น้อยกว่าขั้นต่ำ");
+
+    const sessions: EventSessionInput[] = [...eventDates]
+      .sort((first, second) => first.getTime() - second.getTime())
+      .map((date) => ({
+        title: `วันที่จัดงาน ${formatDate(date)}`,
+        startsAt: dateTimeOnDay(date, eventTimeFrom),
+        endsAt: dateTimeOnDay(date, eventTimeTo),
+      }));
 
     const payload: EventInput = {
       slug: slugify(title),
@@ -136,13 +143,17 @@ export default function EventDetailForm() {
       buyEndAt: new Date(buyEndAt).toISOString(),
       minTicketQTY: minQ,
       maxTicketQTY: maxQ,
+      sessions,
     };
 
     try {
       setSubmitting(true);
       const created = await api.events.create(payload);
-      console.log("created", created);
-      router.push("/admin/settings/event");
+      if (!created.success) {
+        alert(created.error.message);
+        return;
+      }
+      router.push(`/admin/${payload.slug}`);
     } catch (err) {
       console.error(err);
       alert("สร้างงานไม่สำเร็จ");
@@ -317,8 +328,8 @@ export default function EventDetailForm() {
                             id="event-date"
                             type="text"
                             readOnly
-                            placeholder={"dd / mm / year"}
-                            value={`${formatDate(dateRange?.from)} – ${formatDate(dateRange?.to)}`}
+                            placeholder="เลือกวันที่จัดงาน"
+                            value={eventDates.map(formatDate).join(", ")}
                             className="py-3 w-full h-auto font-light cursor-pointer"
                           />
                         </DialogTrigger>
@@ -326,17 +337,19 @@ export default function EventDetailForm() {
                           <DialogHeader>
                             <DialogTitle>เลือกวันและเวลาจัดงาน</DialogTitle>
                             <DialogDescription>
-                              เลือกวันที่ แล้วกำหนดเวลาเริ่ม–สิ้นสุด
+                              เลือกวันจัดงานได้หลายวัน โดยใช้เวลาเดียวกันทุกวันที่เลือก
                             </DialogDescription>
                           </DialogHeader>
 
                           <Card className="mx-auto w-fit max-w-[calc(100vw-2rem)]">
                             <CardContent>
                               <Calendar
-                                mode="range"
-                                defaultMonth={dateRange?.from}
-                                selected={draftDate}
-                                onSelect={setDraftDate}
+                                mode="multiple"
+                                defaultMonth={draftEventDates[0] ?? new Date()}
+                                selected={draftEventDates}
+                                onSelect={(dates) =>
+                                  setDraftEventDates(dates ?? [])
+                                }
                                 numberOfMonths={2}
                               />
                             </CardContent>
@@ -393,7 +406,12 @@ export default function EventDetailForm() {
                             <Button
                               type="button"
                               onClick={() => {
-                                setDateRange(draftDate);
+                                setEventDates(
+                                  [...draftEventDates].sort(
+                                    (first, second) =>
+                                      first.getTime() - second.getTime(),
+                                  ),
+                                );
                                 setEventTimeFrom(draftEventTimeFrom);
                                 setEventTimeTo(draftEventTimeTo);
                                 setOpen(false);

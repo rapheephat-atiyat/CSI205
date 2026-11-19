@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { addDays, format } from "date-fns";
-import { type DateRange } from "react-day-picker";
+import { format } from "date-fns";
 
 import { api } from "@/lib/api-client";
-import { EventDetail, EventInput } from "@/lib/api-types";
+import {
+  type EventDetail,
+  type EventInput,
+  type EventSessionInput,
+} from "@/lib/api-types";
 
 // import icon
 import { Clock2Icon, Save } from "lucide-react";
@@ -59,6 +62,17 @@ function formatDate(d?: Date) {
   });
 }
 
+function dateKey(date: Date) {
+  return format(date, "yyyy-MM-dd");
+}
+
+function dateTimeOnDay(day: Date, time: string) {
+  const [hours, minutes] = time.split(":");
+  const date = new Date(day);
+  date.setHours(Number(hours), Number(minutes), 0, 0);
+  return date.toISOString();
+}
+
 // ISO -> ค่าสำหรับ datetime-local
 function toLocalInput(iso?: string) {
   if (!iso) return "";
@@ -90,13 +104,13 @@ export default function Page() {
   const [maxTicketQTY, setMaxTicketQTY] = useState("10");
   const [token, setToken] = useState("1");
 
-  // date evnet
-  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
+  // event dates
+  const [eventDates, setEventDates] = useState<Date[]>([]);
   const [eventTimeFrom, setEventTimeFrom] = useState("00:00");
   const [eventTimeTo, setEventTimeTo] = useState("00:00");
 
   // draft in dialog b4 submit
-  const [draftDate, setDraftDate] = useState<DateRange | undefined>(undefined);
+  const [draftEventDates, setDraftEventDates] = useState<Date[]>([]);
   const [draftEventTimeFrom, setDraftEventTimeFrom] = useState("00:00");
   const [draftEventTimeTo, setDraftEventTimeTo] = useState("00:00");
 
@@ -128,23 +142,31 @@ export default function Page() {
     setMinTicketQTY(String(event.minTicketQTY ?? 1));
     setMaxTicketQTY(String(event.maxTicketQTY ?? 10));
 
-    const dated = (event.sessions ?? []).filter((s) => s.startsAt);
+    const dated = (event.sessions ?? []).filter((session) => session.startsAt);
     if (dated.length) {
+      const datesByKey = new Map<string, Date>();
+      for (const session of dated) {
+        const date = new Date(session.startsAt!);
+        datesByKey.set(
+          dateKey(date),
+          new Date(date.getFullYear(), date.getMonth(), date.getDate()),
+        );
+      }
+      const dates = [...datesByKey.values()].sort(
+        (first, second) => first.getTime() - second.getTime(),
+      );
       const first = dated[0];
-      const last = dated[dated.length - 1];
-      const from = new Date(first.startsAt!);
-      const to = new Date(last.endsAt ?? last.startsAt!);
-      const range = { from, to };
-      const tFrom = format(from, "HH:mm");
-      const tTo = format(new Date(first.endsAt ?? first.startsAt!), "HH:mm");
-      setDateRange(range);
-      setDraftDate(range);
-      setEventTimeFrom(tFrom);
-      setEventTimeTo(tTo);
-      setDraftEventTimeFrom(tFrom);
-      setDraftEventTimeTo(tTo);
+      const firstStart = new Date(first.startsAt!);
+      const firstEnd = new Date(first.endsAt ?? first.startsAt!);
+      setEventDates(dates);
+      setDraftEventDates(dates);
+      setEventTimeFrom(format(firstStart, "HH:mm"));
+      setEventTimeTo(format(firstEnd, "HH:mm"));
+      setDraftEventTimeFrom(format(firstStart, "HH:mm"));
+      setDraftEventTimeTo(format(firstEnd, "HH:mm"));
     } else {
-      setDraftDate({ from: new Date(), to: addDays(new Date(), 3) });
+      setEventDates([]);
+      setDraftEventDates([]);
     }
   }, [event]);
 
@@ -153,8 +175,13 @@ export default function Page() {
     if (!event) return;
 
     if (!description.trim()) return alert("กรุณากรอกรายละเอียดงาน");
-    if (!dateRange?.from || !dateRange?.to)
-      return alert("กรุณาเลือกวันที่จัดงาน");
+    if (eventDates.length === 0) return alert("กรุณาเลือกวันที่จัดงาน");
+    if (
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(eventTimeFrom) ||
+      !/^([01]\d|2[0-3]):[0-5]\d$/.test(eventTimeTo) ||
+      eventTimeTo <= eventTimeFrom
+    )
+      return alert("กรุณาตั้งเวลาเริ่มและเวลาสิ้นสุดให้ถูกต้อง");
     if (new Date(buyEndAt) <= new Date(buyAt))
       return alert("วันปิดขายต้องมากกว่าวันเปิดขาย");
 
@@ -162,6 +189,55 @@ export default function Page() {
     const maxQ = Number(maxTicketQTY);
     if (!(minQ >= 1) || !(maxQ >= minQ))
       return alert("จำนวนบัตรสูงสุดต้องไม่น้อยกว่าขั้นต่ำ");
+
+    const sortedDates = [...eventDates].sort(
+      (first, second) => first.getTime() - second.getTime(),
+    );
+    const selectedDateKeys = new Set(sortedDates.map(dateKey));
+    const datesWithSessions = new Set<string>();
+    const sessions: EventSessionInput[] = [];
+
+    for (const session of event.sessions ?? []) {
+      if (!session.startsAt) {
+        sessions.push({
+          id: session.id,
+          title: session.title,
+          description: session.description,
+          startsAt: null,
+          endsAt: null,
+        });
+        continue;
+      }
+
+      const sessionDate = new Date(session.startsAt);
+      const key = dateKey(sessionDate);
+      if (!selectedDateKeys.has(key)) continue;
+
+      datesWithSessions.add(key);
+      const isEventDay = session.title.startsWith("วันที่จัดงาน ");
+      sessions.push({
+        id: session.id,
+        title: isEventDay
+          ? `วันที่จัดงาน ${formatDate(sessionDate)}`
+          : session.title,
+        description: session.description,
+        startsAt: isEventDay
+          ? dateTimeOnDay(sessionDate, eventTimeFrom)
+          : session.startsAt,
+        endsAt: isEventDay
+          ? dateTimeOnDay(sessionDate, eventTimeTo)
+          : session.endsAt,
+      });
+    }
+
+    for (const date of sortedDates) {
+      if (datesWithSessions.has(dateKey(date))) continue;
+      sessions.push({
+        title: `วันที่จัดงาน ${formatDate(date)}`,
+        startsAt: dateTimeOnDay(date, eventTimeFrom),
+        endsAt: dateTimeOnDay(date, eventTimeTo),
+      });
+    }
 
     const payload: Partial<EventInput> = {
       title,
@@ -178,11 +254,16 @@ export default function Page() {
       buyEndAt: new Date(buyEndAt).toISOString(),
       minTicketQTY: minQ,
       maxTicketQTY: maxQ,
+      sessions,
     };
 
     try {
       setSubmitting(true);
-      await api.events.update(event.id, payload);
+      const updated = await api.events.update(event.id, payload);
+      if (!updated.success) {
+        alert(updated.error.message);
+        return;
+      }
     } catch (err) {
       console.error(err);
       alert("บันทึกไม่สำเร็จ");
@@ -382,12 +463,8 @@ export default function Page() {
                             id="event-date"
                             type="text"
                             readOnly
-                            placeholder={"เลือกระยะเวลาจัดงาน"}
-                            value={
-                              dateRange?.from
-                                ? `${formatDate(dateRange.from)} – ${formatDate(dateRange.to)}`
-                                : ""
-                            }
+                            placeholder="เลือกวันที่จัดงาน"
+                            value={eventDates.map(formatDate).join(", ")}
                             className="py-3 w-full h-auto font-light cursor-pointer"
                           />
                         </DialogTrigger>
@@ -395,17 +472,20 @@ export default function Page() {
                           <DialogHeader>
                             <DialogTitle>เลือกวันและเวลาจัดงาน</DialogTitle>
                             <DialogDescription>
-                              เลือกวันที่ แล้วกำหนดเวลาเริ่ม–สิ้นสุด
+                              เลือกวันจัดงานได้หลายวัน
+                              โดยใช้เวลาเดียวกันทุกวันที่เลือก
                             </DialogDescription>
                           </DialogHeader>
 
                           <Card className="mx-auto w-fit max-w-[calc(100vw-2rem)]">
                             <CardContent>
                               <Calendar
-                                mode="range"
-                                defaultMonth={draftDate?.from}
-                                selected={draftDate}
-                                onSelect={setDraftDate}
+                                mode="multiple"
+                                defaultMonth={draftEventDates[0] ?? new Date()}
+                                selected={draftEventDates}
+                                onSelect={(dates) =>
+                                  setDraftEventDates(dates ?? [])
+                                }
                                 numberOfMonths={2}
                               />
                             </CardContent>
@@ -462,7 +542,12 @@ export default function Page() {
                             <Button
                               type="button"
                               onClick={() => {
-                                setDateRange(draftDate);
+                                setEventDates(
+                                  [...draftEventDates].sort(
+                                    (first, second) =>
+                                      first.getTime() - second.getTime(),
+                                  ),
+                                );
                                 setEventTimeFrom(draftEventTimeFrom);
                                 setEventTimeTo(draftEventTimeTo);
                                 setOpen(false);

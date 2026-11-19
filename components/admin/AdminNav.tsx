@@ -32,7 +32,6 @@ import {
 } from "lucide-react";
 import { cn } from "cn";
 import Brand from "@/components/core/Brand";
-import { useEffect } from "react";
 
 type NavItem = {
   icon: LucideIcon;
@@ -46,7 +45,7 @@ type NavGroup = {
 };
 
 export default function AdminNav() {
-  const { open, setOpen, state, toggleSidebar, setOpenMobile } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
   const { slug } = useParams<{ slug: string }>();
   const pathname = usePathname();
   const groups = getNavGroups(slug);
@@ -75,17 +74,11 @@ export default function AdminNav() {
     ];
   }
 
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-
   return (
     <Sidebar collapsible="icon" className="flex items-center justify-center">
       <SidebarHeader className="flex items-center justify-center">
         {sidebarState && (
-          <Link href="/admin" className="border border-brand">
-            <Brand />
-          </Link>
+          <Brand href="/admin" />
         )}
       </SidebarHeader>
       <SidebarContent>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 // import ui
@@ -39,98 +39,186 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // icon
-import { Plus, SearchIcon } from "lucide-react";
+import { Plus, RefreshCw, SearchIcon } from "lucide-react";
 
 import { api } from "@/lib/api-client";
 import { PERMISSIONS } from "@/lib/permissions";
 import type { EventDetail, StoreDetail, User } from "@/lib/api-types";
-import { Skeleton } from "@/components/ui/skeleton";
 
 type Store = EventDetail["stores"][number];
+type SortKey = "name" | "income-desc" | "income-asc";
+
+const selectClass =
+  "h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
+
+const formatToken = (v?: string | number | null) => {
+  if (v == null) return "-";
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toLocaleString("th-TH") : "-";
+};
 
 export default function Page() {
   const { slug } = useParams<{ slug: string }>();
 
-  const [search, setSearch] = useState("");
+  // ---------- data ---------- //
   const [event, setEvent] = useState<EventDetail | null>(null);
-  const [vendors, setVendors] = useState<Store[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   // รายละเอียดร้าน (ยอดโทเคน/สินค้า) แยกตาม store id
   const [details, setDetails] = useState<Record<string, StoreDetail>>({});
+  // ร้านที่โหลดรายละเอียดไม่สำเร็จ
+  const [failedStoreIds, setFailedStoreIds] = useState<Set<string>>(new Set());
+
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [usersError, setUsersError] = useState<string | null>(null);
 
-  async function load() {
-    setUsersError(null);
-    const res = await api.events.get(slug);
-    if (!res.success) {
-      setError(res.error.message);
+  // ---------- filters ---------- //
+  const [search, setSearch] = useState("");
+  const [sortKey, setSortKey] = useState<SortKey>("name");
+
+  const load = useCallback(
+    async (silent = false) => {
+      if (silent) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
+      setUsersError(null);
+
+      // โหลดรายละเอียดงาน และรายชื่อผู้ใช้พร้อมกัน
+      const [eventRes, usersRes] = await Promise.all([
+        api.events.get(slug),
+        api.admin.users.list(),
+      ]);
+
+      if (!eventRes.success) {
+        setError(eventRes.error.message);
+        setLoading(false);
+        setRefreshing(false);
+        return;
+      }
+
+      const stores = eventRes.data.stores;
+      const storeResults = await Promise.all(
+        stores.map((s) => api.store.getMy(s.id)),
+      );
+
+      const map: Record<string, StoreDetail> = {};
+      const failed = new Set<string>();
+      storeResults.forEach((r, i) => {
+        if (r.success) map[stores[i].id] = r.data;
+        else failed.add(stores[i].id);
+      });
+
+      setEvent(eventRes.data);
+      setDetails(map);
+      setFailedStoreIds(failed);
+
+      // ใช้หาชื่อผู้ดูแลร้าน (ถ้าไม่มีสิทธิ์ดูรายชื่อผู้ใช้ ก็แสดงเป็น "-")
+      if (usersRes.success) setUsers(usersRes.data);
+      else setUsersError(usersRes.error.message);
+
       setLoading(false);
-      return;
-    }
-    setEvent(res.data);
-    setVendors(res.data.stores);
-
-    const results = await Promise.all(
-      res.data.stores.map((s) => api.store.getMy(s.id)),
-    );
-    const map: Record<string, StoreDetail> = {};
-    results.forEach((r, i) => {
-      if (r.success) map[res.data.stores[i].id] = r.data;
-    });
-    setDetails(map);
-
-    // ใช้หาชื่อผู้ดูแลร้าน (ถ้าไม่มีสิทธิ์ดูรายชื่อผู้ใช้ ก็แสดงเป็น "-")
-    const usersRes = await api.admin.users.list();
-    if (usersRes.success) setUsers(usersRes.data);
-    else setUsersError(usersRes.error.message);
-
-    setLoading(false);
-  }
+      setRefreshing(false);
+    },
+    [slug],
+  );
 
   useEffect(() => {
     load();
-  }, [slug]);
+  }, [load]);
 
-  function managersOf(storeId: string) {
-    const names = users
-      .filter((u) =>
-        u.roles.some((r) => r.role === "VENDOR" && r.storeId === storeId),
-      )
-      .map((u) => u.name);
-    return names.length ? names.join(", ") : "-";
-  }
+  // ---------- derived ---------- //
+  const vendors: Store[] = useMemo(() => event?.stores ?? [], [event]);
 
+  const managersByStore = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    for (const u of users) {
+      for (const r of u.roles) {
+        if (r.role === "VENDOR" && r.storeId) {
+          (map[r.storeId] ??= []).push(u.name);
+        }
+      }
+    }
+    return map;
+  }, [users]);
+
+  const incomeOf = useCallback(
+    (storeId: string) => Number(details[storeId]?.walletBalance ?? 0),
+    [details],
+  );
+
+  const totalIncome = useMemo(
+    () => vendors.reduce((sum, v) => sum + incomeOf(v.id), 0),
+    [vendors, incomeOf],
+  );
+
+  const storesWithoutProduct = useMemo(
+    () => vendors.filter((v) => details[v.id] && !details[v.id].product).length,
+    [vendors, details],
+  );
+
+  const storesWithoutManager = useMemo(
+    () => vendors.filter((v) => !managersByStore[v.id]?.length).length,
+    [vendors, managersByStore],
+  );
+
+  const filtered = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+    const list = vendors.filter((v) => {
+      if (!keyword) return true;
+      const product = details[v.id]?.product?.title ?? "";
+      const managers = (managersByStore[v.id] ?? []).join(" ");
+      return `${v.name} ${product} ${managers}`.toLowerCase().includes(keyword);
+    });
+
+    return [...list].sort((a, b) => {
+      if (sortKey === "income-desc") return incomeOf(b.id) - incomeOf(a.id);
+      if (sortKey === "income-asc") return incomeOf(a.id) - incomeOf(b.id);
+      return a.name.localeCompare(b.name, "th");
+    });
+  }, [vendors, details, managersByStore, search, sortKey, incomeOf]);
+
+  // ---------- assign vendor ---------- //
   const [assignOpen, setAssignOpen] = useState(false);
   const [selectedStore, setSelectedStore] = useState<Store | null>(null);
   const [selectedUserId, setSelectedUserId] = useState("");
+  const [userSearch, setUserSearch] = useState("");
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState<string | null>(null);
 
-  const availableUsers = selectedStore
-    ? users.filter(
-        (user) =>
-          user.status === "ACTIVE" &&
-          !user.roles.some(
-            (role) =>
-              role.role === "VENDOR" && role.storeId === selectedStore.id,
-          ),
-      )
-    : [];
+  const availableUsers = useMemo(() => {
+    if (!selectedStore) return [];
+    const keyword = userSearch.trim().toLowerCase();
+    return users.filter(
+      (user) =>
+        user.status === "ACTIVE" &&
+        !user.roles.some(
+          (role) => role.role === "VENDOR" && role.storeId === selectedStore.id,
+        ) &&
+        (!keyword ||
+          `${user.name} ${user.email}`.toLowerCase().includes(keyword)),
+    );
+  }, [users, selectedStore, userSearch]);
+
+  function resetAssign() {
+    setSelectedStore(null);
+    setSelectedUserId("");
+    setUserSearch("");
+    setAssignError(null);
+  }
 
   function openAssignVendor(store: Store) {
+    resetAssign();
     setSelectedStore(store);
-    setSelectedUserId("");
-    setAssignError(null);
     setAssignOpen(true);
   }
 
   async function handleAssignVendor(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!event || !selectedStore || !selectedUserId) return;
+    if (!event || !selectedStore || !selectedUserId || assigning) return;
 
     setAssigning(true);
     setAssignError(null);
@@ -151,36 +239,49 @@ export default function Page() {
       current.map((user) => (user.id === res.data.id ? res.data : user)),
     );
     setAssignOpen(false);
-    setSelectedStore(null);
-    setSelectedUserId("");
+    resetAssign();
   }
 
+  // ---------- create store ---------- //
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
 
   function openCreate() {
     setNewName("");
     setNewDescription("");
+    setCreateError(null);
     setCreateOpen(true);
   }
 
   async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!event) return;
+    if (!event || creating) return;
+
+    const name = newName.trim();
+    if (!name) {
+      setCreateError("กรุณากรอกชื่อร้าน");
+      return;
+    }
 
     setCreating(true);
+    setCreateError(null);
     const res = await api.store.create({
       eventId: event.id,
-      name: newName.trim(),
+      name,
       description: newDescription.trim() || null,
     });
     setCreating(false);
 
-    if (!res.success) return alert(res.error.message);
+    if (!res.success) {
+      setCreateError(res.error.message);
+      return;
+    }
+
     setCreateOpen(false);
-    load();
+    load(true); // รีเฟรชแบบเงียบ ไม่กลับไปหน้า skeleton
   }
 
   // ---------- UI ---------- //
@@ -207,19 +308,34 @@ export default function Page() {
         </div>
       </div>
     );
-  if (error || !event) return <div className="p-4">{error ?? "ไม่พบงาน"}</div>;
 
-  const fmt = (v?: string | null) =>
-    v == null ? "-" : Number(v).toLocaleString("th-TH");
-  const totalIncome = Object.values(details).reduce(
-    (sum, d) => sum + Number(d.walletBalance),
-    0,
-  );
+  if (error || !event)
+    return (
+      <div className="p-4 flex flex-col items-start gap-3">
+        <p role="alert" className="text-destructive">
+          {error ?? "ไม่พบงาน"}
+        </p>
+        <Button variant="outline" onClick={() => load()}>
+          <RefreshCw />
+          ลองใหม่
+        </Button>
+      </div>
+    );
 
-  const keyword = search.trim().toLowerCase();
-  const filtered = vendors.filter((v) =>
-    v.name.toLowerCase().includes(keyword),
-  );
+  const stats = [
+    { label: "ร้านค้าทั้งหมด", value: formatToken(vendors.length) },
+    { label: "รายได้รวมทุกร้าน", value: `${formatToken(totalIncome)} Token` },
+    {
+      label: "ร้านที่ยังไม่มีสินค้า",
+      value: formatToken(storesWithoutProduct),
+      warn: storesWithoutProduct > 0,
+    },
+    {
+      label: "ร้านที่ยังไม่มีผู้ดูแล",
+      value: usersError ? "-" : formatToken(storesWithoutManager),
+      warn: !usersError && storesWithoutManager > 0,
+    },
+  ];
 
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -242,108 +358,174 @@ export default function Page() {
 
       <div className="p-4 mx-auto w-full max-w-7xl flex flex-col items-start justify-center gap-4">
         {/* หัวเรื่อง */}
-        <div className="w-full flex flex-row items-center justify-between">
+        <div className="w-full flex flex-row items-center justify-between gap-3">
           <div>
-            <div className="text-[24px] font-semibold text-black">ร้านค้า</div>
-            <div className="text-[14px] font-medium text-muted-foreground">
+            <h1 className="text-[24px] font-semibold text-black">ร้านค้า</h1>
+            <p className="text-[14px] font-medium text-muted-foreground">
               ร้านมีสินค้าได้เพียง 1 รายการ
-            </div>
+            </p>
           </div>
-          {/* create vendor */}
-          <Badge
-            onClick={openCreate}
-            variant={"outline"}
-            className="p-3 flex flex-row items-center border border-brand text-brand justify-center w-fit h-auto hover:bg-brand hover:text-on-brand font-semibold text-[16px] rounded-[10px] gap-1.5 hover:cursor-pointer transition ease-in [&>svg]:size-5!"
-          >
-            <Plus />
-            สร้างร้านค้า
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => load(true)}
+              disabled={refreshing}
+              aria-label="รีเฟรชข้อมูล"
+            >
+              <RefreshCw className={refreshing ? "animate-spin" : ""} />
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={openCreate}
+              className="h-auto p-3 border-brand text-brand hover:bg-brand hover:text-on-brand font-semibold text-[16px] rounded-[10px] gap-1.5 [&>svg]:size-5!"
+            >
+              <Plus />
+              สร้างร้านค้า
+            </Button>
+          </div>
+        </div>
+
+        {/* สรุปภาพรวม */}
+        <div className="w-full grid grid-cols-2 lg:grid-cols-4 gap-3">
+          {stats.map((s) => (
+            <div
+              key={s.label}
+              className="rounded-[10px] border p-4 flex flex-col gap-1"
+            >
+              <span className="text-sm text-muted-foreground">{s.label}</span>
+              <span
+                className={`text-xl font-semibold ${
+                  s.warn ? "text-destructive" : "text-black"
+                }`}
+              >
+                {s.value}
+              </span>
+            </div>
+          ))}
         </div>
 
         {/* vendor */}
-        <Badge
-          variant={"outline"}
-          className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5"
-        >
-          <div className="flex flex-col items-start justify-center">
-            <div className="text-[16px] font-semibold text-black">
-              ร้านค้าทั้งหมด ({vendors.length})
-            </div>
-            <div className="text-sm text-muted-foreground">
-              รายได้รวมทุกร้าน {fmt(String(totalIncome))} Token
-            </div>
+        <div className="p-4 flex flex-col items-start justify-center w-full rounded-[10px] border gap-3">
+          <div className="text-[16px] font-semibold text-black">
+            รายชื่อร้านค้า
+            {filtered.length !== vendors.length &&
+              ` (${filtered.length}/${vendors.length})`}
           </div>
 
-          <div className="flex w-full flex-col items-start justify-center gap-1">
-            <FieldGroup className="flex lg:flex-row">
-              <Field className="lg:flex-2">
-                <FieldLabel
-                  htmlFor="search-vendor"
-                  className="text-sm text-muted-foreground"
-                >
-                  ค้นหา
-                </FieldLabel>
-                <InputGroup className="w-full h-auto flex p-2">
-                  <InputGroupInput
-                    id="search-vendor"
-                    placeholder="ค้นหาชื่อร้าน"
-                    className="text-sm"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  <InputGroupAddon>
-                    <SearchIcon className="text-muted-foreground" />
-                  </InputGroupAddon>
-                </InputGroup>
-              </Field>
-            </FieldGroup>
+          <FieldGroup className="flex lg:flex-row w-full">
+            <Field className="lg:flex-2">
+              <FieldLabel
+                htmlFor="search-vendor"
+                className="text-sm text-muted-foreground"
+              >
+                ค้นหา
+              </FieldLabel>
+              <InputGroup className="w-full h-auto flex p-2">
+                <InputGroupInput
+                  id="search-vendor"
+                  placeholder="ค้นหาชื่อร้าน สินค้า หรือผู้ดูแล"
+                  className="text-sm"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
+                <InputGroupAddon>
+                  <SearchIcon className="text-muted-foreground" />
+                </InputGroupAddon>
+              </InputGroup>
+            </Field>
+            <Field className="lg:flex-1">
+              <FieldLabel
+                htmlFor="sort-vendor"
+                className="text-sm text-muted-foreground"
+              >
+                เรียงตาม
+              </FieldLabel>
+              <select
+                id="sort-vendor"
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as SortKey)}
+                className={`${selectClass} h-12`}
+              >
+                <option value="name">ชื่อร้าน (ก-ฮ)</option>
+                <option value="income-desc">รายได้ มาก → น้อย</option>
+                <option value="income-asc">รายได้ น้อย → มาก</option>
+              </select>
+            </Field>
+          </FieldGroup>
 
-            <div className="mt-2 w-full">
-              <Table>
-                <TableCaption>รายชื่อร้านค้าในงาน</TableCaption>
-                <TableHeader>
+          <div className="mt-2 w-full overflow-x-auto">
+            <Table>
+              <TableCaption>รายชื่อร้านค้าในงาน</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ร้านค้า</TableHead>
+                  <TableHead>สินค้า</TableHead>
+                  <TableHead>ราคา</TableHead>
+                  <TableHead>รายได้ร้าน</TableHead>
+                  <TableHead>ผู้ดูแลร้าน</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.length === 0 ? (
                   <TableRow>
-                    <TableHead>ร้านค้า</TableHead>
-                    <TableHead>สินค้า</TableHead>
-                    <TableHead>ราคา</TableHead>
-                    <TableHead>รายได้ร้าน</TableHead>
-                    <TableHead>ผู้ดูแลร้าน</TableHead>
+                    <TableCell
+                      colSpan={5}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      {vendors.length === 0
+                        ? "ยังไม่มีร้านค้า กด “สร้างร้านค้า” เพื่อเริ่มต้น"
+                        : "ไม่พบร้านค้าที่ค้นหา"}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="h-24 text-center text-muted-foreground"
-                      >
-                        {vendors.length === 0
-                          ? "ยังไม่มีร้านค้า"
-                          : "ไม่พบร้านค้าที่ค้นหา"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filtered.map((vendor) => (
+                ) : (
+                  filtered.map((vendor) => {
+                    const detail = details[vendor.id];
+                    const failed = failedStoreIds.has(vendor.id);
+                    const managers = managersByStore[vendor.id] ?? [];
+
+                    return (
                       <TableRow key={vendor.id}>
                         <TableCell className="font-medium">
                           {vendor.name}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {details[vendor.id]?.product?.title ?? "-"}
+                          {failed ? (
+                            <span className="text-destructive text-sm">
+                              โหลดไม่สำเร็จ
+                            </span>
+                          ) : (
+                            (detail?.product?.title ?? "-")
+                          )}
                         </TableCell>
                         <TableCell>
-                          {details[vendor.id]?.product
-                            ? `${fmt(details[vendor.id]!.product!.price)} Token`
+                          {detail?.product
+                            ? `${formatToken(detail.product.price)} Token`
                             : "-"}
                         </TableCell>
                         <TableCell className="font-medium">
-                          {details[vendor.id]
-                            ? `${fmt(details[vendor.id].walletBalance)} Token`
+                          {detail
+                            ? `${formatToken(detail.walletBalance)} Token`
                             : "-"}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col items-start gap-2">
-                            <span>{managersOf(vendor.id)}</span>
+                            {managers.length === 0 ? (
+                              <span className="text-muted-foreground">-</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1">
+                                {managers.map((name, i) => (
+                                  <Badge
+                                    key={`${name}-${i}`}
+                                    variant="secondary"
+                                  >
+                                    {name}
+                                  </Badge>
+                                ))}
+                              </div>
+                            )}
                             <Button
                               type="button"
                               size="sm"
@@ -357,28 +539,26 @@ export default function Page() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-            {usersError && (
-              <p role="alert" className="mt-2 text-sm text-destructive">
-                โหลดรายชื่อผู้ใช้เพื่อผูก Vendor ไม่สำเร็จ: {usersError}
-              </p>
-            )}
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
           </div>
-        </Badge>
 
+          {usersError && (
+            <p role="alert" className="text-sm text-destructive">
+              โหลดรายชื่อผู้ใช้เพื่อผูก Vendor ไม่สำเร็จ: {usersError}
+            </p>
+          )}
+        </div>
+
+        {/* dialog assign vendor */}
         <Dialog
           open={assignOpen}
           onOpenChange={(open) => {
             setAssignOpen(open);
-            if (!open) {
-              setSelectedStore(null);
-              setSelectedUserId("");
-              setAssignError(null);
-            }
+            if (!open) resetAssign();
           }}
         >
           <DialogContent className="sm:max-w-md">
@@ -394,6 +574,18 @@ export default function Page() {
             <form onSubmit={handleAssignVendor}>
               <FieldGroup>
                 <Field>
+                  <FieldLabel htmlFor="vendor-user-search">
+                    ค้นหาบัญชีผู้ใช้
+                  </FieldLabel>
+                  <Input
+                    id="vendor-user-search"
+                    placeholder="ชื่อหรืออีเมล"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                    disabled={Boolean(usersError)}
+                  />
+                </Field>
+                <Field>
                   <FieldLabel htmlFor="vendor-user">บัญชีผู้ใช้ *</FieldLabel>
                   <select
                     id="vendor-user"
@@ -403,7 +595,7 @@ export default function Page() {
                     disabled={
                       Boolean(usersError) || availableUsers.length === 0
                     }
-                    className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className={selectClass}
                   >
                     <option value="" disabled>
                       เลือกบัญชีผู้ใช้
@@ -423,7 +615,9 @@ export default function Page() {
                 </p>
               ) : availableUsers.length === 0 ? (
                 <p className="mt-3 text-sm text-muted-foreground">
-                  ไม่มีบัญชีผู้ใช้ที่ยังผูกกับร้านนี้ได้
+                  {userSearch.trim()
+                    ? "ไม่พบบัญชีผู้ใช้ที่ตรงกับคำค้นหา"
+                    : "ไม่มีบัญชีผู้ใช้ที่ยังผูกกับร้านนี้ได้"}
                 </p>
               ) : null}
               {assignError && (
@@ -440,7 +634,7 @@ export default function Page() {
                 </DialogClose>
                 <Button
                   type="submit"
-                  className="bg-brand hover:bg-brand-hover"
+                  className="bg-brand hover:bg-brand-hover cursor-pointer"
                   disabled={
                     assigning ||
                     !selectedUserId ||
@@ -461,7 +655,7 @@ export default function Page() {
             <DialogHeader>
               <DialogTitle>สร้างร้านค้า</DialogTitle>
               <DialogDescription>
-                เปิดร้านใหม่ในงาน "{event.title}"
+                เปิดร้านใหม่ในงาน “{event.title}”
               </DialogDescription>
             </DialogHeader>
 
@@ -489,6 +683,12 @@ export default function Page() {
                   />
                 </Field>
               </FieldGroup>
+
+              {createError && (
+                <p role="alert" className="mt-3 text-sm text-destructive">
+                  {createError}
+                </p>
+              )}
 
               <DialogFooter className="mt-4">
                 <DialogClose asChild>

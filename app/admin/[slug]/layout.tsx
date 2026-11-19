@@ -20,7 +20,7 @@ export default async function AdminLayout({
       }
     >
       <TooltipProvider>
-        <SidebarProvider defaultOpen={false}>
+        <SidebarProvider defaultOpen>
           <AdminNav />
           <main className="bg-[#F5F5F5] w-full">
             <TopBar />

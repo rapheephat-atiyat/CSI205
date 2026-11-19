@@ -5,13 +5,14 @@ import Link from "next/link";
 
 interface Props {
     title?: string;
+    href?: string;
     className?: string;
     priority?: boolean;
     onlyLogo?: boolean;
     onClick?: () => void;
 }
 
-export default function Brand({ title = "TUATUA", className, priority, onlyLogo, onClick }: Props) {
+export default function Brand({ title = "TUATUA", href = "/", className, priority, onlyLogo, onClick }: Props) {
     return (
         <>
             {onlyLogo ? (
@@ -24,7 +25,7 @@ export default function Brand({ title = "TUATUA", className, priority, onlyLogo,
                 />
             ) : (
                 <Link
-                    href="/"
+                    href={href}
                     onClick={onClick}
                     className={cn("inline-flex min-h-11 shrink-0 items-center gap-2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2", className)}
                 >
