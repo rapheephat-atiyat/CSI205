@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useAdminAccess } from "@/components/admin/AdminAccess";
+import { toast } from "sonner";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // import ui
 import {
@@ -46,10 +48,10 @@ import { Plus, RefreshCw, SearchIcon } from "lucide-react";
 
 import { api } from "@/lib/api-client";
 import { PERMISSIONS } from "@/lib/permissions";
-import type { EventDetail, StoreDetail, User } from "@/lib/api-types";
+import type { AdminStore, AdminUser } from "@/lib/api-types";
 
-type Store = EventDetail["stores"][number];
-type SortKey = "name" | "income-desc" | "income-asc";
+type Store = AdminStore;
+type SortKey = "name" | "balance-desc" | "balance-asc";
 
 const selectClass =
   "h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
@@ -61,16 +63,12 @@ const formatToken = (v?: string | number | null) => {
 };
 
 export default function Page() {
-  const { slug } = useParams<{ slug: string }>();
+  const { eventId, eventTitle, slug, can } = useAdminAccess();
+  const canAssign = can(PERMISSIONS.PERMISSION_MANAGE);
 
   // ---------- data ---------- //
-  const [event, setEvent] = useState<EventDetail | null>(null);
-  const [users, setUsers] = useState<User[]>([]);
-  // รายละเอียดร้าน (ยอดโทเคน/สินค้า) แยกตาม store id
-  const [details, setDetails] = useState<Record<string, StoreDetail>>({});
-  // ร้านที่โหลดรายละเอียดไม่สำเร็จ
-  const [failedStoreIds, setFailedStoreIds] = useState<Set<string>>(new Set());
-
+  const [vendors, setVendors] = useState<AdminStore[]>([]);
+  const [users, setUsers] = useState<AdminUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -80,79 +78,50 @@ export default function Page() {
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
 
-  const load = useCallback(
-    async (silent = false) => {
-      if (silent) setRefreshing(true);
-      else setLoading(true);
-      setError(null);
-      setUsersError(null);
+  const [revision, setRevision] = useState(0);
 
-      // โหลดรายละเอียดงาน และรายชื่อผู้ใช้พร้อมกัน
-      const [eventRes, usersRes] = await Promise.all([
-        api.events.get(slug),
-        api.admin.users.list(),
-      ]);
-
-      if (!eventRes.success) {
-        setError(eventRes.error.message);
-        setLoading(false);
-        setRefreshing(false);
-        return;
-      }
-
-      const stores = eventRes.data.stores;
-      const storeResults = await Promise.all(
-        stores.map((s) => api.store.getMy(s.id)),
-      );
-
-      const map: Record<string, StoreDetail> = {};
-      const failed = new Set<string>();
-      storeResults.forEach((r, i) => {
-        if (r.success) map[stores[i].id] = r.data;
-        else failed.add(stores[i].id);
-      });
-
-      setEvent(eventRes.data);
-      setDetails(map);
-      setFailedStoreIds(failed);
-
-      // ใช้หาชื่อผู้ดูแลร้าน (ถ้าไม่มีสิทธิ์ดูรายชื่อผู้ใช้ ก็แสดงเป็น "-")
-      if (usersRes.success) setUsers(usersRes.data);
-      else setUsersError(usersRes.error.message);
-
-      setLoading(false);
-      setRefreshing(false);
-    },
-    [slug],
-  );
+  function reload(silent = false) {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+    setUsersError(null);
+    setRevision((value) => value + 1);
+  }
 
   useEffect(() => {
-    load();
-  }, [load]);
-
-  // ---------- derived ---------- //
-  const vendors: Store[] = useMemo(() => event?.stores ?? [], [event]);
-
-  const managersByStore = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    for (const u of users) {
-      for (const r of u.roles) {
-        if (r.role === "VENDOR" && r.storeId) {
-          (map[r.storeId] ??= []).push(u.name);
-        }
+    let cancelled = false;
+    Promise.all([
+      api.admin.stores.list(eventId),
+      canAssign ? api.admin.eventUsers.list(eventId) : Promise.resolve(null),
+    ]).then(([storeResponse, userResponse]) => {
+      if (cancelled) return;
+      if (storeResponse.success) setVendors(storeResponse.data);
+      else {
+        setError(storeResponse.error.message);
+        toast.error(storeResponse.error.message);
       }
-    }
-    return map;
-  }, [users]);
+      if (userResponse?.success) setUsers(userResponse.data);
+      else if (userResponse) setUsersError(userResponse.error.message);
+    }).finally(() => {
+      if (!cancelled) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [eventId, canAssign, revision]);
 
-  const incomeOf = useCallback(
+  const details = useMemo(() => Object.fromEntries(vendors.map((store) => [store.id, store])), [vendors]);
+  const managersByStore = useMemo(() => Object.fromEntries(vendors.map((store) => [store.id, store.managers.map((manager) => manager.name)])), [vendors]);
+
+  const balanceOf = useCallback(
     (storeId: string) => Number(details[storeId]?.walletBalance ?? 0),
     [details],
   );
 
-  const totalIncome = useMemo(
-    () => vendors.reduce((sum, v) => sum + incomeOf(v.id), 0),
-    [vendors, incomeOf],
+  const totalBalance = useMemo(
+    () => vendors.reduce((sum, v) => sum + balanceOf(v.id), 0),
+    [vendors, balanceOf],
   );
 
   const storesWithoutProduct = useMemo(
@@ -175,11 +144,11 @@ export default function Page() {
     });
 
     return [...list].sort((a, b) => {
-      if (sortKey === "income-desc") return incomeOf(b.id) - incomeOf(a.id);
-      if (sortKey === "income-asc") return incomeOf(a.id) - incomeOf(b.id);
+      if (sortKey === "balance-desc") return balanceOf(b.id) - balanceOf(a.id);
+      if (sortKey === "balance-asc") return balanceOf(a.id) - balanceOf(b.id);
       return a.name.localeCompare(b.name, "th");
     });
-  }, [vendors, details, managersByStore, search, sortKey, incomeOf]);
+  }, [vendors, details, managersByStore, search, sortKey, balanceOf]);
 
   // ---------- assign vendor ---------- //
   const [assignOpen, setAssignOpen] = useState(false);
@@ -218,13 +187,12 @@ export default function Page() {
 
   async function handleAssignVendor(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!event || !selectedStore || !selectedUserId || assigning) return;
+    if (!canAssign || !selectedStore || !selectedUserId || assigning) return;
 
     setAssigning(true);
     setAssignError(null);
-    const res = await api.admin.users.assignRole(selectedUserId, {
+    const res = await api.admin.eventUsers.assignRole(eventId, selectedUserId, {
       role: "VENDOR",
-      eventId: event.id,
       storeId: selectedStore.id,
       permissions: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_SELL],
     });
@@ -232,12 +200,12 @@ export default function Page() {
 
     if (!res.success) {
       setAssignError(res.error.message);
+      toast.error(res.error.message);
       return;
     }
 
-    setUsers((current) =>
-      current.map((user) => (user.id === res.data.id ? res.data : user)),
-    );
+    toast.success("มอบหมายผู้ดูแลร้านแล้ว");
+    reload(true);
     setAssignOpen(false);
     resetAssign();
   }
@@ -247,41 +215,57 @@ export default function Page() {
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
   const [creating, setCreating] = useState(false);
+  const [editingStore, setEditingStore] = useState<AdminStore | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  function openCreate() {
-    setNewName("");
-    setNewDescription("");
+  function openStoreForm(store: AdminStore | null = null) {
+    setEditingStore(store);
+    setNewName(store?.name ?? "");
+    setNewDescription(store?.description ?? "");
     setCreateError(null);
+    setConfirmDelete(false);
     setCreateOpen(true);
   }
 
-  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!event || creating) return;
-
+  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (creating) return;
     const name = newName.trim();
     if (!name) {
-      setCreateError("กรุณากรอกชื่อร้าน");
+      toast.error("กรุณากรอกชื่อร้าน");
       return;
     }
-
     setCreating(true);
     setCreateError(null);
-    const res = await api.store.create({
-      eventId: event.id,
-      name,
-      description: newDescription.trim() || null,
-    });
+    const input = { name, description: newDescription.trim() || null };
+    const result = editingStore
+      ? await api.admin.stores.update(eventId, editingStore.id, input)
+      : await api.admin.stores.create(eventId, input);
     setCreating(false);
-
-    if (!res.success) {
-      setCreateError(res.error.message);
+    if (!result.success) {
+      setCreateError(result.error.message);
+      toast.error(result.error.message);
       return;
     }
-
+    toast.success("บันทึกร้านค้าแล้ว");
     setCreateOpen(false);
-    load(true); // รีเฟรชแบบเงียบ ไม่กลับไปหน้า skeleton
+    reload(true);
+  }
+
+  async function handleDelete() {
+    if (!editingStore || !confirmDelete || creating) return;
+    setCreating(true);
+    const result = await api.admin.stores.delete(eventId, editingStore.id);
+    setCreating(false);
+    if (!result.success) {
+      setCreateError(result.error.message);
+      toast.error(result.error.message);
+      return;
+    }
+    toast.success("ลบร้านค้าแล้ว");
+    setCreateOpen(false);
+    reload(true);
   }
 
   // ---------- UI ---------- //
@@ -309,13 +293,13 @@ export default function Page() {
       </div>
     );
 
-  if (error || !event)
+  if (error)
     return (
       <div className="p-4 flex flex-col items-start gap-3">
         <p role="alert" className="text-destructive">
           {error ?? "ไม่พบงาน"}
         </p>
-        <Button variant="outline" onClick={() => load()}>
+        <Button variant="outline" onClick={() => reload()}>
           <RefreshCw />
           ลองใหม่
         </Button>
@@ -324,7 +308,7 @@ export default function Page() {
 
   const stats = [
     { label: "ร้านค้าทั้งหมด", value: formatToken(vendors.length) },
-    { label: "รายได้รวมทุกร้าน", value: `${formatToken(totalIncome)} Token` },
+    { label: "ยอด Token คงเหลือรวม", value: `${formatToken(totalBalance)} Token` },
     {
       label: "ร้านที่ยังไม่มีสินค้า",
       value: formatToken(storesWithoutProduct),
@@ -345,7 +329,7 @@ export default function Page() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink href={`/admin/${slug}`}>
-                {event.title}
+                {eventTitle}
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -370,7 +354,7 @@ export default function Page() {
               type="button"
               variant="ghost"
               size="icon"
-              onClick={() => load(true)}
+              onClick={() => reload(true)}
               disabled={refreshing}
               aria-label="รีเฟรชข้อมูล"
             >
@@ -379,7 +363,7 @@ export default function Page() {
             <Button
               type="button"
               variant="outline"
-              onClick={openCreate}
+              onClick={() => openStoreForm()}
               className="h-auto p-3 border-brand text-brand hover:bg-brand hover:text-on-brand font-semibold text-[16px] rounded-[10px] gap-1.5 [&>svg]:size-5! cursor-pointer"
             >
               <Plus />
@@ -450,8 +434,8 @@ export default function Page() {
                 className={`${selectClass} h-12 cursor-pointer`}
               >
                 <option value="name">ชื่อร้าน (ก-ฮ)</option>
-                <option value="income-desc">รายได้ มาก → น้อย</option>
-                <option value="income-asc">รายได้ น้อย → มาก</option>
+                <option value="balance-desc">ยอดคงเหลือ มาก → น้อย</option>
+                <option value="balance-asc">ยอดคงเหลือ น้อย → มาก</option>
               </select>
             </Field>
           </FieldGroup>
@@ -464,8 +448,8 @@ export default function Page() {
                   <TableHead>ร้านค้า</TableHead>
                   <TableHead>สินค้า</TableHead>
                   <TableHead>ราคา</TableHead>
-                  <TableHead>รายได้ร้าน</TableHead>
-                  <TableHead>ผู้ดูแลร้าน</TableHead>
+                  <TableHead>ยอด Token คงเหลือ</TableHead>
+                  <TableHead>ผู้ดูแลร้านและจัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -483,7 +467,6 @@ export default function Page() {
                 ) : (
                   filtered.map((vendor) => {
                     const detail = details[vendor.id];
-                    const failed = failedStoreIds.has(vendor.id);
                     const managers = managersByStore[vendor.id] ?? [];
 
                     return (
@@ -492,13 +475,7 @@ export default function Page() {
                           {vendor.name}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {failed ? (
-                            <span className="text-destructive text-sm">
-                              โหลดไม่สำเร็จ
-                            </span>
-                          ) : (
-                            (detail?.product?.title ?? "-")
-                          )}
+                          {detail?.product?.title ?? "—"}
                         </TableCell>
                         <TableCell>
                           {detail?.product
@@ -530,12 +507,15 @@ export default function Page() {
                               type="button"
                               size="sm"
                               variant="outline"
-                              disabled={Boolean(usersError)}
+                              disabled={!canAssign || Boolean(usersError)}
                               onClick={() => openAssignVendor(vendor)}
                               className="cursor-pointer"
                             >
                               <Plus />
                               เพิ่ม Vendor
+                            </Button>
+                            <Button type="button" size="sm" variant="outline" onClick={() => openStoreForm(vendor)}>
+                              แก้ไขร้านค้า
                             </Button>
                           </div>
                         </TableCell>
@@ -654,9 +634,9 @@ export default function Page() {
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>สร้างร้านค้า</DialogTitle>
+              <DialogTitle>{editingStore ? "แก้ไขร้านค้า" : "สร้างร้านค้า"}</DialogTitle>
               <DialogDescription>
-                เปิดร้านใหม่ในงาน “{event.title}”
+                {eventTitle} · ร้านค้าที่มีธุรกรรมจะลบไม่ได้
               </DialogDescription>
             </DialogHeader>
 
@@ -702,9 +682,18 @@ export default function Page() {
                   className="bg-brand hover:bg-brand-hover"
                   disabled={creating}
                 >
-                  {creating ? "กำลังสร้าง..." : "สร้างร้านค้า"}
+                  {creating ? "กำลังบันทึก..." : "บันทึกร้านค้า"}
                 </Button>
               </DialogFooter>
+              {editingStore && (
+                <div className="mt-4 space-y-3 border-t pt-4">
+                  <label className="flex min-h-11 items-center gap-3 text-sm">
+                    <Checkbox checked={confirmDelete} onCheckedChange={(value) => setConfirmDelete(value === true)} />
+                    ยืนยันลบร้านค้านี้
+                  </label>
+                  <Button type="button" variant="destructive" disabled={!confirmDelete || creating} onClick={handleDelete}>ลบร้านค้า</Button>
+                </div>
+              )}
             </form>
           </DialogContent>
         </Dialog>

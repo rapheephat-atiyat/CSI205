@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import SuperAdminTopbar from "@/components/admin/SuperAdminTopbar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { requirePageUser } from "@/server/auth/page-user";
@@ -29,6 +30,7 @@ export default function FaqPage() {
 }
 
 async function FaqContent() {
+  await connection();
   const user = await requirePageUser("/admin/faq");
   const isAdmin = user.userRoles.some(
     (role) =>

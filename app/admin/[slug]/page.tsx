@@ -11,7 +11,6 @@ import {
   ScanLine,
   Ticket,
   Coins,
-  SquareArrowOutUpRight,
   ClipboardCheck,
 } from "lucide-react";
 import {
@@ -28,7 +27,9 @@ import {
   BreadcrumbList,
   BreadcrumbPage,
 } from "@/components/ui/breadcrumb";
-import { useParams } from "next/navigation";
+import { useAdminAccess } from "@/components/admin/AdminAccess";
+import { PERMISSIONS } from "@/lib/permissions";
+import { toast } from "sonner";
 import { api } from "@/lib/api-client";
 import type { EventDetail, EventOverviewReport } from "@/lib/api-types";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,7 +42,8 @@ type Stat = {
 };
 
 export default function AdminDashboardPage() {
-  const { slug } = useParams();
+  const { slug, eventId, can } = useAdminAccess();
+  const canReadReport = can(PERMISSIONS.REPORT_READ);
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -53,17 +55,14 @@ export default function AdminDashboardPage() {
     let active = true;
 
     async function load() {
-      setLoading(true);
-      setError(null);
-      setEvent(null);
-      setStores([]);
-      setOverview(null);
-      setOverviewError(null);
-
-      const res = await api.events.get(`${slug}`);
+      const [res, overviewRes] = await Promise.all([
+        api.events.get(slug),
+        canReadReport ? api.admin.eventOverview(eventId) : Promise.resolve(null),
+      ]);
       if (!active) return;
       if (!res.success) {
         setError(res.error.message);
+        toast.error(res.error.message);
         setLoading(false);
         return;
       }
@@ -72,10 +71,10 @@ export default function AdminDashboardPage() {
       setStores(res.data.stores);
       setLoading(false);
 
-      const overviewRes = await api.admin.eventOverview(res.data.id);
-      if (!active) return;
+      if (!overviewRes) return;
       if (!overviewRes.success) {
         setOverviewError(overviewRes.error.message);
+        toast.error(overviewRes.error.message);
         return;
       }
 
@@ -86,7 +85,7 @@ export default function AdminDashboardPage() {
     return () => {
       active = false;
     };
-  }, [slug]);
+  }, [slug, eventId, canReadReport]);
 
   const styles = {
     text: "text-muted-foreground text-sm font-light",
@@ -101,6 +100,8 @@ export default function AdminDashboardPage() {
       )
     : null;
   const unavailableValue = error ? "—" : "0";
+  const checkedIn = overview?.totalCheckedIn.toLocaleString("th-TH") ?? "—";
+  const notCheckedIn = overview ? Math.max(overview.totalTicketsSold - overview.totalCheckedIn, 0).toLocaleString("th-TH") : "—";
   const pendingOrderCount =
     overview?.pendingOrders.toLocaleString("th-TH") ?? "—";
   const pendingTicketCount =
@@ -120,7 +121,7 @@ export default function AdminDashboardPage() {
     {
       icon: ScanLine,
       label: "จำนวนเช็กอิน",
-      value: unavailableValue,
+      value: checkedIn,
       unit: "คน",
     },
     {
@@ -132,7 +133,7 @@ export default function AdminDashboardPage() {
     {
       icon: Coins,
       label: "ยอดร้านค้า",
-      value: unavailableValue,
+      value: overview ? Number(overview.totalStoreVolume).toLocaleString("th-TH") : "—",
       unit: "Token",
     },
   ];
@@ -317,7 +318,7 @@ export default function AdminDashboardPage() {
                 "text-2xl font-semibold text-black md:text-3xl lg:text-4xl",
               )}
             >
-              {unavailableValue} /{" "}
+              {checkedIn} /{" "}
               {totalBookedTickets?.toLocaleString("th-TH") ?? unavailableValue}
               <span className="lg:text-2xl"> คน</span>
             </div>
@@ -328,7 +329,7 @@ export default function AdminDashboardPage() {
                 </div>
                 <div className="flex items-center justify-center gap-2">
                   <div className="text-lg font-semibold">
-                    {unavailableValue}
+                    {notCheckedIn}
                   </div>
                 </div>
               </div>
@@ -338,7 +339,7 @@ export default function AdminDashboardPage() {
               <div className={"w-full flex items-start justify-between"}>
                 <div className={cn(styles.text)}>เช็กอินแล้ว</div>
                 <div className={cn(styles.text, "font-bold text-black")}>
-                  {unavailableValue}
+                  {checkedIn}
                 </div>
               </div>
               <div className={"w-full flex items-start justify-between"}>
@@ -346,7 +347,7 @@ export default function AdminDashboardPage() {
                 <div
                   className={cn(styles.text, "font-bold text-black flex gap-1")}
                 >
-                  {unavailableValue}
+                  {notCheckedIn}
                   <span className="font-normal">คน</span>
                 </div>
               </div>
@@ -413,10 +414,14 @@ export default function AdminDashboardPage() {
             <div className={cn(styles.text, "md:text-lg")}>
               ตรวจสลิปด้วยตนเองก่อนส่ง QR ให้ผู้ซื้อ
             </div>
-            <Badge className="p-3 flex items-center justify-center [&>svg]:size-4! bg-brand h-auto w-full rounded-[10px] text-[14px] lg:text-[18px] hover:bg-brand-hover hover:cursor-pointer">
-              <ClipboardCheck />
-              เปิดคิวตรวจสอบ
-            </Badge>
+            {can(PERMISSIONS.ORDER_REVIEW) && (
+              <Badge asChild className="min-h-11 p-3 flex items-center justify-center [&>svg]:size-4! bg-brand h-auto w-full rounded-[10px] text-[14px] lg:text-[18px] hover:bg-brand-hover">
+                <Link href={`/admin/${encodeURIComponent(slug)}/tickets/payments`}>
+                  <ClipboardCheck aria-hidden="true" />
+                  เปิดคิวตรวจสอบ
+                </Link>
+              </Badge>
+            )}
           </Badge>
         </div>
       </div>
