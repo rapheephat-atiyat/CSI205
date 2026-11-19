@@ -1,82 +1,187 @@
 "use client";
 
-import { useState } from "react";
-
-
+import { useEffect, useRef, useState } from "react";
+import { Html5Qrcode } from "html5-qrcode";
+import { useVendorStore } from "@/components/vendor/vendor-store-context";
+import { Camera, CheckCircle2, RefreshCw, XCircle } from "lucide-react";
 
 export function ScannerBox() {
-  // 1. ต้องประกาศตัวแปร State ก่อนคำสั่ง return เสมอ
+  const { selectedStore } = useVendorStore();
   const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [scannedResult, setScannedResult] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
 
-  // 2. จากนั้นค่อย return โครงสร้าง HTML (JSX) ออกไป
+  const productTitle = selectedStore?.product?.title ?? "สินค้าของร้าน";
+  const productPrice = Number(selectedStore?.product?.price ?? 0);
+
+  const stopCamera = async () => {
+    if (scannerRef.current) {
+      try {
+        await scannerRef.current.stop();
+        scannerRef.current.clear();
+      } catch {
+        // ข้าม error กรณีกล้องหยุดอยู่แล้ว
+      } finally {
+        scannerRef.current = null;
+      }
+    }
+    setIsCameraOpen(false);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (scannerRef.current) {
+        scannerRef.current.stop().catch(() => {});
+      }
+    };
+  }, []);
+
+  const handleOpenCamera = async () => {
+    setScannedResult(null);
+    setCameraError(null);
+
+    // 1. ตรวจสอบว่าเบราว์เซอร์รองรับกล้องไหม (ถ้าเข้าผ่าน IP ธรรมดาที่ไม่ใช่ localhost/HTTPS จะเป็น undefined)
+    if (typeof navigator === "undefined" || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError(
+        "เบราว์เซอร์บล็อกการใช้งานกล้อง กรุณาเปิดเว็บผ่าน http://localhost:3000 หรือ HTTPS เท่านั้น"
+      );
+      return;
+    }
+
+    setIsCameraOpen(true);
+
+    // รอให้ <div id="vendor-qr-reader"> เรนเดอร์เสร็จในเฟรมถัดไป
+    requestAnimationFrame(async () => {
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (!devices || devices.length === 0) {
+          setCameraError("ไม่พบอุปกรณ์กล้องบนเครื่องนี้ (No camera device found)");
+          setIsCameraOpen(false);
+          return;
+        }
+
+        const backCamera = devices.find(
+          (d) =>
+            d.label.toLowerCase().includes("back") ||
+            d.label.toLowerCase().includes("environment")
+        );
+        const cameraId = backCamera ? backCamera.id : devices[0].id;
+
+        const html5QrCode = new Html5Qrcode("vendor-qr-reader");
+        scannerRef.current = html5QrCode;
+
+        await html5QrCode.start(
+          cameraId,
+          {
+            fps: 10,
+            qrbox: { width: 240, height: 240 },
+          },
+          (decodedText) => {
+            setScannedResult(decodedText);
+            stopCamera();
+          },
+          () => {}
+        );
+      } catch (err) {
+        console.error("Camera start error:", err);
+        const rawMsg = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+
+        if (rawMsg.includes("NotAllowedError") || rawMsg.includes("Permission")) {
+          setCameraError(
+            "คุณยังไม่ได้อนุญาตให้ใช้กล้อง — กดที่ไอคอนรูปกุญแจหรือกล้องตรงแถบ URL ด้านบน แล้วเลือก 'อนุญาต (Allow)'"
+          );
+        } else if (rawMsg.includes("NotFoundError")) {
+          setCameraError("ไม่พบกล้องบนอุปกรณ์นี้ (NotFoundError: ต่อเว็บแคมหรือเปิดบนมือถือ)");
+        } else if (rawMsg.includes("NotReadableError") || rawMsg.includes("in use")) {
+          setCameraError("กล้องกำลังถูกใช้งานโดยโปรแกรมหรือแท็บอื่นอยู่ กรุณาปิดโปรแกรมอื่นที่ใช้กล้องก่อน");
+        } else {
+          setCameraError(`ไม่สามารถเปิดกล้องได้ (${rawMsg})`);
+        }
+        setIsCameraOpen(false);
+      }
+    });
+  };
+
   return (
     <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
+      {/* ส่วนหัว */}
       <div className="flex justify-between items-center mb-4">
-        <h2 className="text-lg font-bold text-gray-900">สแกน QR เพื่อรับชำระ</h2>
-        
-        {/* ปุ่มปิดกล้อง (จะโชว์ก็ต่อเมื่อกล้องเปิดอยู่เท่านั้น) */}
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">สแกน QR เพื่อรับชำระ</h2>
+          {selectedStore && (
+            <p className="text-xs text-gray-500 mt-0.5">
+              ร้านค้า: <span className="font-semibold text-gray-700">{selectedStore.name}</span> · รายการ:{" "}
+              <span className="font-semibold text-gray-700">{productTitle}</span> (
+              <span className="font-bold text-[#E53935]">{productPrice.toLocaleString()} Token</span>)
+            </p>
+          )}
+        </div>
+
         {isCameraOpen && (
-          <button 
-            onClick={() => setIsCameraOpen(false)}
-            className="text-sm text-gray-500 hover:text-red-500 font-bold underline"
+          <button
+            type="button"
+            onClick={stopCamera}
+            className="text-sm text-gray-500 hover:text-red-500 font-bold underline cursor-pointer"
           >
             ปิดกล้อง
           </button>
         )}
       </div>
-      
-      {/* ใช้เงื่อนไข (Ternary Operator) เพื่อสลับหน้าจอ */}
-      {!isCameraOpen ? (
-        
-        // ยังไม่ได้เปิดกล้อง โชว์ปุ่ม
-        <div className="w-full h-[400px] bg-slate-50 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center gap-4">
-          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-500">
-            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
+
+      {/* แจ้งเตือนหากเปิดกล้องไม่สำเร็จ */}
+      {cameraError && (
+        <div className="mb-4 p-3.5 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-2.5 text-amber-800 text-xs">
+          <XCircle className="w-4 h-4 shrink-0 mt-0.5 text-amber-600" />
+          <span>{cameraError}</span>
+        </div>
+      )}
+
+      {/* พื้นที่แสดงกล้อง / ปุ่มกด / ผลลัพธ์ */}
+      {isCameraOpen ? (
+        <div className="relative w-full bg-gray-950 rounded-xl overflow-hidden flex flex-col items-center justify-center p-2">
+          <div id="vendor-qr-reader" className="w-full max-w-[420px] overflow-hidden rounded-lg" />
+          <p className="text-xs text-white/80 py-2.5">
+            นำ QR Code ของลูกค้ามาวางให้อยู่ในกรอบสี่เหลี่ยม
+          </p>
+        </div>
+      ) : scannedResult ? (
+        <div className="w-full min-h-[340px] bg-emerald-50/60 border-2 border-emerald-200 rounded-xl p-6 flex flex-col items-center justify-center text-center gap-3">
+          <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600">
+            <CheckCircle2 className="w-8 h-8" />
           </div>
-          <p className="text-gray-500 text-sm">คลิกปุ่มด้านล่างเพื่อสแกน QR Code</p>
-          <button 
-            onClick={() => setIsCameraOpen(true)} // พอกดปุ่มนี้ สวิตช์จะเปลี่ยนเป็น true
-            className="bg-[#E53935] hover:bg-red-700 text-white px-6 py-2.5 rounded-xl font-bold transition-colors shadow-sm"
+          <h3 className="text-base font-bold text-gray-900">อ่านข้อมูล QR Code สำเร็จ</h3>
+          <div className="w-full max-w-md bg-white border border-emerald-200 rounded-xl px-4 py-3 text-xs font-mono text-gray-700 break-all">
+            {scannedResult}
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenCamera}
+            className="mt-2 inline-flex items-center gap-2 bg-[#E53935] hover:bg-red-700 text-white px-5 py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
           >
+            <RefreshCw className="w-4 h-4" />
+            สแกนรายการถัดไป
+          </button>
+        </div>
+      ) : (
+        <div className="w-full h-[380px] bg-slate-50 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center gap-4 p-4">
+          <div className="w-16 h-16 bg-red-50 rounded-full flex items-center justify-center text-red-500">
+            <Camera className="w-8 h-8" />
+          </div>
+          <div className="text-center">
+            <p className="text-gray-700 font-semibold text-sm">พร้อมรับชำระด้วย QR Code</p>
+            <p className="text-gray-400 text-xs mt-1">คลิกปุ่มด้านล่างเพื่อเปิดกล้องสแกน</p>
+          </div>
+          <button
+            type="button"
+            onClick={handleOpenCamera}
+            className="inline-flex items-center gap-2 bg-[#E53935] hover:bg-red-700 text-white px-6 py-2.5 rounded-xl font-bold text-sm transition-colors shadow-sm cursor-pointer"
+          >
+            <Camera className="w-4 h-4" />
             เปิดกล้องสแกน
           </button>
         </div>
-
-      ) : (
-
-        //  กดปุ่มเปิดกล้องแล้วโชว์กรอบดำและเส้นสีแดง
-        <div className="relative w-full h-[400px] bg-gray-900 rounded-xl overflow-hidden flex items-center justify-center">
-          {/* กรอบแดง */}
-          <div className="relative z-10 w-64 h-64 border-2 border-red-500 rounded-2xl">
-            {/* ป้ายด้านล่างกรอบแดง */}
-            <div className="absolute -bottom-14 left-1/2 transform -translate-x-1/2 bg-white px-4 py-2 rounded-full shadow-md w-max">
-              <span className="text-gray-500 font-bold text-sm">รอกล้องทำงาน...</span>
-            </div>
-          </div>
-        </div>
-
       )}
-      
-    </div>
-  );
-}
-
-export function PaymentSummary() {
-  return (
-    <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mt-5">
-      <h2 className="text-lg font-bold text-gray-900 mb-6">สรุปยอดชำระ</h2>
-      
-      <div className="flex justify-between items-center mb-6">
-        <span className="text-sm text-gray-500">ยอดรับชำระทั้งหมด</span>
-        <span className="text-xl font-bold text-red-600">70 Token</span>
-      </div>
-
-      <button className="w-full bg-[#E53935] hover:bg-red-700 text-white py-3.5 rounded-xl text-sm font-bold transition-colors">
-        ยืนยันรับชำระ 70 Token
-      </button>
     </div>
   );
 }
