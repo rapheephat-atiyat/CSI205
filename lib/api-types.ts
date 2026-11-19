@@ -427,3 +427,19 @@ export type FaqQuestionInput = {
 
 export type UpdateFaqCategoryInput = Partial<FaqCategoryInput>;
 export type UpdateFaqQuestionInput = Partial<FaqQuestionInput>;
+
+export type FaqQuestionAdminItem = FaqQuestionItem & {
+    categoryId: string;
+    sortOrder: number;
+    isPublished: boolean;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type FaqCategoryAdminItem = Omit<FaqCategoryItem, "questions"> & {
+    sortOrder: number;
+    isPublished: boolean;
+    questions: FaqQuestionAdminItem[];
+    createdAt: string;
+    updatedAt: string;
+};

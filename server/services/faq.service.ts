@@ -2,12 +2,37 @@ import "server-only";
 import dynamicIconImports from "lucide-react/dynamicIconImports";
 import { getDatabase } from "@/server/database/database.souce";
 import { FaqCategory } from "@/server/database/entities/FaqCategory";
-import { FaqCategoryInput, FaqCategoryItem, FaqQuestionInput, FaqQuestionItem } from "@/lib/api-types";
+import type { FaqCategoryAdminItem, FaqCategoryInput, FaqCategoryItem, FaqQuestionAdminItem, FaqQuestionInput, FaqQuestionItem, UpdateFaqCategoryInput, UpdateFaqQuestionInput } from "@/lib/api-types";
 import { ApiError } from "@/server/http/errors";
 import { FaqQuestion } from "@/server/database/entities/FaqQuestion";
+import type { EntityManager } from "typeorm";
 
 function invalid(message: string): never {
     throw new ApiError("VALIDATION_ERROR", message, 422);
+}
+
+function readId(value: unknown): string {
+    if (typeof value !== "string" || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value)) {
+        invalid("รูปแบบรหัสไม่ถูกต้อง");
+    }
+    return value;
+}
+
+function requireChanges(input: object, fields: readonly string[]) {
+    if (!fields.some((field) => Object.hasOwn(input, field))) {
+        invalid("ไม่มีข้อมูลที่ต้องแก้ไข");
+    }
+}
+
+const categoryNotFound = () => new ApiError("FAQ_CATEGORY_NOT_FOUND", "ไม่พบหมวดคำถาม", 404);
+const questionNotFound = () => new ApiError("FAQ_QUESTION_NOT_FOUND", "ไม่พบคำถาม", 404);
+
+async function requireCategory(manager: EntityManager, id: string) {
+    const category = await manager.findOne(FaqCategory, {
+        where: { id },
+        lock: { mode: "pessimistic_read" },
+    });
+    if (!category) throw categoryNotFound();
 }
 
 function readText(value: unknown, label: string, maxLength?: number): string {
@@ -65,7 +90,7 @@ function toQuestionItem(question: FaqQuestion): FaqQuestionItem {
     };
 }
 
-function toAdminQuestion(question: FaqQuestion) {
+function toAdminQuestion(question: FaqQuestion): FaqQuestionAdminItem {
     return {
         ...toQuestionItem(question),
         categoryId: question.categoryId,
@@ -76,7 +101,7 @@ function toAdminQuestion(question: FaqQuestion) {
     };
 }
 
-function toAdminCategory(category: FaqCategory) {
+function toAdminCategory(category: FaqCategory): FaqCategoryAdminItem {
     return {
         id: category.id,
         name: category.name,
@@ -130,12 +155,12 @@ export async function getPublishedFaq(): Promise<FaqCategoryItem[]> {
     }));
 }
 
-export async function getAdminFaq() {
+export async function getAdminFaq(): Promise<FaqCategoryAdminItem[]> {
     const categories = await findFaq(false);
     return categories.map(toAdminCategory);
 }
 
-export async function createFaqCategory(input: FaqCategoryInput) {
+function readCategoryFields(input: FaqCategoryInput) {
     const name = readText(input.name, "ชื่อหมวด", 255);
     const icon = readText(input.icon, "ชื่อไอคอน", 255);
     const options = readOptions(input);
@@ -144,30 +169,14 @@ export async function createFaqCategory(input: FaqCategoryInput) {
         invalid("ไม่พบไอคอนที่เลือกใน Lucide");
     }
 
-    const db = await getDatabase();
-    const repo = db.getRepository(FaqCategory);
-
-    const category = repo.create({
-        name,
-        icon,
-        ...options,
-    });
-
-    const savedCategory = await repo.save(category);
-    return toAdminCategory(savedCategory);
+    return { name, icon, ...options };
 }
 
-export async function createFaqQuestion(input: FaqQuestionInput) {
-    const categoryId = readText(input.categoryId, "รหัสหมวด");
+function readQuestionFields(input: FaqQuestionInput) {
+    const categoryId = readId(input.categoryId);
     const question = readText(input.question, "คำถาม", 500);
     const answer = readText(input.answer, "คำตอบ");
     const options = readOptions(input);
-
-    const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
-
-    if (!uuidPattern.test(categoryId)) {
-        invalid("รูปแบบรหัสหมวดไม่ถูกต้อง");
-    }
 
     const keywords = input.keywords === undefined ? [] : input.keywords;
 
@@ -209,22 +218,7 @@ export async function createFaqQuestion(input: FaqQuestionInput) {
         }
     }
 
-    const db = await getDatabase();
-
-    const categoryExists = await db.getRepository(FaqCategory)
-        .existsBy({ id: categoryId });
-
-    if (!categoryExists) {
-        throw new ApiError(
-            "FAQ_CATEGORY_NOT_FOUND",
-            "ไม่พบหมวดคำถาม",
-            404,
-        );
-    }
-
-    const repo = db.getRepository(FaqQuestion);
-
-    const item = repo.create({
+    return {
         categoryId,
         question,
         answer,
@@ -234,8 +228,105 @@ export async function createFaqQuestion(input: FaqQuestionInput) {
         linkLabel,
         linkHref,
         ...options,
-    });
+    };
+}
 
-    const savedQuestion = await repo.save(item);
-    return toAdminQuestion(savedQuestion);
+export async function getFaqCategory(id: string): Promise<FaqCategoryAdminItem> {
+    readId(id);
+    const db = await getDatabase();
+    const category = await db.getRepository(FaqCategory).findOne({
+        where: { id },
+        relations: { questions: true },
+        order: { questions: { sortOrder: "ASC", id: "ASC" } },
+    });
+    if (!category) throw categoryNotFound();
+    return toAdminCategory(category);
+}
+
+export async function getFaqQuestion(id: string): Promise<FaqQuestionAdminItem> {
+    readId(id);
+    const db = await getDatabase();
+    const question = await db.getRepository(FaqQuestion).findOneBy({ id });
+    if (!question) throw questionNotFound();
+    return toAdminQuestion(question);
+}
+
+export async function createFaqCategory(input: FaqCategoryInput): Promise<FaqCategoryAdminItem> {
+    const fields = readCategoryFields(input);
+    const db = await getDatabase();
+    const repo = db.getRepository(FaqCategory);
+    return toAdminCategory(await repo.save(repo.create(fields)));
+}
+
+export async function createFaqQuestion(input: FaqQuestionInput): Promise<FaqQuestionAdminItem> {
+    const fields = readQuestionFields(input);
+    const db = await getDatabase();
+    return db.transaction(async (manager) => {
+        await requireCategory(manager, fields.categoryId);
+        return toAdminQuestion(await manager.save(manager.create(FaqQuestion, fields)));
+    });
+}
+
+export async function updateFaqCategory(id: string, input: UpdateFaqCategoryInput): Promise<FaqCategoryAdminItem> {
+    readId(id);
+    requireChanges(input, ["name", "icon", "sortOrder", "isPublished"]);
+    const db = await getDatabase();
+    await db.transaction(async (manager) => {
+        const category = await manager.findOne(FaqCategory, { where: { id }, lock: { mode: "pessimistic_write" } });
+        if (!category) throw categoryNotFound();
+        const fields = readCategoryFields({
+            name: input.name === undefined ? category.name : input.name,
+            icon: input.icon === undefined ? category.icon : input.icon,
+            sortOrder: input.sortOrder === undefined ? category.sortOrder : input.sortOrder,
+            isPublished: input.isPublished === undefined ? category.isPublished : input.isPublished,
+        });
+        manager.merge(FaqCategory, category, fields);
+        await manager.save(category);
+    });
+    return getFaqCategory(id);
+}
+
+export async function updateFaqQuestion(id: string, input: UpdateFaqQuestionInput): Promise<FaqQuestionAdminItem> {
+    readId(id);
+    requireChanges(input, ["categoryId", "question", "answer", "keywords", "linkLabel", "linkHref", "sortOrder", "isPublished"]);
+    const db = await getDatabase();
+    return db.transaction(async (manager) => {
+        const question = await manager.findOne(FaqQuestion, { where: { id }, lock: { mode: "pessimistic_write" } });
+        if (!question) throw questionNotFound();
+        const fields = readQuestionFields({
+            categoryId: input.categoryId === undefined ? question.categoryId : input.categoryId,
+            question: input.question === undefined ? question.question : input.question,
+            answer: input.answer === undefined ? question.answer : input.answer,
+            keywords: input.keywords === undefined ? question.keywords : input.keywords,
+            linkLabel: input.linkLabel === undefined ? question.linkLabel : input.linkLabel,
+            linkHref: input.linkHref === undefined ? question.linkHref : input.linkHref,
+            sortOrder: input.sortOrder === undefined ? question.sortOrder : input.sortOrder,
+            isPublished: input.isPublished === undefined ? question.isPublished : input.isPublished,
+        });
+        await requireCategory(manager, fields.categoryId);
+        manager.merge(FaqQuestion, question, fields);
+        return toAdminQuestion(await manager.save(question));
+    });
+}
+
+export async function deleteFaqQuestion(id: string): Promise<{ id: string }> {
+    readId(id);
+    const db = await getDatabase();
+    const result = await db.getRepository(FaqQuestion).delete({ id });
+    if (!result.affected) throw questionNotFound();
+    return { id };
+}
+
+export async function deleteFaqCategory(id: string): Promise<{ id: string }> {
+    readId(id);
+    const db = await getDatabase();
+    return db.transaction(async (manager) => {
+        const category = await manager.findOne(FaqCategory, { where: { id }, lock: { mode: "pessimistic_write" } });
+        if (!category) throw categoryNotFound();
+        if (await manager.existsBy(FaqQuestion, { categoryId: id })) {
+            throw new ApiError("FAQ_CATEGORY_HAS_QUESTIONS", "กรุณาย้ายหรือลบคำถามในหมวดนี้ก่อน", 409);
+        }
+        await manager.delete(FaqCategory, { id });
+        return { id };
+    });
 }
