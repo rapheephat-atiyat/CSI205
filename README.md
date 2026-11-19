@@ -16,6 +16,19 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## FAQ seed
+
+ตั้ง `DATABASE` ใน `.env` ให้ชี้ฐานข้อมูลที่ต้องการ แล้วรัน:
+
+```bash
+npm run migration:run
+npm run db:seed:faq
+```
+
+เพิ่ม 4 หมวดและ 12 คำถามภาษาไทยพร้อมไอคอน Lucide และเผยแพร่รายการใหม่บน `/faq`
+รันซ้ำได้ โดยข้ามหมวดชื่อเดิมและคำถามชื่อเดิมภายในหมวดนั้น รักษาคำตอบและสถานะที่แอดมินแก้ไว้
+คำสั่งนี้เพิ่มเฉพาะ FAQ ส่วน `npm run db:seed` จะรวม FAQ กับข้อมูลตัวอย่างส่วนอื่นด้วย
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
