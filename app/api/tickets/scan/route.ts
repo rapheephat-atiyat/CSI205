@@ -7,6 +7,6 @@ import { scanTicket } from "@/server/services/ticket.service";
 
 export const POST = withHandler(async (req) => {
     const staff = await requireUser(req);
-    const { qrToken } = await readJson<ScanTicketInput>(req);
-    return success(await scanTicket(staff, qrToken));
+    const { qrToken, action } = await readJson<ScanTicketInput>(req);
+    return success(await scanTicket(staff, qrToken, action));
 });

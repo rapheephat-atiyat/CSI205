@@ -125,31 +125,42 @@ function validateTicketType(ticketType: EventTicket) {
     }
 }
 
-export async function scanTicket(staff: User, qrToken: string): Promise<TicketItem> {
+export async function scanTicket(staff: User, qrToken: string, action: "in" | "out" = "in"): Promise<TicketItem> {
     if (typeof qrToken !== "string" || !qrToken.trim()) {
-        throw new ApiError("VALIDATION_ERROR", "กรุณาระบุ QR ของบัตร", 422);
+        throw new ApiError("VALIDATION_ERROR", "กรุณาระบุ QR หรือรหัสของบัตร", 422);
     }
 
+    const tokenOrCode = qrToken.trim();
     const db = await getDatabase();
     return db.transaction(async (manager) => {
         const ticket = await manager.findOne(Ticket, {
-            where: { qrToken: qrToken.trim() },
+            where: [{ qrToken: tokenOrCode }, { ticketCode: tokenOrCode }],
+            relations: { eventTicket: true, user: true },
             lock: { mode: "pessimistic_write" },
         });
         if (!ticket) throw new ApiError("TICKET_NOT_FOUND", "ไม่พบบัตรในระบบ", 404);
         if (!hasPermission(staff, PERMISSIONS.TICKET_SCAN, { eventId: ticket.eventId })) {
             throw new ApiError("FORBIDDEN", "คุณไม่มีสิทธิ์สแกนบัตรในงานนี้", 403);
         }
-        if (ticket.status === TICKET_STATUSES.USED) {
-            throw new ApiError("TICKET_ALREADY_USED", "บัตรนี้ถูกสแกนเข้างานไปแล้ว", 409);
-        }
-        if (ticket.status !== TICKET_STATUSES.ACTIVE) {
-            throw new ApiError("TICKET_NOT_ACTIVE", "บัตรยังไม่ได้ชำระเงินหรือถูกยกเลิก", 400);
+
+        if (action === "in") {
+            if (ticket.status === TICKET_STATUSES.USED) {
+                throw new ApiError("TICKET_ALREADY_USED", "บัตรนี้ถูกสแกนเข้างานไปแล้ว", 409);
+            }
+            if (ticket.status !== TICKET_STATUSES.ACTIVE) {
+                throw new ApiError("TICKET_NOT_ACTIVE", "บัตรยังไม่ได้ชำระเงินหรือถูกยกเลิก", 400);
+            }
+
+            ticket.status = TICKET_STATUSES.USED;
+            ticket.checkedInAt = new Date();
+            ticket.checkedInById = staff.id;
+        } else {
+            if (ticket.status !== TICKET_STATUSES.USED) {
+                throw new ApiError("TICKET_NOT_CHECKED_IN", "บัตรนี้ยังไม่ได้เช็กอินเข้างาน", 400);
+            }
+            ticket.status = TICKET_STATUSES.ACTIVE;
         }
 
-        ticket.status = TICKET_STATUSES.USED;
-        ticket.checkedInAt = new Date();
-        ticket.checkedInById = staff.id;
         return toTicketItem(await manager.save(ticket));
     });
 }

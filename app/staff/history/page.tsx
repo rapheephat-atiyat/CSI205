@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { OutcomeBadge } from "@/components/staff/status-badge";
 import { cn } from "@/lib/utils";
-import { scanHistory } from "@/lib/staff-mock";
+import { useStaff } from "@/components/staff/staff-context";
 
 type Filter = "all" | "in" | "out" | "error";
 
@@ -20,9 +20,10 @@ const filters: { value: Filter; label: string }[] = [
 const isError = (o: string) => o === "expired" || o === "duplicate" || o === "invalid";
 
 export default function ScanHistoryPage() {
+  const { scanHistory: historyList } = useStaff();
   const [filter, setFilter] = useState<Filter>("all");
 
-  const rows = scanHistory.filter((r) =>
+  const rows = historyList.filter((r) =>
     filter === "all"
       ? true
       : filter === "error"

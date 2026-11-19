@@ -1,5 +1,5 @@
 export type AttendeeStatus = "not-arrived" | "checked-in" | "checked-out";
-export type TicketType = "General" | "VIP" | "Student";
+export type TicketType = "ทั่วไป" | "บัตร VIP" | "บัตรผู้ติดตาม" | "General" | "VIP" | "Student" | string;
 
 export type Attendee = {
   id: string;
@@ -35,20 +35,20 @@ export const staffProfile = {
 };
 
 export const eventInfo = {
-  name: "TuaTua Fest 2026",
+  name: "TuaTua",
   date: "21 ต.ค. 2569",
   capacity: 1200,
 };
 
 export const attendees: Attendee[] = [
-  { id: "a1", name: "ธนกร วงศ์สกุล", ticketId: "TT-000124", ticketType: "General", status: "checked-in", tokens: 250, lastActionAt: "10:42" },
-  { id: "a2", name: "พิมพ์ชนก ศรีสุข", ticketId: "TT-000125", ticketType: "VIP", status: "not-arrived", tokens: 800 },
-  { id: "a3", name: "กิตติพงษ์ แก้วมณี", ticketId: "TT-000126", ticketType: "Student", status: "checked-out", tokens: 40, lastActionAt: "12:05" },
-  { id: "a4", name: "อรอุมา เจริญผล", ticketId: "TT-000127", ticketType: "General", status: "checked-in", tokens: 120, lastActionAt: "11:18" },
-  { id: "a5", name: "วีรภัทร สุขสวัสดิ์", ticketId: "TT-000128", ticketType: "General", status: "not-arrived", tokens: 0 },
-  { id: "a6", name: "ณัฐธิดา บุญเรือง", ticketId: "TT-000129", ticketType: "VIP", status: "checked-in", tokens: 1500, lastActionAt: "09:55" },
-  { id: "a7", name: "ปวีณา มั่นคง", ticketId: "TT-000130", ticketType: "Student", status: "not-arrived", tokens: 60 },
-  { id: "a8", name: "รัชชานนท์ ทองดี", ticketId: "TT-000131", ticketType: "General", status: "checked-in", tokens: 310, lastActionAt: "10:03" },
+  { id: "a1", name: "ธนกร วงศ์สกุล", ticketId: "TT-000124", ticketType: "ทั่วไป", status: "checked-in", tokens: 250, lastActionAt: "10:42" },
+  { id: "a2", name: "พิมพ์ชนก ศรีสุข", ticketId: "TT-000125", ticketType: "บัตร VIP", status: "not-arrived", tokens: 800 },
+  { id: "a3", name: "กิตติพงษ์ แก้วมณี", ticketId: "TT-000126", ticketType: "บัตรผู้ติดตาม", status: "checked-out", tokens: 40, lastActionAt: "12:05" },
+  { id: "a4", name: "อรอุมา เจริญผล", ticketId: "TT-000127", ticketType: "ทั่วไป", status: "checked-in", tokens: 120, lastActionAt: "11:18" },
+  { id: "a5", name: "วีรภัทร สุขสวัสดิ์", ticketId: "TT-000128", ticketType: "ทั่วไป", status: "not-arrived", tokens: 0 },
+  { id: "a6", name: "ณัฐธิดา บุญเรือง", ticketId: "TT-000129", ticketType: "บัตร VIP", status: "checked-in", tokens: 1500, lastActionAt: "09:55" },
+  { id: "a7", name: "ปวีณา มั่นคง", ticketId: "TT-000130", ticketType: "บัตรผู้ติดตาม", status: "not-arrived", tokens: 60 },
+  { id: "a8", name: "รัชชานนท์ ทองดี", ticketId: "TT-000131", ticketType: "ทั่วไป", status: "checked-in", tokens: 310, lastActionAt: "10:03" },
 ];
 
 export const scanHistory: ScanRecord[] = [

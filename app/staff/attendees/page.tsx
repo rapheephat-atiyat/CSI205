@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { AttendeeStatusBadge } from "@/components/staff/status-badge";
 import { cn } from "@/lib/utils";
-import { attendees, formatTokens, type AttendeeStatus } from "@/lib/staff-mock";
+import { formatTokens, type AttendeeStatus } from "@/lib/staff-mock";
+import { useStaff } from "@/components/staff/staff-context";
 
 type Filter = "all" | AttendeeStatus;
 
@@ -19,17 +20,18 @@ const filters: { value: Filter; label: string }[] = [
 ];
 
 export default function AttendeeSearchPage() {
+  const { attendees: list } = useStaff();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return attendees.filter(
+    return list.filter(
       (a) =>
         (filter === "all" || a.status === filter) &&
-        (!q || a.name.toLowerCase().includes(q) || a.ticketId.toLowerCase().includes(q))
+        (!q || a.name.toLowerCase().includes(q) || a.ticketId.toLowerCase().includes(q) || a.ticketType.toLowerCase().includes(q))
     );
-  }, [query, filter]);
+  }, [list, query, filter]);
 
   return (
     <>
@@ -103,7 +105,7 @@ export default function AttendeeSearchPage() {
                 <div className="min-w-0">
                   <p className="truncate font-medium">{a.name}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
-                    <span className="font-mono">{a.ticketId}</span> · บัตร {a.ticketType}
+                    <span className="font-mono">{a.ticketId}</span> · {a.ticketType.startsWith("บัตร") ? a.ticketType : `บัตร${a.ticketType}`}
                   </p>
                 </div>
                 <AttendeeStatusBadge status={a.status} />
@@ -115,7 +117,7 @@ export default function AttendeeSearchPage() {
                 </span>
                 <div className="flex gap-2">
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/staff/top-up">เติม Token</Link>
+                    <Link href={`/staff/top-up?attendeeId=${encodeURIComponent(a.id)}`}>เติม Token</Link>
                   </Button>
                   <Button asChild size="sm" className="bg-brand text-on-brand hover:bg-brand-hover">
                     <Link href="/staff/check-in">เช็กอิน/เอาท์</Link>

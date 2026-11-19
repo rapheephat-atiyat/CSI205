@@ -298,6 +298,47 @@ export type CreateOrderInput = {
 
 export type ScanTicketInput = {
     qrToken: string;
+    action?: "in" | "out";
+};
+
+export type StaffAttendeeItem = {
+    id: string;
+    name: string;
+    ticketId: string;
+    ticketType: string;
+    status: "not-arrived" | "checked-in" | "checked-out";
+    tokens: number;
+    userId: string;
+    lastActionAt?: string;
+    phone?: string;
+    email?: string;
+};
+
+export type StaffOverviewData = {
+    total: number;
+    checkedIn: number;
+    checkedOut: number;
+    waiting: number;
+    eventInfo: {
+        id?: string;
+        name: string;
+        date: string;
+        capacity: number;
+    };
+    recentScans: {
+        id: string;
+        time: string;
+        attendeeName: string;
+        ticketId: string;
+        action: "in" | "out";
+        outcome: "checked-in" | "checked-out" | "expired" | "duplicate" | "invalid";
+    }[];
+    staffProfile?: {
+        name: string;
+        role: string;
+        topUpQuotaTotal: number;
+        topUpQuotaUsed: number;
+    };
 };
 
 export type ProductItem = {

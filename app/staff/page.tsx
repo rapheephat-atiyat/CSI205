@@ -1,25 +1,22 @@
+"use client";
+
 import Link from "next/link";
-import { ArrowRight, Coins, LogIn, ScanLine, Search, Users } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Coins, LogIn, ScanLine, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { OutcomeBadge } from "@/components/staff/status-badge";
-import {
-  attendees,
-  eventInfo,
-  formatTokens,
-  scanHistory,
-  staffProfile,
-} from "@/lib/staff-mock";
+import { eventInfo as defaultEventInfo, formatTokens } from "@/lib/staff-mock";
+import { useStaff } from "@/components/staff/staff-context";
 
 export default function StaffDashboardPage() {
-  const total = attendees.length;
-  const checkedIn = attendees.filter((a) => a.status === "checked-in").length;
-  const checkedOut = attendees.filter((a) => a.status === "checked-out").length;
-  const waiting = total - checkedIn - checkedOut;
-  const quotaLeft = staffProfile.topUpQuotaTotal - staffProfile.topUpQuotaUsed;
+  const { total, checkedIn, checkedOut, waiting, scanHistory } = useStaff();
+  const [eventData] = useState(defaultEventInfo);
+
+  const recentScans = scanHistory.slice(0, 5);
 
   const stats = [
-    { label: "ผู้เข้าร่วมทั้งหมด", value: total, note: `ความจุงาน ${formatTokens(eventInfo.capacity)} คน` },
+    { label: "ผู้เข้าร่วมทั้งหมด", value: total, note: `ความจุงาน ${formatTokens(eventData.capacity)} คน` },
     { label: "อยู่ในงานตอนนี้", value: checkedIn, note: "เช็กอินแล้ว" },
     { label: "ออกจากงานแล้ว", value: checkedOut, note: "เช็กเอาท์แล้ว" },
     { label: "ยังไม่เข้างาน", value: waiting, note: "รอเช็กอิน" },
@@ -30,7 +27,7 @@ export default function StaffDashboardPage() {
       <PageHeader
         eyebrow="Staff Dashboard"
         title="ภาพรวมผู้เข้าร่วมและยอดเช็กอิน"
-        description={`${eventInfo.name} · ${eventInfo.date}`}
+        description={`${eventData.name} · ${eventData.date}`}
         action={
           <Button asChild size="lg" className="bg-brand text-on-brand hover:bg-brand-hover">
             <Link href="/staff/scanner">
@@ -45,12 +42,15 @@ export default function StaffDashboardPage() {
         {stats.map((s) => (
           <div key={s.label} className="rounded-xl border bg-background p-4">
             <p className="text-sm text-muted-foreground">{s.label}</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums">{s.value}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{s.note}</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums" suppressHydrationWarning>
+              {s.value}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground" suppressHydrationWarning>
+              {s.note}
+            </p>
           </div>
         ))}
       </section>
-
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <section className="rounded-xl border bg-background lg:col-span-2">
@@ -63,18 +63,24 @@ export default function StaffDashboardPage() {
               ดูทั้งหมด <ArrowRight className="size-3.5" aria-hidden />
             </Link>
           </div>
-          <ul className="divide-y">
-            {scanHistory.slice(0, 5).map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{r.attendeeName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="font-mono">{r.ticketId}</span> · {r.time} น.
-                  </p>
-                </div>
-                <OutcomeBadge outcome={r.outcome} />
+          <ul className="divide-y" suppressHydrationWarning>
+            {recentScans.length === 0 ? (
+              <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                ยังไม่มีรายการสแกนล่าสุด
               </li>
-            ))}
+            ) : (
+              recentScans.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{r.attendeeName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-mono">{r.ticketId}</span> · {r.time} น.
+                    </p>
+                  </div>
+                  <OutcomeBadge outcome={r.outcome} />
+                </li>
+              ))
+            )}
           </ul>
         </section>
 
@@ -95,19 +101,6 @@ export default function StaffDashboardPage() {
                 </Button>
               ))}
             </div>
-          </div>
-          <div className="rounded-xl border bg-brand-soft p-4 sm:p-5">
-            <div className="flex items-center gap-2 text-sm font-medium">
-              <Users className="size-4 text-brand" aria-hidden />
-              โควตาเติม Token ของคุณ
-            </div>
-            <p className="mt-2 text-2xl font-semibold tabular-nums">
-              {formatTokens(quotaLeft)}
-              <span className="ml-1 text-sm font-normal text-muted-foreground">
-                / {formatTokens(staffProfile.topUpQuotaTotal)} Token
-              </span>
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">คงเหลือสำหรับวันนี้</p>
           </div>
         </section>
       </div>
