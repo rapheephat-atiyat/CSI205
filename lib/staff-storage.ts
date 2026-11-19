@@ -1,9 +1,40 @@
 "use client";
 
-import { scanHistory as seedHistory, staffProfile as defaultProfile, type ScanRecord } from "./staff-mock";
+import {
+  attendees as seedAttendees,
+  scanHistory as seedHistory,
+  staffProfile as defaultProfile,
+  type Attendee,
+  type ScanRecord,
+} from "./staff-mock";
 
 const STORAGE_SCAN_KEY = "tuatua_staff_scans";
 const STORAGE_QUOTA_KEY = "tuatua_staff_quota";
+const STORAGE_ATTENDEES_KEY = "tuatua_staff_attendees";
+
+export function getStoredAttendees(): Attendee[] {
+  if (typeof window === "undefined") {
+    return seedAttendees.map((a) => ({ ...a }));
+  }
+  try {
+    const raw = localStorage.getItem(STORAGE_ATTENDEES_KEY);
+    if (!raw) return seedAttendees.map((a) => ({ ...a }));
+    const parsed = JSON.parse(raw) as Attendee[];
+    return parsed && parsed.length > 0 ? parsed : seedAttendees.map((a) => ({ ...a }));
+  } catch {
+    return seedAttendees.map((a) => ({ ...a }));
+  }
+}
+
+export function saveStoredAttendees(attendees: Attendee[]): void {
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem(STORAGE_ATTENDEES_KEY, JSON.stringify(attendees));
+    } catch {
+      // ignore storage errors
+    }
+  }
+}
 
 export function getStoredScans(): ScanRecord[] {
   if (typeof window === "undefined") return seedHistory;

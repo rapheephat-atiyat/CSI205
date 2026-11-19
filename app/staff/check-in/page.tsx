@@ -1,68 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Coins, LogIn, LogOut, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { AttendeeStatusBadge } from "@/components/staff/status-badge";
 import { ScanResultCard } from "@/components/staff/scan-result";
 import { cn } from "@/lib/utils";
-import { attendees as seed, formatTokens, type Attendee } from "@/lib/staff-mock";
+import { formatTokens } from "@/lib/staff-mock";
 import { api } from "@/lib/api-client";
-import { saveScanRecord } from "@/lib/staff-storage";
+import { useStaff } from "@/components/staff/staff-context";
 
 type Feedback = { kind: "checked-in" | "checked-out" | "duplicate"; name: string; ticketId: string };
 
-function nowTime() {
-  return new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-}
-
 export default function CheckInPage() {
-  const [list, setList] = useState<Attendee[]>(seed);
-  const [selectedId, setSelectedId] = useState(seed[1].id);
+  const { attendees, checkInOrOut } = useStaff();
+  const [selectedId, setSelectedId] = useState(() => attendees[1]?.id ?? attendees[0]?.id ?? "");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  useEffect(() => {
-    async function loadAttendees() {
-      try {
-        const res = await api.staff.attendees();
-        if (res.success && res.data && res.data.length > 0) {
-          const mapped: Attendee[] = res.data.map((item) => ({
-            id: item.id,
-            name: item.name,
-            ticketId: item.ticketId,
-            ticketType: (item.ticketType as Attendee["ticketType"]) || "ทั่วไป",
-            status: item.status,
-            tokens: item.tokens,
-            lastActionAt: item.lastActionAt,
-          }));
-          setList(mapped);
-          setSelectedId(mapped[0]?.id ?? seed[0].id);
-        }
-      } catch {
-        // use default seed
-      }
-    }
-    loadAttendees();
-  }, []);
-
-  const selected = list.find((a) => a.id === selectedId) ?? list[0];
+  const selected = attendees.find((a) => a.id === selectedId) ?? attendees[0];
 
   async function apply(action: "in" | "out") {
-    const already =
-      (action === "in" && selected.status === "checked-in") ||
-      (action === "out" && selected.status !== "checked-in");
-    if (already) {
-      setFeedback({ kind: "duplicate", name: selected.name, ticketId: selected.ticketId });
-      saveScanRecord({
-        time: nowTime(),
-        attendeeName: selected.name,
-        ticketId: selected.ticketId,
-        action,
-        outcome: "duplicate",
-      });
-      return;
-    }
+    if (!selected) return;
 
     try {
       await api.tickets.scan({ qrToken: selected.ticketId, action });
@@ -70,27 +29,12 @@ export default function CheckInPage() {
       // offline / mock mode fallback
     }
 
-    setList((prev) =>
-      prev.map((a) =>
-        a.id === selected.id
-          ? { ...a, status: action === "in" ? "checked-in" : "checked-out", lastActionAt: nowTime() }
-          : a
-      )
-    );
+    const res = checkInOrOut(selected.id, action);
 
-    const kind = action === "in" ? "checked-in" : "checked-out";
     setFeedback({
-      kind,
+      kind: res.outcome,
       name: selected.name,
       ticketId: selected.ticketId,
-    });
-
-    saveScanRecord({
-      time: nowTime(),
-      attendeeName: selected.name,
-      ticketId: selected.ticketId,
-      action,
-      outcome: kind,
     });
   }
 
@@ -106,7 +50,7 @@ export default function CheckInPage() {
         <section className="rounded-xl border bg-background">
           <h2 className="border-b px-4 py-3 text-sm font-medium">ผู้เข้าร่วม</h2>
           <ul className="max-h-[26rem] divide-y overflow-y-auto">
-            {list.map((a) => (
+            {attendees.map((a) => (
               <li key={a.id}>
                 <button
                   type="button"

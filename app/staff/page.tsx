@@ -1,72 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ArrowRight, Coins, LogIn, ScanLine, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { OutcomeBadge } from "@/components/staff/status-badge";
-import {
-  attendees as seedAttendees,
-  eventInfo as defaultEventInfo,
-  formatTokens,
-  type ScanRecord,
-} from "@/lib/staff-mock";
-import { api } from "@/lib/api-client";
-import { getStoredScans } from "@/lib/staff-storage";
+import { eventInfo as defaultEventInfo, formatTokens } from "@/lib/staff-mock";
+import { useStaff } from "@/components/staff/staff-context";
 
 export default function StaffDashboardPage() {
-  const [total, setTotal] = useState(seedAttendees.length);
-  const [checkedIn, setCheckedIn] = useState(
-    seedAttendees.filter((a) => a.status === "checked-in").length
-  );
-  const [checkedOut, setCheckedOut] = useState(
-    seedAttendees.filter((a) => a.status === "checked-out").length
-  );
-  const [waiting, setWaiting] = useState(total - checkedIn - checkedOut);
-  const [eventData, setEventData] = useState(defaultEventInfo);
-  const [recentScans, setRecentScans] = useState<ScanRecord[]>(() => getStoredScans().slice(0, 5));
+  const { total, checkedIn, checkedOut, waiting, scanHistory } = useStaff();
+  const [eventData] = useState(defaultEventInfo);
 
-  useEffect(() => {
-    const localScans = getStoredScans();
-
-    // Fetch server data
-    async function loadOverview() {
-      try {
-        const res = await api.staff.overview();
-        if (res.success && res.data) {
-          const d = res.data;
-          setTotal(d.total > 0 ? d.total : seedAttendees.length);
-          setCheckedIn(d.checkedIn);
-          setCheckedOut(d.checkedOut);
-          setWaiting(d.waiting);
-          if (d.eventInfo) {
-            setEventData({
-              name: d.eventInfo.name,
-              date: d.eventInfo.date,
-              capacity: d.eventInfo.capacity,
-            });
-          }
-          if (d.recentScans?.length) {
-            const serverScans: ScanRecord[] = d.recentScans.map((s) => ({
-              id: s.id,
-              time: s.time,
-              attendeeName: s.attendeeName,
-              ticketId: s.ticketId,
-              action: s.action,
-              outcome: s.outcome,
-            }));
-            const existingIds = new Set(localScans.map((l) => l.id));
-            const merged = [...localScans, ...serverScans.filter((s) => !existingIds.has(s.id))];
-            setRecentScans(merged.slice(0, 5));
-          }
-        }
-      } catch {
-        // use local
-      }
-    }
-    loadOverview();
-  }, []);
+  const recentScans = scanHistory.slice(0, 5);
 
   const stats = [
     { label: "ผู้เข้าร่วมทั้งหมด", value: total, note: `ความจุงาน ${formatTokens(eventData.capacity)} คน` },

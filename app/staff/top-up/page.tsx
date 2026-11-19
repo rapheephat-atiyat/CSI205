@@ -9,22 +9,23 @@ import { cn } from "@/lib/utils";
 import { attendees as seed, formatTokens, staffProfile } from "@/lib/staff-mock";
 import { api } from "@/lib/api-client";
 import { addTopUpUsed, getStoredTopUpQuota } from "@/lib/staff-storage";
+import { useStaff } from "@/components/staff/staff-context";
 
 const presets = [50, 100, 200, 500];
 
 function TokenTopUpContent() {
   const searchParams = useSearchParams();
   const initialAttendeeId = searchParams.get("attendeeId");
+  const { attendees: attendeesList, updateAttendeeTokens, setAttendees } = useStaff();
 
-  const [attendeesList, setAttendeesList] = useState(seed);
-  const [attendeeId, setAttendeeId] = useState(initialAttendeeId ?? seed[0].id);
+  const [attendeeId, setAttendeeId] = useState(() => initialAttendeeId ?? attendeesList[0]?.id ?? seed[0].id);
   const [amount, setAmount] = useState<number>(100);
   const [custom, setCustom] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [done, setDone] = useState<{ name: string; amount: number; balance: number } | null>(null);
   const [used, setUsed] = useState(() => getStoredTopUpQuota().used);
-  const [balances, setBalances] = useState<Record<string, number>>(
-    Object.fromEntries(seed.map((a) => [a.id, a.tokens]))
+  const [balances, setBalances] = useState<Record<string, number>>(() =>
+    Object.fromEntries(attendeesList.map((a) => [a.id, a.tokens]))
   );
 
   useEffect(() => {
@@ -41,7 +42,7 @@ function TokenTopUpContent() {
             tokens: item.tokens,
             lastActionAt: item.lastActionAt,
           }));
-          setAttendeesList(mapped);
+          setAttendees(mapped);
           setBalances(Object.fromEntries(mapped.map((a) => [a.id, a.tokens])));
           if (initialAttendeeId && mapped.some((m) => m.id === initialAttendeeId)) {
             setAttendeeId(initialAttendeeId);
@@ -54,7 +55,7 @@ function TokenTopUpContent() {
       }
     }
     loadAttendees();
-  }, [initialAttendeeId]);
+  }, [initialAttendeeId, setAttendees]);
 
   const attendee = attendeesList.find((a) => a.id === attendeeId) ?? attendeesList[0] ?? seed[0];
   const quotaLeft = staffProfile.topUpQuotaTotal - used;
@@ -86,6 +87,7 @@ function TokenTopUpContent() {
     }
 
     setBalances((b) => ({ ...b, [attendee.id]: nextBalance }));
+    updateAttendeeTokens(attendee.id, nextBalance);
     const newUsed = used + amount;
     setUsed(newUsed);
     addTopUpUsed(amount);

@@ -1,14 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Coins, Search, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { AttendeeStatusBadge } from "@/components/staff/status-badge";
 import { cn } from "@/lib/utils";
-import { attendees as seed, formatTokens, type AttendeeStatus, type Attendee } from "@/lib/staff-mock";
-import { api } from "@/lib/api-client";
+import { formatTokens, type AttendeeStatus } from "@/lib/staff-mock";
+import { useStaff } from "@/components/staff/staff-context";
 
 type Filter = "all" | AttendeeStatus;
 
@@ -20,32 +20,9 @@ const filters: { value: Filter; label: string }[] = [
 ];
 
 export default function AttendeeSearchPage() {
-  const [list, setList] = useState<Attendee[]>(seed);
+  const { attendees: list } = useStaff();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
-
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const res = await api.staff.attendees();
-        if (res.success && res.data && res.data.length > 0) {
-          const mapped: Attendee[] = res.data.map((item) => ({
-            id: item.id,
-            name: item.name,
-            ticketId: item.ticketId,
-            ticketType: (item.ticketType as Attendee["ticketType"]) || "ทั่วไป",
-            status: item.status,
-            tokens: item.tokens,
-            lastActionAt: item.lastActionAt,
-          }));
-          setList(mapped);
-        }
-      } catch {
-        // fallback to seed
-      }
-    }
-    loadData();
-  }, []);
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();

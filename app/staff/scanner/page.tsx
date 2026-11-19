@@ -7,9 +7,8 @@ import { PageHeader } from "@/components/staff/page-header";
 import { ScanResultCard } from "@/components/staff/scan-result";
 import { cn } from "@/lib/utils";
 import type { ScanOutcome } from "@/lib/staff-mock";
-import { attendees as mockAttendees } from "@/lib/staff-mock";
 import { api } from "@/lib/api-client";
-import { saveScanRecord } from "@/lib/staff-storage";
+import { useStaff } from "@/components/staff/staff-context";
 
 type Mode = "in" | "out";
 
@@ -21,6 +20,7 @@ const demoOutcomes: { outcome: ScanOutcome; label: string }[] = [
 ];
 
 export default function ScannerPage() {
+  const { attendees, checkInOrOut, addScan } = useStaff();
   const [mode, setMode] = useState<Mode>("in");
   const [torch, setTorch] = useState(false);
   const [code, setCode] = useState("");
@@ -60,13 +60,7 @@ export default function ScannerPage() {
         setResultName(fullName);
         setResultTicket(tId);
 
-        saveScanRecord({
-          time: nowTime,
-          attendeeName: fullName,
-          ticketId: tId,
-          action: mode,
-          outcome,
-        });
+        checkInOrOut(tId, mode);
       } else {
         const errCode = res.error?.code ?? "";
         let outcome: ScanOutcome = "invalid";
@@ -74,14 +68,14 @@ export default function ScannerPage() {
         else if (errCode === "TICKET_NOT_ACTIVE") outcome = "expired";
         else if (errCode === "TICKET_NOT_CHECKED_IN") outcome = "duplicate";
 
-        const matchedMock = mockAttendees.find((a) => a.ticketId.toLowerCase() === cleanCode.toLowerCase());
-        const name = matchedMock ? matchedMock.name : undefined;
+        const matched = attendees.find((a) => a.ticketId.toLowerCase() === cleanCode.toLowerCase());
+        const name = matched ? matched.name : undefined;
 
         setResult(outcome);
         setResultName(name);
         setResultTicket(cleanCode);
 
-        saveScanRecord({
+        addScan({
           time: nowTime,
           attendeeName: name ?? "ไม่ทราบชื่อ",
           ticketId: cleanCode,
@@ -90,21 +84,12 @@ export default function ScannerPage() {
         });
       }
     } catch {
-      // Fallback local processing if network/backend offline
-      const matched = mockAttendees.find((a) => a.ticketId.toLowerCase() === cleanCode.toLowerCase());
-      if (matched) {
-        const outcome: ScanOutcome = mode === "out" ? "checked-out" : "checked-in";
-        setResult(outcome);
-        setResultName(matched.name);
-        setResultTicket(matched.ticketId);
-
-        saveScanRecord({
-          time: nowTime,
-          attendeeName: matched.name,
-          ticketId: matched.ticketId,
-          action: mode,
-          outcome,
-        });
+      // Fallback local processing
+      const checkRes = checkInOrOut(cleanCode, mode);
+      if (checkRes.attendee) {
+        setResult(checkRes.outcome);
+        setResultName(checkRes.attendee.name);
+        setResultTicket(checkRes.attendee.ticketId);
       } else {
         const isFormatOk = /^TT-\d{6}$/i.test(cleanCode);
         const outcome: ScanOutcome = isFormatOk ? (mode === "out" ? "checked-out" : "checked-in") : "invalid";
@@ -114,7 +99,7 @@ export default function ScannerPage() {
         setResultName(name);
         setResultTicket(cleanCode);
 
-        saveScanRecord({
+        addScan({
           time: nowTime,
           attendeeName: name ?? "ไม่ทราบชื่อ",
           ticketId: cleanCode,
@@ -125,7 +110,7 @@ export default function ScannerPage() {
     } finally {
       setIsProcessing(false);
     }
-  }, [mode, isProcessing]);
+  }, [mode, isProcessing, attendees, checkInOrOut, addScan]);
 
   // Start camera on mount
   useEffect(() => {
@@ -224,7 +209,7 @@ export default function ScannerPage() {
     setResultName(name);
     setResultTicket(tId);
 
-    saveScanRecord({
+    addScan({
       time: nowTime,
       attendeeName: name ?? "ไม่ทราบชื่อ",
       ticketId: tId,
