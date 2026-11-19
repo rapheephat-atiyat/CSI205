@@ -5,7 +5,6 @@ import {
     Index,
     JoinColumn,
     ManyToOne,
-    PrimaryColumn,
     PrimaryGeneratedColumn,
     UpdateDateColumn,
     type Relation,
@@ -15,6 +14,7 @@ import { User } from "./User";
 
 @Entity({ name: "sessions", schema: "public" })
 @Index("uq_sessions_token", ["token"], { unique: true })
+@Index("idx_sessions_user", ["userId"])
 export class Session {
 
     @PrimaryGeneratedColumn("uuid")

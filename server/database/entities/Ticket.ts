@@ -1,9 +1,11 @@
 import { Events } from "@/server/database/entities/Event";
+import type { TicketSouvenir } from "@/lib/api-types";
 import { EventTicket } from "@/server/database/entities/EventTicket";
 import { Order } from "@/server/database/entities/Order";
 import { User } from "@/server/database/entities/User";
 import { TICKET_STATUSES, type TicketStatus } from "@/server/database/enums/domain.enum";
 import {
+    Check,
     Column,
     CreateDateColumn,
     Entity,
@@ -18,6 +20,7 @@ import {
 @Entity({ name: "tickets", schema: "public" })
 @Index("uq_tickets_ticket_code", ["ticketCode"], { unique: true })
 @Index("uq_tickets_qr_token", ["qrToken"], { unique: true })
+@Check("chk_tickets_unit_price", `"unitPrice" >= 0`)
 export class Ticket {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
@@ -26,7 +29,11 @@ export class Ticket {
     orderId!: string;
 
     @ManyToOne(() => Order, (o) => o.tickets, { onDelete: "CASCADE", nullable: false })
-    @JoinColumn({ name: "order_id", referencedColumnName: "id" })
+    @JoinColumn([
+        { name: "order_id", referencedColumnName: "id", foreignKeyConstraintName: "fk_tickets_order_buyer_event" },
+        { name: "event_id", referencedColumnName: "eventId" },
+        { name: "user_id", referencedColumnName: "userId" },
+    ])
     order!: Relation<Order>;
 
     @Column({ name: "event_id", type: "uuid" })
@@ -40,7 +47,10 @@ export class Ticket {
     eventTicketId!: string;
 
     @ManyToOne(() => EventTicket, (et) => et.issuedTickets, { onDelete: "RESTRICT", nullable: false })
-    @JoinColumn({ name: "event_ticket_id", referencedColumnName: "id" })
+    @JoinColumn([
+        { name: "event_ticket_id", referencedColumnName: "id", foreignKeyConstraintName: "fk_tickets_ticket_type_event" },
+        { name: "event_id", referencedColumnName: "eventId" },
+    ])
     eventTicket!: Relation<EventTicket>;
 
     @Column({ name: "user_id", type: "uuid" })
@@ -92,14 +102,8 @@ export class Ticket {
     @JoinColumn({ name: "checked_in_by_id", referencedColumnName: "id" })
     checkedInBy!: Relation<User> | null;
 
-    @Column({ type: "boolean", default: false })
-    receiveSouvenir!: boolean;
-
-    @Column({ type: "varchar", length: 20, nullable: true })
-    souvenirSize!: string | null;
-
-    @Column({ type: "timestamptz", nullable: true })
-    souvenirClaimedAt!: Date | null;
+    @Column({ name: "souvenir_items", type: "jsonb", default: [] })
+    souvenirItems!: TicketSouvenir[];
 
     @CreateDateColumn({ name: "created_at", type: "timestamptz" })
     createdAt!: Date;

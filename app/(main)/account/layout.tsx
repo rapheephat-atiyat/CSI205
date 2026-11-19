@@ -1,4 +1,4 @@
-import AccBreadCrumb from "@/app/(main)/account/AccBreadCrumb";
+import AccBreadCrumb, { AccountLinks } from "@/app/(main)/account/AccBreadCrumb";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReactNode, Suspense } from "react";
 
@@ -8,18 +8,18 @@ function BreadcrumbSkeleton() {
 
 export default function Layout({ children }: { children: ReactNode }) {
     return (
-        <main className="outline outline-red-500 max-w-7xl mx-auto w-full pt-8 px-10 pb-20">
-            <Suspense fallback={<BreadcrumbSkeleton />}>
-                <div className="flex flex-row gap-8">
-                    <aside className="w-84 sticky outline outline-red-500 top-[calc(var(--navbar-height)+2rem)] shrink-0 self-start">
-                        <AccBreadCrumb />
-                    </aside>
-                    <section className="flex-1 outline outline-green-500">
-                        {children}
-                    </section>
-                </div>
-            </Suspense>
-
-        </main >
+        <main className="mx-auto w-full max-w-6xl space-y-5 px-4 pt-6 pb-12 sm:px-6 sm:pt-8 lg:px-10">
+            <Suspense fallback={<BreadcrumbSkeleton />}><AccBreadCrumb /></Suspense>
+            <div className="grid gap-5 lg:grid-cols-[13rem_minmax(0,1fr)]">
+                <aside className="self-start lg:sticky lg:top-[calc(var(--navbar-height)+1.5rem)]">
+                    <Suspense>
+                        <AccountLinks />
+                    </Suspense>
+                </aside>
+                <section className="min-w-0">
+                    {children}
+                </section>
+            </div>
+        </main>
     );
 }

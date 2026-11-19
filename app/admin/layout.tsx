@@ -1,10 +1,11 @@
 import { Suspense } from "react";
-import AdminNav from "@/components/admin/AdminNav";
-import TopBar from "@/components/admin/TopBar";
-
+import { redirect } from "next/navigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
+import { requirePageUser } from "@/server/auth/page-user";
+import SuperAdminTopbar from "@/components/admin/SuperAdminTopbar";
+import OnlyOnPath from "@/components/admin/OnlyOnPath";
 
 export default function AdminLayout({
   children,
@@ -19,15 +20,40 @@ export default function AdminLayout({
         </div>
       }
     >
-      <TooltipProvider>
-        <SidebarProvider defaultOpen={false}>
-          <AdminNav />
-          <main className="bg-[#F5F5F5] w-full">
-            <TopBar />
-            {children}
-          </main>
-        </SidebarProvider>
-      </TooltipProvider>
+      <AuthenticatedAdminLayout>{children}</AuthenticatedAdminLayout>
     </Suspense>
+  );
+}
+
+async function AuthenticatedAdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await requirePageUser("/admin");
+  const isAdmin = user.userRoles.some((r) => r.role === "ADMIN");
+
+  if (!isAdmin) {
+    redirect("/");
+  }
+
+  return (
+    <TooltipProvider>
+      <SidebarProvider defaultOpen={false}>
+        <main className="bg-[#F5F5F5] w-full">
+          <OnlyOnPath path="/admin">
+            <SuperAdminTopbar
+              showFaqLink={user.userRoles.some(
+                (role) =>
+                  role.role === "ADMIN" &&
+                  role.eventId === null &&
+                  role.storeId === null,
+              )}
+            />
+          </OnlyOnPath>
+          {children}
+        </main>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

@@ -15,6 +15,19 @@ import {
 } from "lucide-react"
 import { authClient } from "@/lib/auth-client"
 
+function getDestination() {
+  const next = new URLSearchParams(window.location.search).get("next")
+  if (!next?.startsWith("/")) return "/"
+  try {
+    const url = new URL(next, window.location.origin)
+    return url.origin === window.location.origin && !url.pathname.startsWith("//")
+      ? url.pathname + url.search + url.hash
+      : "/"
+  } catch {
+    return "/"
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter()
   const [showPassword, setShowPassword] = React.useState(false)
@@ -27,13 +40,14 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMessage(null)
+    const destination = getDestination()
 
     await authClient.signIn.email(
       {
         email: email.trim(),
         password,
         rememberMe,
-        callbackURL: "/",
+        callbackURL: destination,
       },
       {
         onRequest: () => {
@@ -41,7 +55,7 @@ export default function LoginPage() {
         },
         onSuccess: () => {
           setIsLoading(false)
-          router.push("/")
+          router.push(destination)
           router.refresh()
         },
         onError: (ctx) => {

@@ -1,11 +1,13 @@
 import { Store } from "@/server/database/entities/Store";
 import { User } from "@/server/database/entities/User";
 import { WalletHistory } from "@/server/database/entities/WalletHistory";
-import { Column, CreateDateColumn, Entity, Index, JoinColumn, OneToMany, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from "typeorm";
+import { Check, Column, CreateDateColumn, Entity, Index, JoinColumn, OneToMany, OneToOne, PrimaryGeneratedColumn, UpdateDateColumn, type Relation } from "typeorm";
 
 @Entity({ name: "wallets", schema: "public" })
 @Index("uq_wallets_user_id", ["userId"], { unique: true })
 @Index("uq_wallets_store_id", ["storeId"], { unique: true })
+@Check("chk_wallets_one_owner", `("user_id" IS NULL) <> ("store_id" IS NULL)`)
+@Check("chk_wallets_balance", `"total" >= 0`)
 export class Wallet {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
@@ -30,7 +32,7 @@ export class Wallet {
     @JoinColumn({ name: "store_id", referencedColumnName: "id" })
     store!: Relation<Store> | null;
 
-    @Column({ type: "decimal", precision: 10, scale: 2, default: "0.00" })
+    @Column({ type: "decimal", precision: 10, scale: 2, default: () => "0.00" })
     total!: string;
 
     @OneToMany(() => WalletHistory, (wh) => wh.wallet)

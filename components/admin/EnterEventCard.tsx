@@ -1,4 +1,4 @@
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, XAxis } from "recharts";
 
 import {
   ChartContainer,
@@ -45,7 +45,7 @@ export function EnterEventCard() {
             />
           }
         />
-        <ChartLegend content={<ChartLegendContent />} className="text-[16px]" />
+        <ChartLegend content={<ChartLegendContent className="text-[16px]" />} />
 
         <Bar
           dataKey="attendees"

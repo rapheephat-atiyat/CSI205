@@ -1,7 +1,8 @@
 import { Store } from "@/server/database/entities/Store";
-import { Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn, type Relation, UpdateDateColumn } from "typeorm";
+import { Check, Column, CreateDateColumn, Entity, JoinColumn, OneToOne, PrimaryGeneratedColumn, type Relation, UpdateDateColumn } from "typeorm";
 
 @Entity({ name: "products", schema: "public" })
+@Check("chk_products_price", `"price" >= 0`)
 export class Product {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
