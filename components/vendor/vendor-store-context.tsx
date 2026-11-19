@@ -121,7 +121,7 @@ function StoreSelectionGate({
           <ChevronRight className="size-3.5 text-slate-400" />
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* <div className="flex items-center gap-4">
           <span>21 ต.ค. 2569</span>
           <button type="button" className="text-slate-500 hover:text-slate-800">
             <Bell className="size-4" />
@@ -130,7 +130,7 @@ function StoreSelectionGate({
             <span>TH</span>
             <ChevronDown className="size-3.5" />
           </div>
-        </div>
+        </div> */}
       </header>
 
       {/* พื้นที่เนื้อหาหลัก */}
