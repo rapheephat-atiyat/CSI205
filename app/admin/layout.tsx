@@ -7,7 +7,25 @@ import { requirePageUser } from "@/server/auth/page-user";
 import SuperAdminTopbar from "@/components/admin/SuperAdminTopbar";
 import OnlyOnPath from "@/components/admin/OnlyOnPath";
 
-export default async function AdminLayout({
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense
+      fallback={
+        <div className="w-full h-dvh flex items-center justify-center py-4">
+          <Spinner className="size-8 text-brand" />
+        </div>
+      }
+    >
+      <AuthenticatedAdminLayout>{children}</AuthenticatedAdminLayout>
+    </Suspense>
+  );
+}
+
+async function AuthenticatedAdminLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -20,23 +38,22 @@ export default async function AdminLayout({
   }
 
   return (
-    <Suspense
-      fallback={
-        <div className="w-full h-dvh flex items-center justify-center py-4">
-          <Spinner className="size-8 text-brand" />
-        </div>
-      }
-    >
-      <TooltipProvider>
-        <SidebarProvider defaultOpen={false}>
-          <main className="bg-[#F5F5F5] w-full">
-            <OnlyOnPath path="/admin">
-              <SuperAdminTopbar />
-            </OnlyOnPath>
-            {children}
-          </main>
-        </SidebarProvider>
-      </TooltipProvider>
-    </Suspense>
+    <TooltipProvider>
+      <SidebarProvider defaultOpen={false}>
+        <main className="bg-[#F5F5F5] w-full">
+          <OnlyOnPath path="/admin">
+            <SuperAdminTopbar
+              showFaqLink={user.userRoles.some(
+                (role) =>
+                  role.role === "ADMIN" &&
+                  role.eventId === null &&
+                  role.storeId === null,
+              )}
+            />
+          </OnlyOnPath>
+          {children}
+        </main>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

@@ -14,12 +14,12 @@ import { Button } from "@/components/ui/button";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { authClient } from "@/lib/auth-client";
-import { ChevronDown, LogOut, Ticket, User } from "lucide-react";
+import { ChevronDown, CircleHelp, LogOut, Ticket, User } from "lucide-react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 
-export default function SuperAdminTopbar() {
+export default function SuperAdminTopbar({ showFaqLink = false }: { showFaqLink?: boolean }) {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
@@ -68,9 +68,10 @@ export default function SuperAdminTopbar() {
   };
 
   return (
-    <div className="p-4 px-7 w-full flex items-center justify-between mx-auto min-h-10 bg-on-brand">
+    <div className="p-4 px-7 w-full flex flex-wrap items-center justify-between gap-3 mx-auto min-h-10 bg-on-brand">
       <Brand />
-      <div>
+      <div className="flex items-center gap-2">
+        {showFaqLink && <Button asChild variant={pathname === "/admin/faq" ? "secondary" : "outline"} className="h-11 gap-2"><Link href="/admin/faq" aria-current={pathname === "/admin/faq" ? "page" : undefined}><CircleHelp aria-hidden="true" />FAQ</Link></Button>}
         {isPending ? (
           <div className="flex w-fit items-center gap-4">
             <Skeleton className="size-11 w-32 round-md" />
