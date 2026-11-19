@@ -16,6 +16,7 @@ export { Store } from "@/server/database/entities/Store";
 export { Product } from "@/server/database/entities/Product";
 export { Wallet } from "@/server/database/entities/Wallet";
 export { WalletHistory } from "@/server/database/entities/WalletHistory";
+export { AdminActivity } from "./AdminActivity";
 
 import { Account } from "@/server/database/entities/Account";
 import { Events } from "@/server/database/entities/Event";
@@ -35,6 +36,9 @@ import { UserRolePermission } from "@/server/database/entities/UserRolePermissio
 import { Verification } from "@/server/database/entities/Verification";
 import { Wallet } from "@/server/database/entities/Wallet";
 import { WalletHistory } from "@/server/database/entities/WalletHistory";
+import { FaqCategory } from "@/server/database/entities/FaqCategory";
+import { FaqQuestion } from "@/server/database/entities/FaqQuestion";
+import { AdminActivity } from "./AdminActivity";
 
 export const databaseEntities = [
     User,
@@ -55,4 +59,7 @@ export const databaseEntities = [
     Product,
     Wallet,
     WalletHistory,
+    FaqCategory,
+    FaqQuestion,
+    AdminActivity,
 ];

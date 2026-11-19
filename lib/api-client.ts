@@ -1,4 +1,6 @@
 import type {
+    AdminActivityItem, AdminExportReport, AdminOrderDetail, AdminOrderFilters, AdminOrderSummary,
+    AdminStore, AdminUser, EventOverviewReport, OrderReviewInput, OrderShippingUpdate, Paginated,
     ApiResponse,
     AssignUserRoleInput,
     CreateOrderInput,
@@ -9,6 +11,11 @@ import type {
     EventSummary,
     EventTicketInput,
     EventTicketItem,
+    FaqCategoryAdminItem,
+    FaqCategoryInput,
+    FaqCategoryItem,
+    FaqQuestionAdminItem,
+    FaqQuestionInput,
     OrderDetail,
     OverviewReport,
     ProductInput,
@@ -20,10 +27,13 @@ import type {
     TicketItem,
     User as Profile,
     UserInput,
+    UpdateFaqCategoryInput,
+    UpdateFaqQuestionInput,
     WalletDetail,
     WalletHistoryItem,
     WalletTransactionInput,
 } from "@/lib/api-types";
+import type { Permission } from "@/lib/permissions";
 
 async function request<T>(path: string, method = "GET", body?: unknown): Promise<ApiResponse<T>> {
     let response: Response;
@@ -53,12 +63,20 @@ function orderPath(orderId: string) {
     return `/api/orders/${encodeURIComponent(orderId)}`;
 }
 
+function adminOrderPath(eventId: string, orderId: string) {
+    return `${eventPath(eventId)}/orders/${encodeURIComponent(orderId)}`;
+}
+
 function withStoreId(path: string, storeId?: string) {
     return storeId ? `${path}?storeId=${encodeURIComponent(storeId)}` : path;
 }
 
 
 export const api = {
+    faq: {
+        /** อ่านเฉพาะหมวดและคำถามที่เผยแพร่แล้ว ไม่ต้องเข้าสู่ระบบ */
+        list: () => request<FaqCategoryItem[]>("/api/faq"),
+    },
     me: {
         /**
          * อ่านโปรไฟล์ของบัญชีที่ล็อกอินอยู่
@@ -325,6 +343,48 @@ export const api = {
     },
 
     admin: {
+        eventOverview: (eventId: string) => request<EventOverviewReport>(`${eventPath(eventId)}/overview`),
+        activities: (eventId: string) => request<AdminActivityItem[]>(`${eventPath(eventId)}/activities`),
+        exportReport: (eventId: string) => request<AdminExportReport>(`${eventPath(eventId)}/reports`),
+        orders: {
+            list: (eventId: string, filters: AdminOrderFilters = {}) => {
+                const query = new URLSearchParams();
+                for (const [key, value] of Object.entries(filters)) if (value !== undefined && value !== "") query.set(key, String(value));
+                return request<Paginated<AdminOrderSummary>>(`${eventPath(eventId)}/orders?${query}`);
+            },
+            get: (eventId: string, orderId: string) => request<AdminOrderDetail>(adminOrderPath(eventId, orderId)),
+            review: (eventId: string, orderId: string, input: OrderReviewInput) => request<AdminOrderDetail>(`${adminOrderPath(eventId, orderId)}/review`, "POST", input),
+            shipping: (eventId: string, orderId: string, input: OrderShippingUpdate) => request<AdminOrderDetail>(`${adminOrderPath(eventId, orderId)}/shipping`, "PATCH", input),
+            slipUrl: (eventId: string, orderId: string) => `${adminOrderPath(eventId, orderId)}/slip`,
+        },
+        stores: {
+            list: (eventId: string) => request<AdminStore[]>(`${eventPath(eventId)}/stores`),
+            create: (eventId: string, input: Omit<StoreInput, "eventId">) => request<StoreDetail>(`${eventPath(eventId)}/stores`, "POST", input),
+            update: (eventId: string, storeId: string, input: Partial<StoreInput>) => request<AdminStore>(`${eventPath(eventId)}/stores/${encodeURIComponent(storeId)}`, "PATCH", input),
+            delete: (eventId: string, storeId: string) => request<{ id: string }>(`${eventPath(eventId)}/stores/${encodeURIComponent(storeId)}`, "DELETE"),
+        },
+        eventUsers: {
+            list: (eventId: string, query = "") => request<AdminUser[]>(`${eventPath(eventId)}/users?query=${encodeURIComponent(query)}`),
+            assignRole: (eventId: string, userId: string, input: AssignUserRoleInput) => request<{ id: string }>(`${eventPath(eventId)}/users/${encodeURIComponent(userId)}/roles`, "POST", input),
+            updateRole: (eventId: string, userId: string, roleId: string, permissions: Permission[]) => request<{ id: string }>(`${eventPath(eventId)}/users/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleId)}`, "PATCH", { permissions }),
+            revokeRole: (eventId: string, userId: string, roleId: string) => request<{ id: string }>(`${eventPath(eventId)}/users/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleId)}`, "DELETE"),
+        },
+        /** ทุกเมธอดต้องใช้บัญชี ADMIN ระดับระบบ */
+        faq: {
+            list: () => request<FaqCategoryAdminItem[]>("/api/admin/faq"),
+            categories: {
+                get: (id: string) => request<FaqCategoryAdminItem>(`/api/admin/faq/categories/${encodeURIComponent(id)}`),
+                create: (input: FaqCategoryInput) => request<FaqCategoryAdminItem>("/api/admin/faq/categories", "POST", input),
+                update: (id: string, input: UpdateFaqCategoryInput) => request<FaqCategoryAdminItem>(`/api/admin/faq/categories/${encodeURIComponent(id)}`, "PATCH", input),
+                delete: (id: string) => request<{ id: string }>(`/api/admin/faq/categories/${encodeURIComponent(id)}`, "DELETE"),
+            },
+            questions: {
+                get: (id: string) => request<FaqQuestionAdminItem>(`/api/admin/faq/questions/${encodeURIComponent(id)}`),
+                create: (input: FaqQuestionInput) => request<FaqQuestionAdminItem>("/api/admin/faq/questions", "POST", input),
+                update: (id: string, input: UpdateFaqQuestionInput) => request<FaqQuestionAdminItem>(`/api/admin/faq/questions/${encodeURIComponent(id)}`, "PATCH", input),
+                delete: (id: string) => request<{ id: string }>(`/api/admin/faq/questions/${encodeURIComponent(id)}`, "DELETE"),
+            },
+        },
         users: {
             /**
              * ดูผู้ใช้ทั้งหมด ต้องมีสิทธิ์จัดการบทบาท

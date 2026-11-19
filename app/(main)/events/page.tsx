@@ -1,8 +1,8 @@
 import { Suspense } from "react";
 import { connection } from "next/server";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getEvents } from "@/server/services/event.service";
-import { FALLBACK_EVENTS } from "@/lib/events-mock";
+import { getPublicEvents } from "@/server/cache/public-content";
+import ContentLoadError from "@/components/core/ContentLoadError";
 import { type EventSummary } from "@/lib/api-types";
 import EventsClient from "@/components/events/EventsClient";
 
@@ -30,15 +30,13 @@ function EventsSkeleton() {
 async function EventsList() {
     await connection();
     let events: EventSummary[] = [];
+    let loadFailed = false;
     try {
-        events = await getEvents();
-        if (!events || events.length === 0) {
-            events = [...FALLBACK_EVENTS];
-        }
+        events = await getPublicEvents();
     } catch {
-        events = [...FALLBACK_EVENTS];
+        loadFailed = true;
     }
-
+    if (loadFailed) return <ContentLoadError message="โหลดข้อมูลงานไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" />;
     return <EventsClient initialEvents={events} />;
 }
 

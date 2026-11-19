@@ -34,3 +34,24 @@ export async function requirePermission(
     checkPermission(user, permission, scope);
     return user;
 }
+
+/** FAQ เป็นข้อมูลกลางของระบบ จึงให้เฉพาะ ADMIN ที่ไม่มีขอบเขตงานหรือร้านค้าจัดการ */
+export async function requireAdmin(request: Request): Promise<User> {
+    const user = await requireUser(request);
+    const isAdmin = user.userRoles.some((role) =>
+        role.role === Role.ADMIN && role.eventId === null && role.storeId === null
+    );
+    if (!isAdmin) {
+        throw new ApiError("FORBIDDEN", "เฉพาะผู้ดูแลระบบเท่านั้นที่ทำรายการนี้ได้", 403);
+    }
+    return user;
+}
+
+export async function requireEventAdmin(request: Request, permission: Permission, eventId: string) {
+    const user = await requireUser(request);
+    const isAdmin = user.userRoles.some((role) => role.role === Role.ADMIN && role.storeId === null
+        && (role.eventId === null || role.eventId === eventId));
+    if (!isAdmin) throw new ApiError("FORBIDDEN", "คุณไม่มีสิทธิ์ดูแลงานนี้", 403);
+    checkPermission(user, permission, { eventId });
+    return user;
+}

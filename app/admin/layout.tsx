@@ -1,10 +1,12 @@
 import { Suspense } from "react";
-import AdminNav from "@/components/admin/AdminNav";
-import TopBar from "@/components/admin/TopBar";
-
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
+import { requirePageUser } from "@/server/auth/page-user";
+import SuperAdminTopbar from "@/components/admin/SuperAdminTopbar";
+import OnlyOnPath from "@/components/admin/OnlyOnPath";
 
 export default function AdminLayout({
   children,
@@ -19,15 +21,38 @@ export default function AdminLayout({
         </div>
       }
     >
-      <TooltipProvider>
-        <SidebarProvider defaultOpen={false}>
-          <AdminNav />
-          <main className="bg-[#F5F5F5] w-full">
-            <TopBar />
-            {children}
-          </main>
-        </SidebarProvider>
-      </TooltipProvider>
+      <AdminGate>{children}</AdminGate>
     </Suspense>
+  );
+}
+
+async function AdminGate({ children }: { children: React.ReactNode }) {
+  // Wait before calling auth helpers that can be instrumented by Console Ninja.
+  await connection();
+  const user = await requirePageUser("/admin");
+  const isAdmin = user.userRoles.some((r) => r.role === "ADMIN");
+
+  if (!isAdmin) {
+    redirect("/");
+  }
+
+  return (
+    <TooltipProvider>
+      <SidebarProvider defaultOpen={false}>
+        <main className="bg-[#F5F5F5] w-full">
+          <OnlyOnPath path="/admin">
+            <SuperAdminTopbar
+              showFaqLink={user.userRoles.some(
+                (role) =>
+                  role.role === "ADMIN" &&
+                  role.eventId === null &&
+                  role.storeId === null,
+              )}
+            />
+          </OnlyOnPath>
+          {children}
+        </main>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

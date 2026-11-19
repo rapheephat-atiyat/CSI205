@@ -13,7 +13,7 @@ const footerGroups = [
     {
         title: "ให้เราช่วยคุณ",
         links: [
-            { label: "ศูนย์ช่วยเหลือ", href: "/help" },
+            { label: "ศูนย์ช่วยเหลือ", href: "/faq" },
             { label: "บัตรของฉัน", href: "/account/tickets" },
         ],
     },
