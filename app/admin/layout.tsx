@@ -38,7 +38,14 @@ async function AdminGate({ children }: { children: React.ReactNode }) {
       <SidebarProvider defaultOpen={false}>
         <main className="bg-[#F5F5F5] w-full">
           <OnlyOnPath path="/admin">
-            <SuperAdminTopbar />
+            <SuperAdminTopbar
+              showFaqLink={user.userRoles.some(
+                (role) =>
+                  role.role === "ADMIN" &&
+                  role.eventId === null &&
+                  role.storeId === null,
+              )}
+            />
           </OnlyOnPath>
           {children}
         </main>
