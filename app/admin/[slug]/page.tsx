@@ -218,7 +218,9 @@ export default function AdminDashboardPage() {
         className="flex h-auto w-full flex-col items-start gap-3 rounded-[10px] p-4"
       >
         <div className="flex w-full items-center justify-between gap-3">
-          <div className="text-lg font-semibold text-black">ประเภทบัตรในงาน</div>
+          <div className="text-lg font-semibold text-black">
+            ประเภทบัตรในงาน
+          </div>
           <Link
             href={`/admin/${slug}/tickets`}
             className="text-sm font-medium text-brand hover:underline"
@@ -299,7 +301,9 @@ export default function AdminDashboardPage() {
                   ยังไม่เช็กอิน
                 </div>
                 <div className="flex items-center justify-center gap-2">
-                  <div className="text-lg font-semibold">{unavailableValue}</div>
+                  <div className="text-lg font-semibold">
+                    {unavailableValue}
+                  </div>
                 </div>
               </div>
             </div>
@@ -491,13 +495,6 @@ export default function AdminDashboardPage() {
               รวม {stores.length} ร้าน
             </div>
           </div>
-          <Badge
-            variant={"outline"}
-            className="w-full flex items-center justify-center [&>svg]:size-4! rounded-[10px] p-3 text-[14px] md:text-[18px] gap-2 outline outline-brand hover:cursor-pointer hover:bg-brand-hover hover:text-on-brand"
-          >
-            <SquareArrowOutUpRight />
-            ดูรายงานทั้งหมด
-          </Badge>
         </Badge>
       </div>
     </div>

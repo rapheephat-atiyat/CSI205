@@ -41,7 +41,6 @@ const num = (v?: string | number | null) =>
   v === null || v === undefined ? "-" : Number(v).toLocaleString("th-TH");
 
 export default function Page() {
-  const [downLoadFinish, setDownLoadFinish] = useState(false);
   const { slug } = useParams<{ slug: string }>();
 
   const [event, setEvent] = useState<EventDetail | null>(null);
@@ -125,17 +124,6 @@ export default function Page() {
     },
   ];
 
-  useEffect(() => {
-    if (!downLoadFinish) return;
-
-    toast.success("โหลดไฟล์สำเร็จ", {
-      position: "bottom-right",
-      className: "text-green-400!",
-    });
-
-    setDownLoadFinish(false);
-  }, [downLoadFinish]);
-
   function downloadCsv(filename: string, rows: Cell[][]) {
     const esc = (v: Cell) => {
       if (v === null || v === undefined) return "";
@@ -152,9 +140,7 @@ export default function Page() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    setTimeout(() => {
-      setDownLoadFinish(true);
-    }, 3000);
+    toast.success("ดาวน์โหลดไฟล์ CSV สำเร็จ");
   }
 
   async function downloadXlsx(
@@ -189,7 +175,7 @@ export default function Page() {
     a.download = filename;
     a.click();
     URL.revokeObjectURL(url);
-    setDownLoadFinish(true);
+    toast.success("ดาวน์โหลดไฟล์ Excel สำเร็จ");
   }
 
   if (loading) {

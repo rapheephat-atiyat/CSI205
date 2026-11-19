@@ -1,28 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api-client";
-import type { OrderDetail } from "@/lib/api-types";
-
-// import icons
-import {
-  ArrowLeft,
-  Check,
-  ChevronRight,
-  Clock,
-  FileCheck,
-  Maximize2,
-  Search,
-  X,
-} from "lucide-react";
-
-// import ui
-import { Badge } from "@/components/ui/badge";
+import type {
+  AdminOrderSummary,
+  EventDetail,
+  Paginated,
+} from "@/lib/api-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -32,12 +28,12 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -46,564 +42,414 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  FileCheck,
+  RefreshCw,
+  Search,
+  XCircle,
+} from "lucide-react";
+import OrderReviewDialog from "./OrderReviewDialog";
 
-// ---------- types ---------- //
-type OrderStatus = OrderDetail["status"];
+const filters = ["review", "all", "PENDING", "PAID", "CANCELLED"] as const;
+type Filter = (typeof filters)[number];
 
-type OrderItem = {
-  name: string;
-  qty: number;
-  unit: string;
-  total: number;
-};
-
-type Participant = {
-  id: string;
-  name: string;
-  gradYear: string | null;
-  phone: string | null;
-  email: string | null;
-  ticketName: string;
-  ticketPrice: number;
-};
-
-type Slip = {
-  paymentSlip: string | null;
-  hasPaymentSlip: boolean;
-  amount: number;
-  updatedAt: string;
-};
-
-type Order = {
-  id: string;
-  code: string;
-  status: OrderStatus;
-  hasPaymentSlip: boolean;
-  total: number;
-  createdAt: string;
-  buyerName: string;
-  buyerEmail: string;
-  buyerGradYear: string | null;
-  buyerPhone: string | null;
-  items: OrderItem[];
-  participants: Participant[];
-  shirtDelivery: string;
-  shirtAddress: string;
-  slip: Slip;
-};
-
-// ---------- helpers ---------- //
-const money = (n: number) => n.toLocaleString("th-TH");
-
-const statusLabel: Record<OrderStatus, string> = {
-  PENDING: "รอตรวจสอบ",
+const filterLabels: Record<Filter, string> = {
+  review: "รอตรวจสลิป",
+  all: "ทุกสถานะ",
+  PENDING: "รอชำระ / รอตรวจ",
   PAID: "ชำระแล้ว",
   CANCELLED: "ยกเลิกแล้ว",
 };
 
-const statusClass: Record<OrderStatus, string> = {
-  PENDING: "border-orange-300 bg-orange-50 text-orange-700",
-  PAID: "border-green-300 bg-green-50 text-green-700",
-  CANCELLED: "border-red-300 bg-red-50 text-red-700",
-};
-
-function StatusBadge({ order }: { order: Order }) {
-  const { status, hasPaymentSlip } = order;
-  return (
-    <Badge
-      variant="outline"
-      className={`flex items-center justify-between gap-1 rounded-[10px] px-3 py-1.5 text-[14px] [&>svg]:size-4! ${statusClass[status]}`}
-    >
-      {status === "PENDING" && <Clock />}
-      {status === "PAID" && <Check />}
-      {status === "CANCELLED" && <X />}
-      {status === "PENDING" && !hasPaymentSlip
-        ? "รอชำระเงิน"
-        : statusLabel[status]}
-    </Badge>
-  );
-}
-
-function formatDateTime(value: string) {
-  return new Date(value).toLocaleString("th-TH", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
-}
-
-function toOrder(order: OrderDetail): Order {
-  const buyerTicket =
-    order.tickets.find((ticket) => ticket.userId === order.userId) ??
-    order.tickets[0];
-  const buyerName = buyerTicket
-    ? [buyerTicket.firstName, buyerTicket.lastName].filter(Boolean).join(" ")
-    : "";
-  const ticketItems = new Map<
-    string,
-    { name: string; qty: number; total: number }
-  >();
-
-  for (const ticket of order.tickets) {
-    const name = ticket.ticketTypeName ?? "บัตร";
-    const key = `${ticket.eventTicketId}:${ticket.unitPrice}`;
-    const item = ticketItems.get(key);
-    if (item) {
-      item.qty += 1;
-      item.total += Number(ticket.unitPrice);
-    } else {
-      ticketItems.set(key, {
-        name,
-        qty: 1,
-        total: Number(ticket.unitPrice),
-      });
-    }
-  }
-
-  const items: OrderItem[] = [...ticketItems.values()].map((item) => ({
-    ...item,
-    unit: "ใบ",
-  }));
-  for (const souvenir of order.souvenirItems) {
-    items.push({
-      name: souvenir.size
-        ? `${souvenir.name} (${souvenir.size})`
-        : souvenir.name,
-      qty: souvenir.quantity,
-      unit: "ชิ้น",
-      total: Number(souvenir.unitPrice) * souvenir.quantity,
-    });
-  }
-  if (Number(order.shippingFee) > 0) {
-    items.push({
-      name: "ค่าจัดส่ง",
-      qty: 1,
-      unit: "ครั้ง",
-      total: Number(order.shippingFee),
-    });
-  }
-
-  const shipping = order.shipping;
-  const address = shipping
-    ? [
-        shipping.recipientName,
-        shipping.recipientPhone,
-        shipping.addressLine,
-        shipping.subDistrict,
-        shipping.district,
-        shipping.province,
-        shipping.postalCode,
-      ]
-        .filter(Boolean)
-        .join(" ")
-    : "-";
-
-  return {
-    id: order.id,
-    code: order.orderNo,
-    status: order.status,
-    hasPaymentSlip: order.hasPaymentSlip,
-    total: Number(order.total),
-    createdAt: formatDateTime(order.createdAt),
-    buyerName: buyerName || "ผู้ซื้อ",
-    buyerEmail: buyerTicket?.email ?? "-",
-    buyerGradYear: buyerTicket?.graduationYear ?? null,
-    buyerPhone: buyerTicket?.phone ?? null,
-    items,
-    participants: order.tickets.map((ticket) => ({
-      id: ticket.id,
-      name:
-        [ticket.firstName, ticket.lastName].filter(Boolean).join(" ") ||
-        "ไม่ระบุชื่อ",
-      gradYear: ticket.graduationYear,
-      phone: ticket.phone,
-      email: ticket.email,
-      ticketName: ticket.ticketTypeName ?? "บัตร",
-      ticketPrice: Number(ticket.unitPrice),
-    })),
-    shirtDelivery:
-      order.deliveryMethod === "SHIPPING"
-        ? "จัดส่ง"
-        : order.deliveryMethod === "PICKUP"
-          ? "รับหน้างาน"
-          : "ไม่มีของที่ระลึก",
-    shirtAddress: address,
-    slip: {
-      paymentSlip: order.paymentSlip,
-      hasPaymentSlip: order.hasPaymentSlip,
-      amount: Number(order.total),
-      updatedAt: formatDateTime(order.paidAt ?? order.updatedAt),
-    },
-  };
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex w-full items-start justify-between gap-4">
-      <div className="text-sm text-muted-foreground md:text-[16px]">
-        {label}
-      </div>
-      <div className="text-right text-sm md:text-[16px]">{value}</div>
-    </div>
-  );
-}
-
-export default function Page() {
+export default function PaymentsPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [eventTitle, setEventTitle] = useState("");
+
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [filter, setFilter] = useState<Filter>("review");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
+
+  const [result, setResult] = useState<Paginated<AdminOrderSummary> | null>(
+    null,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [keyword, setKeyword] = useState("");
-  const [index, setIndex] = useState(0);
-  const [slipOpen, setSlipOpen] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    let active = true;
+  // โหลดรายการคำสั่งซื้อ
+  async function loadData() {
+    setLoading(true);
+    setError(null);
 
-    async function loadOrders() {
-      setLoading(true);
-      setError(null);
-
-      const eventResult = await api.events.get(slug);
-      if (!active) return;
-      if (!eventResult.success) {
-        setError(eventResult.error.message);
-        setLoading(false);
-        return;
-      }
-
-      setEventTitle(eventResult.data.title);
-      const ordersResult = await api.orders.listMy();
-      if (!active) return;
-      if (!ordersResult.success) {
-        setError(ordersResult.error.message);
-        setLoading(false);
-        return;
-      }
-
-      setOrders(
-        ordersResult.data
-          .filter((order) => order.eventId === eventResult.data.id)
-          .map(toOrder),
-      );
+    // 1. โหลดข้อมูลงานก่อนเพื่อเอา event id
+    const eventRes = await api.events.get(slug);
+    if (!eventRes.success) {
+      setError(eventRes.error.message);
       setLoading(false);
+      return;
+    }
+    setEvent(eventRes.data);
+
+    // 2. ดึงรายการคำสั่งซื้อจาก API
+    const orderRes = await api.admin.orders.list(eventRes.data.id, {
+      query: query.trim() || undefined,
+      page,
+      status: filter === "all" || filter === "review" ? undefined : filter,
+      review: filter === "review" ? "pending" : undefined,
+    });
+
+    if (orderRes.success) {
+      setResult(orderRes.data);
+    } else {
+      setError(orderRes.error.message);
     }
 
-    void loadOrders();
-    return () => {
-      active = false;
-    };
-  }, [slug]);
-
-  // กรองตามรหัสคำสั่งซื้อหรือชื่อผู้ซื้อ
-  const filtered = useMemo(() => {
-    const k = keyword.trim().toLowerCase();
-    if (!k) return orders;
-    return orders.filter(
-      (o) =>
-        o.code.toLowerCase().includes(k) ||
-        o.buyerName.toLowerCase().includes(k),
-    );
-  }, [orders, keyword]);
-
-  const pendingCount = orders.filter(
-    (order) => order.status === "PENDING" && order.hasPaymentSlip,
-  ).length;
-
-  const safeIndex =
-    filtered.length === 0 ? 0 : Math.min(index, filtered.length - 1);
-  const current: Order | undefined = filtered[safeIndex];
-
-  function handleSearch(value: string) {
-    setKeyword(value);
-    setIndex(0);
+    setLoading(false);
   }
 
-  function goNext() {
-    if (filtered.length === 0) return;
-    setIndex((safeIndex + 1) % filtered.length);
+  useEffect(() => {
+    loadData();
+  }, [slug, filter, page]);
+
+  // ค้นหาเมื่อกด Enter หรือหยุดพิมพ์
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setPage(1);
+    loadData();
+  }
+
+  const currentIndex =
+    selectedId && result
+      ? result.items.findIndex((item) => item.id === selectedId)
+      : -1;
+  const hasPrev = currentIndex > 0;
+  const hasNext = result
+    ? currentIndex >= 0 && currentIndex < result.items.length - 1
+    : false;
+
+  function handleNavigatePrev() {
+    if (result && currentIndex > 0) {
+      setSelectedId(result.items[currentIndex - 1].id);
+    }
+  }
+
+  function handleNavigateNext() {
+    if (result && currentIndex < result.items.length - 1) {
+      setSelectedId(result.items[currentIndex + 1].id);
+    }
   }
 
   return (
-    <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
-      {/* Breadcrumbs */}
-      <div className="w-full flex items-center justify-start">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href={`/admin/${slug}`}>
-                {eventTitle}
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbLink href={`/admin/${slug}/tickets`}>
-                บัตรและเสื้อ
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>ตรวจสอบการชำระเงิน</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      </div>
+    <div className="w-full max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      {/* Breadcrumb */}
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href={`/admin/${slug}`}>
+              {event?.title ?? slug}
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbLink href={`/admin/${slug}/tickets`}>
+              บัตรและเสื้อ
+            </BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>ตรวจสอบการชำระเงิน</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
 
-      <div className="p-4 mx-auto w-full max-w-7xl flex flex-col items-start justify-center gap-4">
-        {/* หัวเรื่อง + ปุ่มกลับ */}
-        <div className="w-full flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="flex flex-col items-start justify-center">
-            <div className="text-[24px] font-semibold text-black">
-              ตรวจสอบการชำระเงิน
-            </div>
-            <div className="text-[14px] font-medium text-muted-foreground">
-              บัตรและเสื้อ / คิวรอตรวจ {pendingCount} คำสั่งซื้อ
-            </div>
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="text-2xl font-semibold tracking-tight">
+            ตรวจสอบการชำระเงิน
           </div>
-          <Button asChild variant="outline" className="rounded-[10px]">
-            <Link href={`/admin/${slug}/tickets`}>
-              <ArrowLeft />
-              กลับไปคิวรายการ
-            </Link>
-          </Button>
         </div>
 
-        {/* ค้นหา + สถานะ + รายการถัดไป */}
-        <div className="w-full flex flex-col gap-3 md:flex-row md:items-center">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={keyword}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder="ค้นหารหัสคำสั่งซื้อ หรือชื่อผู้ร่วมงาน"
-              className="h-auto py-3 pl-9 font-light"
-            />
-          </div>
-          {current && <StatusBadge order={current} />}
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             type="button"
             variant="outline"
-            onClick={goNext}
-            disabled={filtered.length <= 1}
-            className="rounded-[10px]"
+            className="min-h-10 cursor-pointer"
+            onClick={loadData}
           >
-            <ChevronRight />
-            รายการถัดไป
+            <RefreshCw className="size-4" />
+            <span>รีเฟรช</span>
+          </Button>
+          <Button asChild variant="outline" className="min-h-10 cursor-pointer">
+            <Link href={`/admin/${slug}/tickets`}>
+              <ArrowLeft className="size-4" />
+              <span>กลับไปหน้าบัตร</span>
+            </Link>
           </Button>
         </div>
-
-        {loading && (
-          <div className="w-full rounded-[10px] border p-10 text-center text-muted-foreground">
-            กำลังโหลดคำสั่งซื้อ...
-          </div>
-        )}
-
-        {error && (
-          <div
-            role="alert"
-            className="w-full rounded-[10px] border border-destructive/30 bg-destructive/5 p-4 text-destructive"
-          >
-            โหลดคำสั่งซื้อไม่สำเร็จ: {error}
-          </div>
-        )}
-
-        {!loading && !error && !current && (
-          <div className="w-full rounded-[10px] border p-10 text-center text-muted-foreground">
-            {keyword
-              ? "ไม่พบคำสั่งซื้อที่ค้นหา"
-              : "บัญชีนี้ยังไม่มีคำสั่งซื้อในงานนี้"}
-          </div>
-        )}
-
-        {current && (
-          <div className="w-full grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-            {/* ซ้าย: หลักฐานการโอน */}
-            <Badge
-              variant={"outline"}
-              className="p-4 flex flex-col items-start justify-start w-full h-auto rounded-[10px] gap-3.5"
-            >
-              <div className="w-full flex flex-col items-start gap-1">
-                <div className="text-lg font-semibold text-black">
-                  หลักฐานการโอนเงิน
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  ThaiQR / โอนผ่านธนาคาร
-                </div>
-              </div>
-
-              <div className="w-full rounded-[10px] border bg-muted/30 p-5 flex flex-col items-center gap-3">
-                {current.slip.paymentSlip ? (
-                  <Image
-                    src={current.slip.paymentSlip}
-                    alt={`หลักฐานการชำระเงิน ${current.code}`}
-                    width={960}
-                    height={720}
-                    unoptimized
-                    className="max-h-96 w-full rounded-md object-contain"
-                  />
-                ) : (
-                  <div className="flex flex-col items-center gap-2 py-8 text-center text-muted-foreground">
-                    <FileCheck className="size-10" />
-                    <div className="font-medium">
-                      {current.slip.hasPaymentSlip
-                        ? "มีสลิปแนบ แต่ API ไม่ส่งรูปหลักฐานกลับมา"
-                        : "ยังไม่มีหลักฐานการชำระเงิน"}
-                    </div>
-                  </div>
-                )}
-                <div className="text-3xl font-semibold tabular-nums">
-                  {current.slip.amount.toLocaleString("th-TH", {
-                    minimumFractionDigits: 2,
-                  })}{" "}
-                  บาท
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  อัปเดตล่าสุด {current.slip.updatedAt}
-                </div>
-                <div className="text-center text-xs text-muted-foreground">
-                  ออเดอร์ {current.code}
-                </div>
-              </div>
-
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full rounded-[10px]"
-                onClick={() => setSlipOpen(true)}
-                disabled={!current.slip.paymentSlip}
-              >
-                <Maximize2 />
-                ขยายหลักฐาน
-              </Button>
-            </Badge>
-
-            {/* ขวา: รายละเอียดคำสั่งซื้อ */}
-            <Badge
-              variant={"outline"}
-              className="p-4 flex flex-col items-start justify-start w-full h-auto rounded-[10px] gap-4"
-            >
-              <div className="w-full flex items-start justify-between gap-2">
-                <div className="flex flex-col items-start gap-1">
-                  <div className="text-lg font-semibold text-black">
-                    คำสั่งซื้อ {current.code}
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    สร้าง {current.createdAt}
-                  </div>
-                </div>
-                <StatusBadge order={current} />
-              </div>
-
-              <div className="w-full flex flex-col gap-2">
-                <InfoRow
-                  label="ผู้ร่วมงาน / อีเมล"
-                  value={`${current.buyerName} / ${current.buyerEmail}`}
-                />
-                <InfoRow
-                  label="ปีการศึกษา / โทรศัพท์"
-                  value={`${current.buyerGradYear ?? "-"} / ${current.buyerPhone ?? "-"}`}
-                />
-              </div>
-
-              {/* รายการสั่งซื้อ */}
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/40 hover:bg-muted/40">
-                    <TableHead className="text-muted-foreground">
-                      รายการ
-                    </TableHead>
-                    <TableHead className="text-right text-muted-foreground">
-                      จำนวน
-                    </TableHead>
-                    <TableHead className="text-right text-muted-foreground">
-                      รวม
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {current.items.map((item, itemIndex) => (
-                    <TableRow key={`${item.name}-${itemIndex}`}>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell className="text-right">
-                        {item.qty} {item.unit}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {money(item.total)} บาท
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-
-              <div className="w-full flex items-center justify-between border-b pb-3">
-                <div className="text-sm text-muted-foreground md:text-[16px]">
-                  ยอดที่ต้องชำระทั้งหมด
-                </div>
-                <div className="text-sm font-semibold tabular-nums md:text-[16px]">
-                  {money(current.total)} บาท
-                </div>
-              </div>
-
-              {/* ผู้เข้าร่วมแยกตามบัตร */}
-              <div className="w-full flex flex-col gap-3">
-                <div className="font-semibold">ผู้เข้าร่วมแยกตามบัตร</div>
-                {current.participants.map((p) => (
-                  <div key={p.id} className="flex flex-col gap-0.5">
-                    <div className="font-semibold">
-                      {p.name}
-                      {p.gradYear ? ` ปีการศึกษา ${p.gradYear}` : ""}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {p.phone ?? "-"} • {p.email ?? "-"} • {p.ticketName}{" "}
-                      {money(p.ticketPrice)} บาท
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* การรับของที่ระลึก */}
-              <div className="w-full flex flex-col gap-2 border-t pt-3">
-                <InfoRow
-                  label="การรับของที่ระลึก"
-                  value={current.shirtDelivery}
-                />
-                <div className="text-sm font-medium">
-                  {current.shirtAddress}
-                </div>
-              </div>
-            </Badge>
-          </div>
-        )}
-
-        {/* dialog ขยายหลักฐาน */}
-        <Dialog open={slipOpen} onOpenChange={setSlipOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>หลักฐานการชำระเงิน</DialogTitle>
-              <DialogDescription>
-                {current ? `ออเดอร์ ${current.code}` : ""}
-              </DialogDescription>
-            </DialogHeader>
-
-            {current?.slip.paymentSlip ? (
-              <div className="w-full flex flex-col items-center gap-3 py-2">
-                <Image
-                  src={current.slip.paymentSlip}
-                  alt={`หลักฐานการชำระเงิน ${current.code}`}
-                  width={960}
-                  height={720}
-                  unoptimized
-                  className="max-h-[70vh] w-full rounded-md object-contain"
-                />
-              </div>
-            ) : (
-              <div className="py-8 text-center text-muted-foreground">
-                API ไม่ได้ส่งรูปหลักฐานกลับมา
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
       </div>
+
+      {/* Filter and Search Bar */}
+      <form onSubmit={handleSearchSubmit} className="w-full">
+        <FieldGroup className="flex flex-col sm:flex-row sm:items-end gap-3 rounded-xl border bg-card p-4 shadow-xs">
+          <Field className="flex-1">
+            <FieldLabel htmlFor="order-search" className="text-sm font-medium">
+              ค้นหาคำสั่งซื้อ
+            </FieldLabel>
+            <InputGroup className="w-full h-10 flex">
+              <InputGroupAddon>
+                <Search className="text-muted-foreground" />
+              </InputGroupAddon>
+              <InputGroupInput
+                id="order-search"
+                value={query}
+                maxLength={100}
+                placeholder="ค้นหาเลขคำสั่งซื้อ, ชื่อผู้ซื้อ หรืออีเมล..."
+                className="text-sm"
+                onChange={(e) => setQuery(e.target.value)}
+              />
+            </InputGroup>
+          </Field>
+
+          <Field className="sm:w-56">
+            <FieldLabel htmlFor="order-status" className="text-sm font-medium">
+              สถานะคำสั่งซื้อ
+            </FieldLabel>
+            <Select
+              value={filter}
+              onValueChange={(val) => {
+                if (filters.includes(val as Filter)) {
+                  setFilter(val as Filter);
+                  setPage(1);
+                }
+              }}
+            >
+              <SelectTrigger id="order-status" className="h-10 w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {filters.map((f) => (
+                  <SelectItem key={f} value={f}>
+                    {filterLabels[f]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+
+          <Button
+            type="submit"
+            variant="secondary"
+            className="h-10 px-5 cursor-pointer shrink-0"
+          >
+            ค้นหา
+          </Button>
+        </FieldGroup>
+      </form>
+
+      {/* แสดงกำลังโหลดหรือเกิดข้อผิดพลาด */}
+      {loading && (
+        <div className="rounded-xl border bg-card p-8 space-y-3">
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-48 w-full" />
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-destructive text-sm">
+          {error}
+        </div>
+      )}
+
+      {/* ตารางแสดงรายการคำสั่งซื้อ */}
+      {!loading && !error && result && (
+        <div className="rounded-xl border bg-card p-4 shadow-xs space-y-4">
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>
+              พบ {result.total.toLocaleString("th-TH")} คำสั่งซื้อ
+              {filter === "review" && " ที่รอตรวจสลิป"}
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-48">เลขคำสั่งซื้อ</TableHead>
+                  <TableHead>ผู้ซื้อ</TableHead>
+                  <TableHead className="w-24 text-right">จำนวนบัตร</TableHead>
+                  <TableHead className="w-32 text-right">ยอดรวม</TableHead>
+                  <TableHead className="w-36">สถานะ</TableHead>
+                  <TableHead className="w-28 text-center">สลิป</TableHead>
+                  <TableHead className="w-28 text-right">
+                    <span className="sr-only">การกระทำ</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+
+              <TableBody>
+                {result.items.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={7}
+                      className="h-32 text-center text-muted-foreground"
+                    >
+                      ไม่พบคำสั่งซื้อในตัวกรองนี้
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  result.items.map((order) => {
+                    const isPendingSlip =
+                      order.status === "PENDING" && order.hasPaymentSlip;
+
+                    return (
+                      <TableRow key={order.id} className="hover:bg-muted/30">
+                        <TableCell>
+                          <p className="font-semibold">{order.orderNo}</p>
+                          <p className="text-xs text-muted-foreground pt-0.5">
+                            {new Date(order.createdAt).toLocaleString("th-TH", {
+                              timeZone: "Asia/Bangkok",
+                              dateStyle: "short",
+                              timeStyle: "short",
+                            })}
+                          </p>
+                        </TableCell>
+
+                        <TableCell>
+                          <p className="font-medium">{order.buyerName}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {order.buyerEmail}
+                          </p>
+                        </TableCell>
+
+                        <TableCell className="text-right tabular-nums">
+                          {order.ticketCount} ใบ
+                        </TableCell>
+
+                        <TableCell className="text-right tabular-nums font-medium">
+                          ฿
+                          {Number(order.total).toLocaleString("th-TH", {
+                            minimumFractionDigits: 2,
+                          })}
+                        </TableCell>
+
+                        <TableCell>
+                          {order.status === "PAID" && (
+                            <Badge
+                              variant="outline"
+                              className="bg-green-50 text-green-700 border-green-300 gap-1 font-normal"
+                            >
+                              <CheckCircle2 className="size-3.5" />
+                              ชำระแล้ว
+                            </Badge>
+                          )}
+                          {order.status === "PENDING" && (
+                            <Badge
+                              variant="outline"
+                              className="bg-amber-50 text-amber-700 border-amber-300 gap-1 font-normal"
+                            >
+                              <Clock className="size-3.5" />
+                              {order.hasPaymentSlip
+                                ? "รอตรวจสลิป"
+                                : "รอชำระเงิน"}
+                            </Badge>
+                          )}
+                          {order.status === "CANCELLED" && (
+                            <Badge
+                              variant="outline"
+                              className="bg-red-50 text-red-700 border-red-300 gap-1 font-normal"
+                            >
+                              <XCircle className="size-3.5" />
+                              ยกเลิกแล้ว
+                            </Badge>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="text-center">
+                          {order.hasPaymentSlip ? (
+                            <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium">
+                              <FileCheck className="size-4" />
+                              มีสลิป
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              -
+                            </span>
+                          )}
+                        </TableCell>
+
+                        <TableCell className="text-right">
+                          <Button
+                            type="button"
+                            variant={isPendingSlip ? "brand" : "outline"}
+                            size="sm"
+                            className="min-h-8 cursor-pointer"
+                            onClick={() => setSelectedId(order.id)}
+                          >
+                            {isPendingSlip ? "ตรวจสลิป" : "ดูคำสั่งซื้อ"}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {result.total > 0 && (
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t">
+              <span className="text-sm text-muted-foreground tabular-nums">
+                หน้า {page} จาก{" "}
+                {Math.max(1, Math.ceil(result.total / result.pageSize))}
+              </span>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage(page - 1)}
+                  className="cursor-pointer"
+                >
+                  ก่อนหน้า
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page * result.pageSize >= result.total}
+                  onClick={() => setPage(page + 1)}
+                  className="cursor-pointer"
+                >
+                  ถัดไป
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Dialog ตรวจสอบและจัดการคำสั่งซื้อ */}
+      {event && (
+        <OrderReviewDialog
+          eventId={event.id}
+          orderId={selectedId}
+          onClose={() => setSelectedId(null)}
+          onUpdated={() => {
+            loadData();
+          }}
+          onNavigatePrev={handleNavigatePrev}
+          onNavigateNext={handleNavigateNext}
+          hasPrev={hasPrev}
+          hasNext={hasNext}
+        />
+      )}
     </div>
   );
 }
