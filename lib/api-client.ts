@@ -9,6 +9,11 @@ import type {
     EventSummary,
     EventTicketInput,
     EventTicketItem,
+    FaqCategoryAdminItem,
+    FaqCategoryInput,
+    FaqCategoryItem,
+    FaqQuestionAdminItem,
+    FaqQuestionInput,
     OrderDetail,
     OverviewReport,
     ProductInput,
@@ -20,6 +25,8 @@ import type {
     TicketItem,
     User as Profile,
     UserInput,
+    UpdateFaqCategoryInput,
+    UpdateFaqQuestionInput,
     WalletDetail,
     WalletHistoryItem,
     WalletTransactionInput,
@@ -59,6 +66,10 @@ function withStoreId(path: string, storeId?: string) {
 
 
 export const api = {
+    faq: {
+        /** อ่านเฉพาะหมวดและคำถามที่เผยแพร่แล้ว ไม่ต้องเข้าสู่ระบบ */
+        list: () => request<FaqCategoryItem[]>("/api/faq"),
+    },
     me: {
         /**
          * อ่านโปรไฟล์ของบัญชีที่ล็อกอินอยู่
@@ -325,6 +336,22 @@ export const api = {
     },
 
     admin: {
+        /** ทุกเมธอดต้องใช้บัญชี ADMIN ระดับระบบ */
+        faq: {
+            list: () => request<FaqCategoryAdminItem[]>("/api/admin/faq"),
+            categories: {
+                get: (id: string) => request<FaqCategoryAdminItem>(`/api/admin/faq/categories/${encodeURIComponent(id)}`),
+                create: (input: FaqCategoryInput) => request<FaqCategoryAdminItem>("/api/admin/faq/categories", "POST", input),
+                update: (id: string, input: UpdateFaqCategoryInput) => request<FaqCategoryAdminItem>(`/api/admin/faq/categories/${encodeURIComponent(id)}`, "PATCH", input),
+                delete: (id: string) => request<{ id: string }>(`/api/admin/faq/categories/${encodeURIComponent(id)}`, "DELETE"),
+            },
+            questions: {
+                get: (id: string) => request<FaqQuestionAdminItem>(`/api/admin/faq/questions/${encodeURIComponent(id)}`),
+                create: (input: FaqQuestionInput) => request<FaqQuestionAdminItem>("/api/admin/faq/questions", "POST", input),
+                update: (id: string, input: UpdateFaqQuestionInput) => request<FaqQuestionAdminItem>(`/api/admin/faq/questions/${encodeURIComponent(id)}`, "PATCH", input),
+                delete: (id: string) => request<{ id: string }>(`/api/admin/faq/questions/${encodeURIComponent(id)}`, "DELETE"),
+            },
+        },
         users: {
             /**
              * ดูผู้ใช้ทั้งหมด ต้องมีสิทธิ์จัดการบทบาท
