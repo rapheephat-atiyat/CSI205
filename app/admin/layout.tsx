@@ -1,16 +1,24 @@
 import { Suspense } from "react";
-import AdminNav from "@/components/admin/AdminNav";
-import TopBar from "@/components/admin/TopBar";
-
+import { redirect } from "next/navigation";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
+import { requirePageUser } from "@/server/auth/page-user";
+import SuperAdminTopbar from "@/components/admin/SuperAdminTopbar";
+import OnlyOnPath from "@/components/admin/OnlyOnPath";
 
-export default function AdminLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const user = await requirePageUser("/admin");
+  const isAdmin = user.userRoles.some((r) => r.role === "ADMIN");
+
+  if (!isAdmin) {
+    redirect("/");
+  }
+
   return (
     <Suspense
       fallback={
@@ -21,9 +29,10 @@ export default function AdminLayout({
     >
       <TooltipProvider>
         <SidebarProvider defaultOpen={false}>
-          <AdminNav />
           <main className="bg-[#F5F5F5] w-full">
-            <TopBar />
+            <OnlyOnPath path="/admin">
+              <SuperAdminTopbar />
+            </OnlyOnPath>
             {children}
           </main>
         </SidebarProvider>
