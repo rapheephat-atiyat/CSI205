@@ -6,21 +6,12 @@ import { getEventBySlug, isEventSelling } from "@/server/services/event.service"
 import { releaseExpiredOrderHolds } from "@/server/services/order.service";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { Suspense } from "react";
 
 type Props = {
     params: Promise<{ slug: string }>;
 };
 
-export default function BookPage({ params }: Props) {
-    return (
-        <Suspense fallback={<div>เดี่ยวมาทำ</div>}>
-            <LoadBookingEvent params={params} />
-        </Suspense>
-    );
-}
-
-async function LoadBookingEvent({ params }: Props) {
+export default async function BookPage({ params }: Props) {
     const { slug } = await params;
     await connection();
     const bookingUrl = `/e/${encodeURIComponent(slug)}/book`;
