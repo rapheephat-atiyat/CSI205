@@ -85,8 +85,8 @@ export function Step5Payment({ order, event, paymentQr }: {
         const Icon = isPaid ? CheckCircle2 : isCancelled ? XCircle : Clock3;
         return (
             <BookLayout step={5} event={event}>
-                <BookCard title={isPaid ? "ชำระเงินสำเร็จ" : isCancelled ? "คำสั่งซื้อถูกยกเลิก" : "ส่งหลักฐานแล้ว รอตรวจสอบ"} className="mx-auto max-w-2xl">
-                    <span className="flex size-12 items-center justify-center rounded-full bg-brand-soft text-brand"><Icon aria-hidden="true" className="size-6" /></span>
+                <BookCard title={isPaid ? "ชำระเงินสำเร็จ" : isCancelled ? "คำสั่งซื้อถูกยกเลิก" : "ส่งหลักฐานแล้ว รอตรวจสอบ"} className="mx-auto max-w-2xl text-center">
+                    <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-yellow-200 text-yellow-600"><Icon aria-hidden="true" className="size-6" /></span>
                     <p className="text-sm text-muted-foreground">{isPaid ? "เปิด QR บัตรของคุณเพื่อใช้เช็กอินที่หน้างาน" : isCancelled ? "ดูรายละเอียดรายการนี้ได้จากประวัติคำสั่งซื้อ" : "ระบบได้รับสลิปแล้ว คุณติดตามผลได้จากประวัติคำสั่งซื้อ"}</p>
                     <dl className="space-y-3 rounded-lg border p-4 text-sm">
                         <div className="space-y-1"><dt className="text-muted-foreground">เลขคำสั่งซื้อ</dt><dd className="font-medium wrap-anywhere">{order.orderNo}</dd></div>
