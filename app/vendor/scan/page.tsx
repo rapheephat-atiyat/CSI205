@@ -1,5 +1,6 @@
-"use client";
 import { ScannerBox, PaymentSummary } from "./components";
+
+export const instant = false;
 
 export default function VendorQRScannerPage() {
   return (
