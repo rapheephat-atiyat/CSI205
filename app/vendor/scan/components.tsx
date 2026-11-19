@@ -87,45 +87,67 @@ export function ScannerBox() {
       try {
         const { Html5Qrcode } = await import("html5-qrcode");
         if (requestId !== cameraRequestRef.current) return;
-        const devices = await Html5Qrcode.getCameras();
-        if (requestId !== cameraRequestRef.current) return;
-        if (!devices || devices.length === 0) {
-          setCameraError(
-            "ไม่พบอุปกรณ์กล้องบนเครื่องนี้ — กรุณากรอกรหัส QR ในช่องด้านล่างแทน"
-          );
-          setIsCameraOpen(false);
-          return;
-        }
-
-        const backCamera = devices.find(
-          (d) =>
-            d.label.toLowerCase().includes("back") ||
-            d.label.toLowerCase().includes("environment")
-        );
-        const cameraId = backCamera ? backCamera.id : devices[0].id;
-
         const html5QrCode = new Html5Qrcode("vendor-qr-reader");
         scannerRef.current = html5QrCode;
 
-        await html5QrCode.start(
-          cameraId,
-          {
-            fps: 10,
-            qrbox: { width: 240, height: 240 },
-          },
-          (decodedText) => {
-            stopCamera();
-            processScannedCode(decodedText);
-          },
-          () => {}
-        );
+        const qrConfig = {
+          fps: 10,
+          qrbox: { width: 240, height: 240 },
+        };
+
+        const onScanSuccess = (decodedText: string) => {
+          stopCamera();
+          processScannedCode(decodedText);
+        };
+
+        try {
+          // บังคับเรียกใช้กล้องหลัง (environment) เป็นอันดับแรก
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            qrConfig,
+            onScanSuccess,
+            () => {}
+          );
+        } catch {
+          if (requestId !== cameraRequestRef.current) return;
+          // กรณีอุปกรณ์ไม่รองรับ facingMode (เช่น PC บางรุ่น) ให้ดึงรายการกล้องมาเลือกสำรอง
+          const devices = await Html5Qrcode.getCameras();
+          if (requestId !== cameraRequestRef.current) return;
+          if (!devices || devices.length === 0) {
+            throw new Error("NotFoundError");
+          }
+
+          const backCamera = devices.find((d) => {
+            const label = d.label.toLowerCase();
+            return (
+              label.includes("back") ||
+              label.includes("rear") ||
+              label.includes("environment") ||
+              label.includes("หลัง")
+            );
+          });
+
+          // บนมือถือถ้าหาชื่อไม่เจอ กล้องหลังมักจะอยู่ตัวสุดท้ายของลิสต์ (devices[devices.length - 1])
+          const fallbackCameraId = backCamera
+            ? backCamera.id
+            : devices[devices.length - 1].id;
+
+          await html5QrCode.start(
+            fallbackCameraId,
+            qrConfig,
+            onScanSuccess,
+            () => {}
+          );
+        }
         if (requestId !== cameraRequestRef.current) {
-          await html5QrCode.stop();
-          html5QrCode.clear();
+          await html5QrCode.stop().catch(() => {});
+          if (scannerRef.current === html5QrCode) {
+            html5QrCode.clear();
+            scannerRef.current = null;
+          }
         }
       } catch (err) {
         if (requestId !== cameraRequestRef.current) return;
-        console.error("Camera start error:", err);
         const rawMsg =
           err instanceof Error ? `${err.name}: ${err.message}` : String(err);
 
@@ -133,7 +155,10 @@ export function ScannerBox() {
           setCameraError(
             "ยังไม่ได้รับสิทธิ์เปิดกล้อง — กรุณากดอนุญาตกล้องบนเบราว์เซอร์ หรือกรอกรหัส QR ด้านล่างแทน"
           );
-        } else if (rawMsg.includes("NotFoundError")) {
+        } else if (
+          rawMsg.includes("NotFoundError") ||
+          rawMsg.includes("Requested device not found")
+        ) {
           setCameraError(
             "ไม่พบกล้องบนอุปกรณ์นี้ — กรุณากรอกรหัส QR ในช่องด้านล่างแทน"
           );
