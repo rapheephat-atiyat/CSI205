@@ -1,8 +1,10 @@
 "use client";
+
 import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 
 // icon
-import { SearchIcon, ChevronDown, CircleCheck, CircleDot } from "lucide-react";
+import { SearchIcon, ChevronDown } from "lucide-react";
 
 // import ui
 import { Badge } from "@/components/ui/badge";
@@ -24,6 +26,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
@@ -33,7 +36,6 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import {
   Pagination,
   PaginationContent,
-  PaginationEllipsis,
   PaginationItem,
   PaginationLink,
   PaginationNext,
@@ -42,120 +44,103 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
-// data
-type Attendee = {
-  id: string;
-  name: string;
-  email: string;
-  enrollYear: number;
-  ticketStatus: "pending" | "paid" | "rejected";
-  checkInStatus: "not_checked_in" | "checked_in";
-  role: UserRoleName;
+import { api } from "@/lib/api-client";
+import type { EventDetail, User, UserRoleAssignment } from "@/lib/api-types";
+import type { Permission } from "@/lib/permissions";
+
+// สิทธิ์เริ่มต้นของแต่ละบทบาทที่กำหนดจากหน้านี้
+const DEFAULT_PERMISSIONS: Record<"ADMIN" | "STAFF", Permission[]> = {
+  ADMIN: [],
+  STAFF: ["ticket.scan"] as Permission[],
 };
 
-type UserRoleName = "ADMIN" | "VENDOR" | "STAFF" | "USER";
+const itemsPerPage = 5;
 
-export const attendees: Attendee[] = [
-  {
-    id: "att-001",
-    name: "กิตติพงษ์ ใจดี",
-    email: "kitti@example.com",
-    enrollYear: 2548,
-    ticketStatus: "pending",
-    checkInStatus: "not_checked_in",
-    role: "USER",
-  },
-  {
-    id: "att-002",
-    name: "สุพัตรา รักเรียน",
-    email: "supatra@example.com",
-    enrollYear: 2548,
-    ticketStatus: "paid",
-    checkInStatus: "checked_in",
-    role: "STAFF",
-  },
-  {
-    id: "att-003",
-    name: "ธนากร มั่นคง",
-    email: "thanakorn@example.com",
-    enrollYear: 2548,
-    ticketStatus: "paid",
-    checkInStatus: "not_checked_in",
-    role: "USER",
-  },
-  {
-    id: "att-004",
-    name: "นภัสสร แสงทอง",
-    email: "napassorn@example.com",
-    enrollYear: 2549,
-    ticketStatus: "rejected",
-    checkInStatus: "not_checked_in",
-    role: "VENDOR",
-  },
-  {
-    id: "att-005",
-    name: "วีรภัทร พงษ์ไพบูลย์",
-    email: "weeraphat@example.com",
-    enrollYear: 2547,
-    ticketStatus: "pending",
-    checkInStatus: "checked_in",
-    role: "ADMIN",
-  },
-];
+export default function Page() {
+  const { slug } = useParams<{ slug: string }>();
 
-export default function Page({ slug }: { slug: string }) {
-  const [enrollYear, setEnrollYear] = useState<string>("");
-  const [checkInStatus, setCheckInStatus] = useState<string>("");
-  const [search, setSearch] = useState<string>("");
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = attendees.filter((p) => {
-    const searchLower = search.toLowerCase();
-    return (
-      (p.name.startsWith(searchLower.trim()) ||
-        p.email.toLowerCase().startsWith(searchLower.trim())) &&
-      (enrollYear === "" || p.enrollYear === Number(enrollYear)) &&
-      (checkInStatus === "" || p.checkInStatus === checkInStatus)
-    );
-  });
-  const itemsPerPage = 5;
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
+  const [search, setSearch] = useState("");
+  const [year, setYear] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    async function load() {
+      const eventRes = await api.events.get(slug);
+      if (!eventRes.success) {
+        setError(eventRes.error.message);
+        setLoading(false);
+        return;
+      }
+      setEvent(eventRes.data);
+
+      const usersRes = await api.admin.users.list();
+      if (usersRes.success) setUsers(usersRes.data);
+      else setError(usersRes.error.message);
+      setLoading(false);
+    }
+    load();
+  }, [slug]);
+
+  // กรองหน้ากลับไปหน้า 1 เมื่อเปลี่ยนตัวกรอง
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, year]);
+
+  // ปีที่สำเร็จการศึกษา (พ.ศ.) จากข้อมูลจริง
+  function yearOf(u: User) {
+    return u.graduationAt ? new Date(u.graduationAt).getFullYear() + 543 : null;
+  }
+  const years = Array.from(
+    new Set(users.map(yearOf).filter((y): y is number => y !== null)),
+  ).sort((a, b) => b - a);
+
+  // บทบาทที่เกี่ยวกับงานนี้ (ผูกกับงานนี้ หรือเป็นบทบาทระดับระบบ)
+  function rolesInEvent(u: User): UserRoleAssignment[] {
+    if (!event) return [];
+    return u.roles.filter((r) => r.eventId === null || r.eventId === event.id);
+  }
+
+  async function handleAssign(user: User, role: "ADMIN" | "STAFF") {
+    if (!event) return;
+    if (rolesInEvent(user).some((r) => r.role === role))
+      return alert(`${user.name} มีบทบาท ${role} ในงานนี้แล้ว`);
+
+    const res = await api.admin.users.assignRole(user.id, {
+      role,
+      eventId: event.id,
+      permissions: DEFAULT_PERMISSIONS[role],
+    });
+    if (!res.success) return alert(res.error.message);
+    setUsers((pre) => pre.map((u) => (u.id === user.id ? res.data : u)));
+  }
+
+  // ---------- UI ---------- //
+  if (loading) return <div className="p-4">กำลังโหลด...</div>;
+  if (error && users.length === 0) return <div className="p-4">{error}</div>;
+
+  const keyword = search.trim().toLowerCase();
+  const filtered = users.filter(
+    (u) =>
+      (u.name.toLowerCase().includes(keyword) ||
+        u.email.toLowerCase().includes(keyword)) &&
+      (year === "" || yearOf(u) === Number(year)),
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
   const paged = filtered.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
-
-  const [userRoles, setUserRoles] = useState<Attendee[]>(attendees);
-  function handleUpdateRole(id: string, role: UserRoleName) {
-    setUserRoles((pre) => {
-      return pre.map((user) => {
-        if (user.id === id) {
-          return { ...user, role };
-        }
-        return user;
-      });
-    });
-  }
 
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -164,11 +149,13 @@ export default function Page({ slug }: { slug: string }) {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}`}>
+                {event?.title ?? "ภาพรวมงาน"}
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>ผู้ใช้และสิทธ์</BreadcrumbPage>
+              <BreadcrumbPage>ผู้ใช้และสิทธิ์</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -191,14 +178,13 @@ export default function Page({ slug }: { slug: string }) {
             variant={"outline"}
             className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5"
           >
-            {/* หัวเรื่อง */}
             <div className="w-full flex flex-col items-start justify-center">
               <div className="text-lg font-semibold text-black">
-                ผู้ลงทะเบียนและสิทธิ์บัญชีผู้ดูแล
+                ผู้ลงทะเบียนและสิทธิ์บัญชีผู้ดูแล ({filtered.length})
               </div>
             </div>
 
-            {/* form */}
+            {/* filter */}
             <div className="flex w-full flex-col items-start justify-center gap-1">
               <FieldGroup className="flex lg:flex-row">
                 <Field className="lg:flex-2">
@@ -210,6 +196,7 @@ export default function Page({ slug }: { slug: string }) {
                   </FieldLabel>
                   <InputGroup className="w-full h-auto flex p-2">
                     <InputGroupInput
+                      id="input-user"
                       placeholder="ค้นหาชื่อ หรืออีเมล"
                       className="text-sm"
                       value={search}
@@ -218,19 +205,12 @@ export default function Page({ slug }: { slug: string }) {
                     <InputGroupAddon>
                       <SearchIcon className="text-muted-foreground" />
                     </InputGroupAddon>
-                    <InputGroupAddon
-                      align="inline-end"
-                      className="hidden lg:flex"
-                    ></InputGroupAddon>
                   </InputGroup>
                 </Field>
 
                 <Field className="lg:flex-1">
-                  <FieldLabel
-                    htmlFor="enroll-year"
-                    className="text-sm text-muted-foreground"
-                  >
-                    ปีที่เข้าศึกษา
+                  <FieldLabel className="text-sm text-muted-foreground">
+                    ปีที่สำเร็จการศึกษา
                   </FieldLabel>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -238,71 +218,27 @@ export default function Page({ slug }: { slug: string }) {
                         variant="outline"
                         className="p-3 w-full h-auto items-center justify-between"
                       >
-                        ปีที่เข้าศึกษา
+                        {year === "" ? "ทุกปีการศึกษา" : year}
                         <ChevronDown />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent className="min-w-56">
                       <DropdownMenuGroup>
                         <DropdownMenuLabel>
-                          เลือกปีที่เข้าศึกษา
+                          เลือกปีที่สำเร็จการศึกษา
                         </DropdownMenuLabel>
                         <DropdownMenuRadioGroup
-                          value={enrollYear}
-                          onValueChange={setEnrollYear}
+                          value={year}
+                          onValueChange={setYear}
                         >
                           <DropdownMenuRadioItem value="">
                             ทุกปีการศึกษา
                           </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="2549">
-                            2549
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="2548">
-                            2548
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="2547">
-                            2547
-                          </DropdownMenuRadioItem>
-                        </DropdownMenuRadioGroup>
-                      </DropdownMenuGroup>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </Field>
-                <Field className="lg:flex-1">
-                  <FieldLabel
-                    htmlFor="check-in-status"
-                    className="text-sm text-muted-foreground"
-                  >
-                    สถานะเข้างาน
-                  </FieldLabel>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="p-3 w-full h-auto items-center justify-between"
-                      >
-                        เลือกสถานะเข้างาน
-                        <ChevronDown />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent className="min-w-56">
-                      <DropdownMenuGroup>
-                        <DropdownMenuLabel>
-                          เลือกปีที่เข้าศึกษา
-                        </DropdownMenuLabel>
-                        <DropdownMenuRadioGroup
-                          value={checkInStatus}
-                          onValueChange={setCheckInStatus}
-                        >
-                          <DropdownMenuRadioItem value="">
-                            ทั้งหมด
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="checked_in">
-                            เช็คอินแล้ว
-                          </DropdownMenuRadioItem>
-                          <DropdownMenuRadioItem value="not_checked_in">
-                            ยังไม่เช็คอิน
-                          </DropdownMenuRadioItem>
+                          {years.map((y) => (
+                            <DropdownMenuRadioItem key={y} value={String(y)}>
+                              {y}
+                            </DropdownMenuRadioItem>
+                          ))}
                         </DropdownMenuRadioGroup>
                       </DropdownMenuGroup>
                     </DropdownMenuContent>
@@ -311,134 +247,14 @@ export default function Page({ slug }: { slug: string }) {
               </FieldGroup>
             </div>
 
-            {/* show users */}
-            {/* mobile */}
-            <div className="mt-2 w-full flex flex-col items-start justify-start gap-1.5 lg:hidden">
-              {paged.length === 0 ? (
-                <div className="w-full flex flex-col items-center justify-center text-lg font-semibold">
-                  ไม่พบผู้ใช้
-                </div>
-              ) : (
-                paged.map((p) => (
-                  <div
-                    key={p.id}
-                    className="w-full flex flex-col items-start justify-center gap-1"
-                  >
-                    <div className="text-[15px]">{p.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {p.email}
-                    </div>
-                    {p.checkInStatus === "checked_in" ? (
-                      <Badge
-                        variant={"outline"}
-                        className="p-1 bg-green-100 text-green-500 [&>svg]:size-4!"
-                      >
-                        <CircleCheck />
-                        เช็คอินแล้ว
-                      </Badge>
-                    ) : (
-                      <Badge
-                        variant={"outline"}
-                        className="p-1 bg-red-100 text-red-500 [&>svg]:size-4!"
-                      >
-                        <CircleDot />
-                        ยังไม่เช็คอิน
-                      </Badge>
-                    )}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Badge
-                          variant={"outline"}
-                          className="p-3 w-full text-[14px] rounded-[10px] border border-brand hover:bg-brand-hover hover:text-on-brand ease-in cursor-pointer"
-                        >
-                          จัดการสิทธิ์
-                        </Badge>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent className="w-32">
-                        <DropdownMenuGroup>
-                          <DropdownMenuLabel>Role</DropdownMenuLabel>
-                          <DropdownMenuRadioGroup
-                            value={
-                              userRoles.find((user) => user.id === p.id)
-                                ?.role ?? p.role
-                            }
-                            onValueChange={(value) =>
-                              handleUpdateRole(p.id, value as UserRoleName)
-                            }
-                          >
-                            <DropdownMenuRadioItem value="ADMIN">
-                              ADMIN
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="VENDOR">
-                              VENDOR
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="STAFF">
-                              STAFF
-                            </DropdownMenuRadioItem>
-                            <DropdownMenuRadioItem value="USER">
-                              USER
-                            </DropdownMenuRadioItem>
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <div className="my-1 w-full border "></div>
-                  </div>
-                ))
-              )}
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        className={
-                          currentPage === 1
-                            ? "pointer-events-none opacity-50"
-                            : ""
-                        }
-                        onClick={() => setCurrentPage(1)}
-                      />
-                    </PaginationItem>
-
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(
-                      (n) => (
-                        <PaginationItem key={n}>
-                          <PaginationLink
-                            href="#"
-                            isActive={n === currentPage}
-                            onClick={() => setCurrentPage(n)}
-                          >
-                            {n}
-                          </PaginationLink>
-                        </PaginationItem>
-                      ),
-                    )}
-
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        className={
-                          currentPage === totalPages
-                            ? "pointer-events-none opacity-50"
-                            : ""
-                        }
-                        onClick={() => setCurrentPage(totalPages)}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
-              )}
-            </div>
-            {/* desktop */}
-            <div className="hidden mt-2 w-full lg:flex flex-col items-start justify-start gap-1.5">
+            {/* table */}
+            <div className="mt-2 w-full overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>ชื่อ</TableHead>
-                    <TableHead>สถานะ</TableHead>
+                    <TableHead>บทบาทในงานนี้</TableHead>
+                    <TableHead>สถานะบัญชี</TableHead>
                     <TableHead className="text-center">จัดการ</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -446,88 +262,141 @@ export default function Page({ slug }: { slug: string }) {
                   {paged.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={3}
-                        className="text-center text-xl text-muted-foreground"
+                        colSpan={4}
+                        className="h-24 text-center text-muted-foreground"
                       >
                         ไม่พบผู้ใช้
                       </TableCell>
                     </TableRow>
                   ) : (
-                    paged.map((p) => (
-                      <TableRow key={p.id}>
-                        <TableCell className="text-lg font-medium">
-                          {p.name}
-                          <span className="block font-light text-muted-foreground">
-                            {p.email}
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          {p.checkInStatus === "checked_in" ? (
-                            <Badge
-                              variant={"outline"}
-                              className="p-1 bg-green-100 text-green-500 [&>svg]:size-4!"
-                            >
-                              <CircleCheck />
-                              เช็คอินแล้ว
-                            </Badge>
-                          ) : (
-                            <Badge
-                              variant={"outline"}
-                              className="p-1 bg-red-100 text-red-500 [&>svg]:size-4!"
-                            >
-                              <CircleDot />
-                              ยังไม่เช็คอิน
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
+                    paged.map((u) => {
+                      const roles = rolesInEvent(u);
+                      return (
+                        <TableRow key={u.id}>
+                          <TableCell className="text-lg font-medium">
+                            {u.name}
+                            <span className="block text-sm font-light text-muted-foreground">
+                              {u.email}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {roles.length === 0 ? (
+                                <Badge variant="outline">USER</Badge>
+                              ) : (
+                                roles.map((r) => (
+                                  <Badge key={r.id} variant="outline">
+                                    {r.role}
+                                  </Badge>
+                                ))
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {u.status === "ACTIVE" ? (
                               <Badge
-                                variant={"outline"}
-                                className="p-3 w-fit text-[14px] rounded-[10px] border border-brand hover:bg-brand-hover hover:text-on-brand ease-in cursor-pointer"
+                                variant="outline"
+                                className="bg-green-100 text-green-600"
                               >
-                                จัดการสิทธิ์
+                                ใช้งานได้
                               </Badge>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-32">
-                              <DropdownMenuGroup>
-                                <DropdownMenuLabel>Role</DropdownMenuLabel>
-                                <DropdownMenuRadioGroup
-                                  value={
-                                    userRoles.find((user) => user.id === p.id)
-                                      ?.role ?? p.role
-                                  }
-                                  onValueChange={(value) =>
-                                    handleUpdateRole(
-                                      p.id,
-                                      value as UserRoleName,
-                                    )
-                                  }
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="bg-red-100 text-red-500"
+                              >
+                                ถูกระงับ
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Badge
+                                  variant={"outline"}
+                                  className="p-3 w-fit text-[14px] rounded-[10px] border border-brand hover:bg-brand-hover hover:text-on-brand ease-in cursor-pointer"
                                 >
-                                  <DropdownMenuRadioItem value="ADMIN">
-                                    ADMIN
-                                  </DropdownMenuRadioItem>
-                                  <DropdownMenuRadioItem value="VENDOR">
-                                    VENDOR
-                                  </DropdownMenuRadioItem>
-                                  <DropdownMenuRadioItem value="STAFF">
-                                    STAFF
-                                  </DropdownMenuRadioItem>
-                                  <DropdownMenuRadioItem value="USER">
-                                    USER
-                                  </DropdownMenuRadioItem>
-                                </DropdownMenuRadioGroup>
-                              </DropdownMenuGroup>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
+                                  เพิ่มสิทธิ์
+                                </Badge>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent className="w-44">
+                                <DropdownMenuLabel>
+                                  เพิ่มบทบาทในงานนี้
+                                </DropdownMenuLabel>
+                                <DropdownMenuItem
+                                  onClick={() => handleAssign(u, "ADMIN")}
+                                >
+                                  ADMIN
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => handleAssign(u, "STAFF")}
+                                >
+                                  STAFF (สแกนบัตร)
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
                   )}
                 </TableBody>
               </Table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <Pagination>
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      className={
+                        currentPage === 1
+                          ? "pointer-events-none opacity-50"
+                          : ""
+                      }
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage((p) => Math.max(1, p - 1));
+                      }}
+                    />
+                  </PaginationItem>
+
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (n) => (
+                      <PaginationItem key={n}>
+                        <PaginationLink
+                          href="#"
+                          isActive={n === currentPage}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setCurrentPage(n);
+                          }}
+                        >
+                          {n}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ),
+                  )}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      className={
+                        currentPage === totalPages
+                          ? "pointer-events-none opacity-50"
+                          : ""
+                      }
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setCurrentPage((p) => Math.min(totalPages, p + 1));
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            )}
           </Badge>
         </div>
       </div>

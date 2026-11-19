@@ -36,21 +36,14 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api-client";
-import { EventDetail } from "@/lib/api-types";
+import { EventDetail, OverviewReport } from "@/lib/api-types";
 
-type stats = {
+type Stat = {
   icon: LucideIcon;
   label: string;
   value: string;
   unit: string;
 };
-
-const stats: stats[] = [
-  { icon: Users, label: "ลงทะเบียน", value: "1,248", unit: "คน" },
-  { icon: ScanLine, label: "เช็คอิน", value: "1,248", unit: "คน" },
-  { icon: Ticket, label: "ยอดบัตรที่อนุมัติแล้ว", value: "1,248", unit: "คน" },
-  { icon: Coins, label: "เติม Token หน้างาน", value: "1,248", unit: "คน" },
-];
 
 export type Vendor = {
   id: number;
@@ -112,10 +105,22 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+
+  // overview report
+  const [report, setReport] = useState<OverviewReport | null>(null);
+  useEffect(() => {
+    async function loadReport() {
+      const res = await api.admin.reports.overview();
+      if (res.success) setReport(res.data);
+      else setError(res.error.message);
+    }
+    loadReport();
+  }, [slug]);
   const styles = {
     text: "text-muted-foreground text-sm font-light",
   };
 
+  // effect to load event details
   useEffect(() => {
     async function load() {
       const res = await api.events.get(`${slug}`);
@@ -126,7 +131,40 @@ export default function AdminDashboardPage() {
     load();
   }, [slug]);
 
-  const [progress, setProgress] = useState(71.3);
+  useEffect(() => {
+    console.log(report);
+  }, [report]);
+  let progress = report
+    ? (report.totalCheckedIn / report.totalTicketsSold) * 100
+    : 0;
+
+  const stats: Stat[] = [
+    {
+      icon: Users,
+      label: "จำนวนบัตรที่ถูกจอง",
+      value: (report?.totalTicketsSold ?? 0).toLocaleString(),
+      unit: "ใบ",
+    },
+    {
+      icon: ScanLine,
+      label: "จำนวนเช็กอิน",
+      value: (report?.totalCheckedIn ?? 0).toLocaleString(),
+      unit: "คน",
+    },
+    {
+      icon: Ticket,
+      label: "ยอดออเดอร์ที่ชำระแล้ว",
+      value: (report?.totalTicketRevenue ?? 0).toLocaleString(),
+      unit: "ออเดอร์",
+    },
+    {
+      icon: Coins,
+      label: "ยอดร้านค้า",
+      value: (report?.totalStoreVolume ?? 0).toLocaleString(),
+      unit: "Token",
+    },
+  ];
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6 lg:scrollbar-none">
       {/* Breadcrumbs */}
@@ -199,7 +237,9 @@ export default function AdminDashboardPage() {
                 "text-2xl font-semibold text-black md:text-3xl lg:text-4xl",
               )}
             >
-              684 / 960 <span className="lg:text-2xl">คน</span>
+              {report?.totalCheckedIn.toLocaleString() ?? 0} /
+              {report?.totalTicketsSold.toLocaleString() ?? 0}
+              <span className="lg:text-2xl">คน</span>
             </div>
             {/* Progress bar */}
             <div className="w-full">

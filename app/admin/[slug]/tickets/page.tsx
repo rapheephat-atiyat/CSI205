@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useParams } from "next/navigation";
 
 // import icons
 import { ClipboardCheck, Pencil, Plus, Trash2 } from "lucide-react";
@@ -16,7 +17,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-
 import {
   Dialog,
   DialogClose,
@@ -25,7 +25,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -35,200 +34,168 @@ import {
   TableBody,
   TableCaption,
   TableCell,
-  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
 
-// data
-// ticket
-type Ticket = {
-  id: string;
-  name: string;
-  price: number;
-  tokenPerTicket: number;
-};
+import { api } from "@/lib/api-client";
+import type {
+  EventDetail,
+  EventSouvenirInput,
+  EventSouvenirItem,
+  EventTicketInput,
+  EventTicketItem,
+} from "@/lib/api-types";
 
-// initial tickets
-const initialTickets: Ticket[] = [
-  {
-    id: "ticket-1",
-    name: "ศิษย์เก่าสัมพันธ์",
-    price: 500,
-    tokenPerTicket: 10,
-  },
-  {
-    id: "ticket-2",
-    name: "ศิษย์เก่าสนับสนุน",
-    price: 1000,
-    tokenPerTicket: 50,
-  },
-];
+export default function Page() {
+  const { slug } = useParams<{ slug: string }>();
 
-// shirt
-type Shirt = {
-  id: string;
-  size: string;
-  chest: number;
-  price: number;
-};
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [tickets, setTickets] = useState<EventTicketItem[]>([]);
+  const [souvenirs, setSouvenirs] = useState<EventSouvenirItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-// draft shirt
-type ShirtDraft = {
-  id: string;
-  size: string;
-  chest: string;
-  price: string;
-};
+  async function load() {
+    const res = await api.events.get(slug);
+    if (!res.success) {
+      setError(res.error.message);
+      setLoading(false);
+      return;
+    }
+    setEvent(res.data);
 
-// initial shirts
-const initialShirts: Shirt[] = [
-  { id: "shirt-s", size: "S", chest: 36, price: 300 },
-  { id: "shirt-m", size: "M", chest: 38, price: 300 },
-  { id: "shirt-l", size: "L", chest: 40, price: 300 },
-  { id: "shirt-xl", size: "XL", chest: 42, price: 300 },
-];
+    const [t, s] = await Promise.all([
+      api.events.tickets.list(res.data.id),
+      api.events.souvenirs.list(res.data.id),
+    ]);
+    if (t.success) setTickets(t.data);
+    else setError(t.error.message);
+    if (s.success) setSouvenirs(s.data);
+    else setError(s.error.message);
+    setLoading(false);
+  }
 
-export default function Page( { slug }: { slug: string }) {
+  useEffect(() => {
+    load();
+  }, [slug]);
+
   // ---------- ticket ---------- //
-  // dialog add ticket
-  const [addOpen, setAddOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newPrice, setNewPrice] = useState("");
-  const [newToken, setNewToken] = useState("");
+  const [ticketOpen, setTicketOpen] = useState(false);
+  const [editingTicket, setEditingTicket] = useState<EventTicketItem | null>(
+    null,
+  );
+  const [tName, setTName] = useState("");
+  const [tPrice, setTPrice] = useState("");
+  const [tQuota, setTQuota] = useState("");
+  const [tActive, setTActive] = useState(true);
 
-  function openAddTicket() {
-    setNewName("");
-    setNewPrice("");
-    setNewToken("");
-    setAddOpen(true);
+  function openTicket(ticket?: EventTicketItem) {
+    setEditingTicket(ticket ?? null);
+    setTName(ticket?.name ?? "");
+    setTPrice(ticket ? String(Number(ticket.price)) : "");
+    setTQuota(ticket ? String(ticket.quota) : "");
+    setTActive(ticket?.isActive ?? true);
+    setTicketOpen(true);
   }
 
-  function handleAddTicket(e: React.FormEvent<HTMLFormElement>) {
+  async function handleSaveTicket(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (!event) return;
 
-    const newTicket: Ticket = {
-      id: crypto.randomUUID(),
-      name: newName.trim(),
-      price: Number(newPrice),
-      tokenPerTicket: Number(newToken),
+    const input: EventTicketInput = {
+      name: tName.trim(),
+      price: Number(tPrice).toFixed(2),
+      quota: Number(tQuota),
+      isActive: tActive,
     };
 
-    setTickets(() => [...tickets, newTicket]);
-    setAddOpen(false);
+    const res = editingTicket
+      ? await api.events.tickets.update(event.id, editingTicket.id, input)
+      : await api.events.tickets.create(event.id, input);
+
+    if (!res.success) return alert(res.error.message);
+    setTicketOpen(false);
+    load();
   }
 
-  // dialog edit
-  const [editingTicket, setEditingTicket] = useState<Ticket | null>(null);
-
-  // initial Ticket
-  const [tickets, setTickets] = useState<Ticket[]>(initialTickets);
-
-  // form dialog edit ticket
-  const [draftName, setDraftName] = useState("");
-  const [draftPrice, setDraftPrice] = useState("");
-  const [draftToken, setDraftToken] = useState("");
-
-  function openEditTicket(ticket: Ticket) {
-    setEditingTicket(ticket);
-    setDraftName(ticket.name);
-    setDraftPrice(String(ticket.price));
-    setDraftToken(String(ticket.tokenPerTicket));
+  async function handleDeleteTicket(ticket: EventTicketItem) {
+    if (!event) return;
+    if (!confirm(`ลบบัตร "${ticket.name}" ?`)) return;
+    const res = await api.events.tickets.drop(event.id, ticket.id);
+    if (!res.success) return alert(res.error.message);
+    load();
   }
 
-  // save edit ticket
-  function handleSaveTicket(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  // ---------- souvenir ---------- //
+  const [souvenirOpen, setSouvenirOpen] = useState(false);
+  const [editingSouvenir, setEditingSouvenir] =
+    useState<EventSouvenirItem | null>(null);
+  const [sName, setSName] = useState("");
+  const [sSizes, setSSizes] = useState("");
+  const [sExtraPrice, setSExtraPrice] = useState("");
+  const [sAllowDecline, setSAllowDecline] = useState(true);
+  const [sAllTypes, setSAllTypes] = useState(true);
+  const [sEligible, setSEligible] = useState<string[]>([]);
 
-    const price = Number(draftPrice);
-    const token = Number(draftToken);
-
-    setTickets((pre) => {
-      return pre.map((ticket) => {
-        if (ticket.id === editingTicket?.id) {
-          return {
-            ...ticket,
-            name: draftName.trim(),
-            price,
-            tokenPerTicket: token,
-          };
-        }
-        return ticket;
-      });
-    });
-    setEditingTicket(null);
-  }
-
-  // ---------- shirt ---------- //
-  const [shirts, setShirts] = useState<Shirt[]>(initialShirts);
-
-  // dialog edit shirt
-  const [shirtOpen, setShirtOpen] = useState(false);
-  const [draftShirts, setDraftShirts] = useState<ShirtDraft[]>([]);
-
-  // draft in dailog edit shirt
-  function openEditShirts() {
-    setDraftShirts(
-      shirts.map((s) => ({
-        id: s.id,
-        size: s.size,
-        chest: String(s.chest),
-        price: String(s.price),
-      })),
+  function openSouvenir(souvenir?: EventSouvenirItem) {
+    setEditingSouvenir(souvenir ?? null);
+    setSName(souvenir?.name ?? "");
+    setSSizes((souvenir?.sizes ?? []).join(", "));
+    setSExtraPrice(
+      souvenir?.extraPrice ? String(Number(souvenir.extraPrice)) : "",
     );
-    setShirtOpen(true);
+    setSAllowDecline(souvenir?.allowDecline ?? true);
+    setSAllTypes(souvenir?.allTicketTypes ?? true);
+    setSEligible(souvenir?.eligibleTicketTypeIds ?? []);
+    setSouvenirOpen(true);
   }
 
-  function updateShirt(
-    id: string,
-    field: "size" | "chest" | "price",
-    value: string,
-  ) {
-    setDraftShirts((pre) => {
-      return pre.map((shirt) => {
-        if (shirt.id === id) {
-          return {
-            ...shirt,
-            [field]: value,
-          };
-        }
-        return shirt;
-      });
-    });
+  function toggleEligible(id: string) {
+    setSEligible((pre) =>
+      pre.includes(id) ? pre.filter((x) => x !== id) : [...pre, id],
+    );
   }
 
-  function addDraftShirt() {
-    const newShirt: ShirtDraft = {
-      id: crypto.randomUUID(),
-      size: "",
-      chest: "",
-      price: "",
+  async function handleSaveSouvenir(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!event) return;
+    if (!sAllTypes && sEligible.length === 0)
+      return alert("กรุณาเลือกประเภทบัตรที่รับได้อย่างน้อย 1 ประเภท");
+
+    const input: EventSouvenirInput = {
+      name: sName.trim(),
+      sizes: sSizes
+        .split(",")
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean),
+      extraPrice: sExtraPrice.trim() ? Number(sExtraPrice).toFixed(2) : null,
+      allowDecline: sAllowDecline,
+      allTicketTypes: sAllTypes,
+      eligibleTicketTypeIds: sAllTypes ? [] : sEligible,
     };
-    setDraftShirts((pre) => [...pre, newShirt]);
+
+    const res = editingSouvenir
+      ? await api.events.souvenirs.update(event.id, editingSouvenir.id, input)
+      : await api.events.souvenirs.create(event.id, input);
+
+    if (!res.success) return alert(res.error.message);
+    setSouvenirOpen(false);
+    load();
   }
 
-  function deleteShirt(id: string) {
-    setDraftShirts((pre) => {
-      return pre.filter((shirt) => {
-        return shirt.id !== id;
-      });
-    });
+  async function handleDeleteSouvenir(souvenir: EventSouvenirItem) {
+    if (!event) return;
+    if (!confirm(`ลบ "${souvenir.name}" ?`)) return;
+    const res = await api.events.souvenirs.drop(event.id, souvenir.id);
+    if (!res.success) return alert(res.error.message);
+    load();
   }
 
-  function handleSaveShirt(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setShirts(
-      draftShirts.map((shirt) => ({
-        id: shirt.id,
-        size: shirt.size.trim().toUpperCase(),
-        chest: Number(shirt.chest),
-        price: Number(shirt.price),
-      })),
-    );
-
-    setShirtOpen(false);
-  }
+  // ---------- UI ---------- //
+  if (loading) return <div className="p-4">กำลังโหลด...</div>;
+  if (error && !event) return <div className="p-4">{error}</div>;
 
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -237,11 +204,13 @@ export default function Page( { slug }: { slug: string }) {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}`}>
+                {event?.title ?? "ภาพรวมงาน"}
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
-              <BreadcrumbPage>บัตรและเสื้อ</BreadcrumbPage>
+              <BreadcrumbPage>บัตรและของที่ระลึก</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -251,107 +220,39 @@ export default function Page( { slug }: { slug: string }) {
         {/* หัวเรื่อง */}
         <div className="flex flex-col items-start justify-center">
           <div className="text-[24px] font-semibold text-black">
-            บัตรและเสื้อ
+            บัตรและของที่ระลึก
           </div>
           <div className="text-[14px] font-medium text-muted-foreground">
-            บัตรเข้างานประเภทเดียว เลือกระดับราคาและ Token
-            ที่ได้รับตามที่ผู้ดูแลกำหนด
+            จัดการประเภทบัตร ราคา จำนวน และของที่ระลึกของงาน
           </div>
         </div>
         <div className="w-full flex items-center justify-end">
-          <Link href={"/admin/settings/pricing/payments"}>
+          <Link href={`/admin/${slug}/tickets/payments`}>
             <Badge className="bg-brand text-[14px] p-4 flex items-center justify-center rounded-[10px] hover:bg-brand-hover [&>svg]:size-4! hover:cursor-pointer">
               <ClipboardCheck />
-              ตรวจการชำระเงิน (24)
+              ตรวจการชำระเงิน
             </Badge>
           </Link>
         </div>
 
-        {/* ticket mobile */}
-        <div className="w-full flex flex-col md:hidden">
+        {/* ticket */}
+        <div className="w-full flex flex-col">
           <Badge
             variant={"outline"}
             className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
           >
-            {/* หัวเรื่อง */}
-            <div className="w-full flex flex-col items-start justify-center gap-1">
+            <div className="w-full flex flex-row items-center justify-between">
               <div className="text-lg font-semibold text-black">
                 ระดับราคาบัตรเข้างาน
               </div>
-            </div>
-            <div className="w-full flex items-center justify-end">
               <Badge
-                onClick={openAddTicket}
+                onClick={() => openTicket()}
                 variant={"outline"}
-                className="text-[14px] p-4 flex items-center justify-center rounded-[10px] border border-brand hover:bg-brand-hover hover:text-on-brand hover:font-bold [&>svg]:size-4! transition hover:cursor-pointer"
+                className="w-fit text-[14px] p-4 flex items-center justify-center border border-brand rounded-[10px] text-brand hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
               >
                 <Plus />
                 เพิ่มบัตร
               </Badge>
-            </div>
-            <div className="w-full flex flex-col items-start justify-center p-2 gap-3">
-              {tickets.map((ticket) => {
-                return (
-                  <div
-                    key={ticket.id}
-                    className="w-full flex flex-col items-start justify-center gap-1"
-                  >
-                    <div className="text-[16px] font-semibold md:text-lg">
-                      {ticket.name}
-                    </div>
-                    <div className="w-full flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground md:text-[16px]">
-                        ราคาบัตร
-                      </div>
-                      <div className="text-sm md:text-[16px]">
-                        {ticket.price} บาท
-                      </div>
-                    </div>
-                    <div className="w-full flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground md:text-[16px]">
-                        Token ที่ได้รับ
-                      </div>
-                      <div className="text-sm md:text-[16px]">
-                        {ticket.tokenPerTicket} token / ใบ
-                      </div>
-                    </div>
-                    <Badge
-                      onClick={() => openEditTicket(ticket)}
-                      variant={"outline"}
-                      className="w-full text-[14px] p-4 flex items-center justify-center rounded-[10px] hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
-                    >
-                      <Pencil />
-                      แก้ไขบัตร
-                    </Badge>
-                    <div className="mt-1 w-full border-b border-[#E5E5E5]"></div>
-                  </div>
-                );
-              })}
-            </div>
-          </Badge>
-        </div>
-
-        {/* ticket desktop */}
-        <div className="hidden w-full md:flex flex-col">
-          <Badge
-            variant={"outline"}
-            className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
-          >
-            {/* หัวเรื่อง */}
-            <div className="w-full flex flex-col items-start justify-center gap-1">
-              <div className="w-full flex flex-row items-center justify-between">
-                <div className="text-lg font-semibold text-black">
-                  ระดับราคาบัตรเข้างาน
-                </div>
-                <Badge
-                  onClick={openAddTicket}
-                  variant={"outline"}
-                  className="w-fit text-[14px] p-4 flex items-center justify-center border border-brand rounded-[10px] text-brand hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
-                >
-                  <Plus />
-                  เพิ่มบัตร
-                </Badge>
-              </div>
             </div>
             <Table>
               <TableCaption>ระดับราคาบัตรเข้างาน</TableCaption>
@@ -359,7 +260,8 @@ export default function Page( { slug }: { slug: string }) {
                 <TableRow>
                   <TableHead>ประเภทบัตร</TableHead>
                   <TableHead>ราคาบัตร</TableHead>
-                  <TableHead>จำนวน Token</TableHead>
+                  <TableHead>ขายแล้ว / จำนวน</TableHead>
+                  <TableHead>สถานะ</TableHead>
                   <TableHead></TableHead>
                 </TableRow>
               </TableHeader>
@@ -367,54 +269,158 @@ export default function Page( { slug }: { slug: string }) {
                 {tickets.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={4}
+                      colSpan={5}
                       className="h-24 text-center text-muted-foreground"
                     >
                       ยังไม่มีบัตร
                     </TableCell>
                   </TableRow>
                 ) : (
-                  tickets.map((ticket) => {
-                    return (
-                      <TableRow key={ticket.id}>
-                        <TableCell>{ticket.name}</TableCell>
-                        <TableCell>
-                          {ticket.price.toLocaleString("th-TH")} บาท
-                        </TableCell>
-                        <TableCell>
-                          {ticket.tokenPerTicket} token / ใบ
-                        </TableCell>
-                        <TableCell className="flex items-center justify-end">
+                  tickets.map((ticket) => (
+                    <TableRow key={ticket.id}>
+                      <TableCell>{ticket.name}</TableCell>
+                      <TableCell>
+                        {Number(ticket.price).toLocaleString("th-TH")} บาท
+                      </TableCell>
+                      <TableCell>
+                        {ticket.sold} / {ticket.quota}
+                      </TableCell>
+                      <TableCell>
+                        {ticket.isActive ? "เปิดขาย" : "ปิดขาย"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-2">
                           <Badge
-                            onClick={() => openEditTicket(ticket)}
+                            onClick={() => openTicket(ticket)}
                             variant={"outline"}
                             className="w-fit text-[14px] p-4 flex items-center justify-center rounded-[10px] hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
                           >
                             <Pencil />
-                            แก้ไขบัตร
+                            แก้ไข
                           </Badge>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="ลบบัตร"
+                            onClick={() => handleDeleteTicket(ticket)}
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
           </Badge>
         </div>
 
-        {/* dialog edit ticket */}
-        <Dialog
-          open={editingTicket !== null}
-          onOpenChange={(next) => {
-            if (!next) return setEditingTicket(null);
-          }}
-        >
+        {/* souvenir */}
+        <div className="w-full flex flex-col">
+          <Badge
+            variant={"outline"}
+            className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
+          >
+            <div className="w-full flex flex-row items-center justify-between">
+              <div className="text-lg font-semibold text-black">
+                ของที่ระลึก
+              </div>
+              <Badge
+                onClick={() => openSouvenir()}
+                variant={"outline"}
+                className="w-fit text-[14px] p-4 flex items-center justify-center border border-brand rounded-[10px] text-brand hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
+              >
+                <Plus />
+                เพิ่มของที่ระลึก
+              </Badge>
+            </div>
+            <Table>
+              <TableCaption>รายการของที่ระลึก</TableCaption>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>ชื่อ</TableHead>
+                  <TableHead>ไซซ์</TableHead>
+                  <TableHead>ราคาซื้อเพิ่ม</TableHead>
+                  <TableHead>บัตรที่รับได้</TableHead>
+                  <TableHead></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {souvenirs.length === 0 ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={5}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      ยังไม่มีของที่ระลึก
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  souvenirs.map((souvenir) => (
+                    <TableRow key={souvenir.id}>
+                      <TableCell>{souvenir.name}</TableCell>
+                      <TableCell>
+                        {souvenir.sizes.length
+                          ? souvenir.sizes.join(", ")
+                          : "-"}
+                      </TableCell>
+                      <TableCell>
+                        {souvenir.extraPrice
+                          ? `${Number(souvenir.extraPrice).toLocaleString("th-TH")} บาท`
+                          : "ไม่เปิดขายเพิ่ม"}
+                      </TableCell>
+                      <TableCell>
+                        {souvenir.allTicketTypes
+                          ? "ทุกประเภท"
+                          : tickets
+                              .filter((t) =>
+                                souvenir.eligibleTicketTypeIds.includes(t.id),
+                              )
+                              .map((t) => t.name)
+                              .join(", ") || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center justify-end gap-2">
+                          <Badge
+                            onClick={() => openSouvenir(souvenir)}
+                            variant={"outline"}
+                            className="w-fit text-[14px] p-4 flex items-center justify-center rounded-[10px] hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
+                          >
+                            <Pencil />
+                            แก้ไข
+                          </Badge>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="ลบของที่ระลึก"
+                            onClick={() => handleDeleteSouvenir(souvenir)}
+                          >
+                            <Trash2 />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </Badge>
+        </div>
+
+        {/* dialog add / edit ticket */}
+        <Dialog open={ticketOpen} onOpenChange={setTicketOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>แก้ไขบัตร</DialogTitle>
+              <DialogTitle>
+                {editingTicket ? "แก้ไขบัตร" : "เพิ่มบัตร"}
+              </DialogTitle>
               <DialogDescription>
-                แก้ไขข้อมูลของบัตร "{editingTicket?.name}"
+                {editingTicket
+                  ? `แก้ไขข้อมูลของบัตร "${editingTicket.name}"`
+                  : "กรอกข้อมูลบัตรใบใหม่"}
               </DialogDescription>
             </DialogHeader>
 
@@ -424,10 +430,9 @@ export default function Page( { slug }: { slug: string }) {
                   <FieldLabel htmlFor="ticket-name">ชื่อบัตร *</FieldLabel>
                   <Input
                     id="ticket-name"
-                    type="text"
                     required
-                    value={draftName}
-                    onChange={(e) => setDraftName(e.target.value)}
+                    value={tName}
+                    onChange={(e) => setTName(e.target.value)}
                   />
                 </Field>
                 <Field>
@@ -438,24 +443,34 @@ export default function Page( { slug }: { slug: string }) {
                     id="ticket-price"
                     type="number"
                     min="0"
+                    step="0.01"
                     required
-                    value={draftPrice}
-                    onChange={(e) => setDraftPrice(e.target.value)}
+                    value={tPrice}
+                    onChange={(e) => setTPrice(e.target.value)}
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="ticket-token">
-                    Token ที่ได้รับ (ต่อใบ) *
+                  <FieldLabel htmlFor="ticket-quota">
+                    จำนวนบัตรทั้งหมด *
                   </FieldLabel>
                   <Input
-                    id="ticket-token"
+                    id="ticket-quota"
                     type="number"
-                    min="0"
+                    min={editingTicket?.sold ?? 0}
                     required
-                    value={draftToken}
-                    onChange={(e) => setDraftToken(e.target.value)}
+                    value={tQuota}
+                    onChange={(e) => setTQuota(e.target.value)}
                   />
                 </Field>
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4"
+                    checked={tActive}
+                    onChange={(e) => setTActive(e.target.checked)}
+                  />
+                  เปิดขาย
+                </label>
               </FieldGroup>
 
               <DialogFooter className="mt-4">
@@ -472,52 +487,95 @@ export default function Page( { slug }: { slug: string }) {
           </DialogContent>
         </Dialog>
 
-        {/* dialog add ticket */}
-        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+        {/* dialog add / edit souvenir */}
+        <Dialog open={souvenirOpen} onOpenChange={setSouvenirOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle>เพิ่มบัตร</DialogTitle>
-              <DialogDescription>กรอกข้อมูลบัตรใบใหม่</DialogDescription>
+              <DialogTitle>
+                {editingSouvenir ? "แก้ไขของที่ระลึก" : "เพิ่มของที่ระลึก"}
+              </DialogTitle>
+              <DialogDescription>
+                กำหนดไซซ์ ราคาซื้อเพิ่ม และบัตรที่มีสิทธิ์รับ
+              </DialogDescription>
             </DialogHeader>
 
-            <form className="w-full" onSubmit={handleAddTicket}>
+            <form className="w-full" onSubmit={handleSaveSouvenir}>
               <FieldGroup>
                 <Field>
-                  <FieldLabel htmlFor="new-ticket-name">ชื่อบัตร *</FieldLabel>
+                  <FieldLabel htmlFor="souvenir-name">ชื่อ *</FieldLabel>
                   <Input
-                    id="new-ticket-name"
-                    type="text"
+                    id="souvenir-name"
                     required
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder="เสื้อที่ระลึก"
+                    value={sName}
+                    onChange={(e) => setSName(e.target.value)}
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="new-ticket-price">
-                    ราคาบัตร (บาท) *
-                  </FieldLabel>
+                  <FieldLabel htmlFor="souvenir-sizes">ไซซ์</FieldLabel>
                   <Input
-                    id="new-ticket-price"
-                    type="number"
-                    min="0"
-                    required
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(e.target.value)}
+                    id="souvenir-sizes"
+                    placeholder="S, M, L, XL (เว้นว่างถ้าไม่มีไซซ์)"
+                    value={sSizes}
+                    onChange={(e) => setSSizes(e.target.value)}
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="new-ticket-token">
-                    Token ที่ได้รับ (ต่อใบ) *
+                  <FieldLabel htmlFor="souvenir-extra">
+                    ราคาซื้อเพิ่ม (บาท)
                   </FieldLabel>
                   <Input
-                    id="new-ticket-token"
+                    id="souvenir-extra"
                     type="number"
                     min="0"
-                    required
-                    value={newToken}
-                    onChange={(e) => setNewToken(e.target.value)}
+                    step="0.01"
+                    placeholder="เว้นว่างถ้าไม่เปิดขายเพิ่ม"
+                    value={sExtraPrice}
+                    onChange={(e) => setSExtraPrice(e.target.value)}
                   />
                 </Field>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4"
+                    checked={sAllowDecline}
+                    onChange={(e) => setSAllowDecline(e.target.checked)}
+                  />
+                  ผู้จองขอไม่รับได้
+                </label>
+
+                <label className="flex items-center gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4"
+                    checked={sAllTypes}
+                    onChange={(e) => setSAllTypes(e.target.checked)}
+                  />
+                  บัตรทุกประเภทรับได้
+                </label>
+
+                {!sAllTypes && (
+                  <div className="flex flex-col gap-2 rounded-md border p-3">
+                    <div className="text-sm text-muted-foreground">
+                      เลือกประเภทบัตรที่รับได้
+                    </div>
+                    {tickets.map((ticket) => (
+                      <label
+                        key={ticket.id}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <input
+                          type="checkbox"
+                          className="size-4"
+                          checked={sEligible.includes(ticket.id)}
+                          onChange={() => toggleEligible(ticket.id)}
+                        />
+                        {ticket.name}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </FieldGroup>
 
               <DialogFooter className="mt-4">
@@ -527,185 +585,12 @@ export default function Page( { slug }: { slug: string }) {
                   </Button>
                 </DialogClose>
                 <Button type="submit" className="bg-brand hover:bg-brand-hover">
-                  เพิ่มบัตร
+                  บันทึก
                 </Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-
-        {/* shirt */}
-        <div className="w-full flex flex-col">
-          <Badge
-            variant={"outline"}
-            className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-3.5"
-          >
-            {/* หัวเรื่อง */}
-            <div className="w-full flex flex-row items-center justify-between gap-1">
-              <div className="text-lg font-semibold text-black">
-                เสื้อที่ระลึก
-              </div>
-              <div className="flex items-center justify-end">
-                <Badge
-                  onClick={openEditShirts}
-                  variant={"outline"}
-                  className="w-fit text-[14px] p-4 flex items-center justify-center border border-brand rounded-[10px] text-brand hover:bg-brand-hover hover:text-on-brand [&>svg]:size-4! hover:cursor-pointer"
-                >
-                  <Plus />
-                  แก้ไขเสื้อ
-                </Badge>
-              </div>
-            </div>
-
-            {/* render shirts mobile */}
-            <div className="w-full flex flex-col items-start justify-center p-2 gap-3 md:hidden">
-              {shirts.map((shirt) => {
-                return (
-                  <div
-                    key={shirt.id}
-                    className="w-full flex flex-col items-start justify-center gap-1"
-                  >
-                    <div className="text-[16px] font-semibold md:text-lg">
-                      ขนาด {shirt.size}
-                    </div>
-                    <div className="w-full flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground md:text-[16px]">
-                        รอบอก
-                      </div>
-                      <div className="text-sm md:text-[16px]">
-                        {shirt.chest} นิ้ว
-                      </div>
-                    </div>
-                    <div className="w-full flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground md:text-[16px]">
-                        ราคา / ตัว
-                      </div>
-                      <div className="text-sm md:text-[16px]">
-                        {shirt.price} บาท
-                      </div>
-                    </div>
-                    <div className="mt-1 w-full border-b border-[#E5E5E5]"></div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* redder shirts desktop */}
-            <div className="w-full hidden flex-col items-start justify-center p-2 gap-3 md:flex">
-              <Table className="w-full">
-                <TableCaption>รายละเอียดเสื้อ</TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ขนาด</TableHead>
-                    <TableHead>รอบอก</TableHead>
-                    <TableHead>ราคา / ตัว</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shirts.map((shirt) => {
-                    return (
-                      <TableRow key={shirt.id}>
-                        <TableCell>{shirt.size}</TableCell>
-                        <TableCell>{shirt.chest} นิ้ว</TableCell>
-                        <TableCell>{shirt.price} บาท</TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* dialog edit shirts */}
-            <Dialog open={shirtOpen} onOpenChange={setShirtOpen}>
-              <DialogContent className="sm:max-w-lg">
-                <DialogHeader>
-                  <DialogTitle>แก้ไขเสื้อที่ระลึก</DialogTitle>
-                  <DialogDescription>
-                    แก้ไข เพิ่ม หรือลบไซซ์ แล้วกดบันทึกครั้งเดียว
-                  </DialogDescription>
-                </DialogHeader>
-
-                <form className="w-full" onSubmit={handleSaveShirt}>
-                  <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 text-sm text-muted-foreground">
-                    <div>ไซซ์</div>
-                    <div>รอบอก (นิ้ว)</div>
-                    <div>ราคา (บาท)</div>
-                    <div className="w-9" />
-                  </div>
-
-                  <div className="mt-2 flex max-h-[50vh] flex-col gap-2 overflow-y-auto">
-                    {draftShirts.map((shirt) => (
-                      <div
-                        key={shirt.id}
-                        className="grid grid-cols-[1fr_1fr_1fr_auto] items-center gap-2"
-                      >
-                        <Input
-                          value={shirt.size}
-                          onChange={(e) => {
-                            updateShirt(shirt.id, "size", e.target.value);
-                          }}
-                          required
-                          placeholder="M"
-                        />
-                        <Input
-                          value={shirt.chest}
-                          onChange={(e) => {
-                            updateShirt(shirt.id, "chest", e.target.value);
-                          }}
-                          type="number"
-                          min="0"
-                          required
-                        />
-                        <Input
-                          value={shirt.price}
-                          onChange={(e) => {
-                            updateShirt(shirt.id, "price", e.target.value);
-                          }}
-                          type="number"
-                          min="0"
-                          required
-                        />
-                        <Button
-                          onClick={() => deleteShirt(shirt.id)}
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          aria-label="ลบไซซ์"
-                        >
-                          <Trash2 />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-
-                  <Button
-                    onClick={addDraftShirt}
-                    type="button"
-                    variant="outline"
-                    className="mt-3 w-full"
-                  >
-                    <Plus />
-                    เพิ่มไซซ์
-                  </Button>
-
-                  <DialogFooter className="mt-4">
-                    <DialogClose asChild>
-                      <Button type="button" variant="outline">
-                        ยกเลิก
-                      </Button>
-                    </DialogClose>
-                    <Button
-                      type="submit"
-                      className="bg-brand hover:bg-brand-hover"
-                    >
-                      บันทึก
-                    </Button>
-                  </DialogFooter>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </Badge>
-        </div>
       </div>
     </div>
   );

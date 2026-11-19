@@ -1,8 +1,11 @@
 "use client";
-import { cn } from "cn";
+
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
 
 // ui
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,7 +14,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-
 import {
   Table,
   TableBody,
@@ -23,50 +25,182 @@ import {
 } from "@/components/ui/table";
 
 // icon
-import { Download, Equal } from "lucide-react";
+import { Download } from "lucide-react";
 
-// data
-import { vendors, type Vendor } from "@/app/admin/[slug]/page";
-type ReportItem = {
-  id: string;
-  title: string;
-  description: string;
-  total: number;
-  unit: string;
-};
+import { api } from "@/lib/api-client";
+import type {
+  EventDetail,
+  EventTicketItem,
+  OverviewReport,
+  StoreDetail,
+  WalletHistoryItem,
+} from "@/lib/api-types";
 
-export const reports: ReportItem[] = [
-  {
-    id: "report-attendees",
-    title: "รายชื่อผู้เข้าร่วม",
-    description: "ชื่อ • อีเมล • ปีเข้าศึกษา พ.ศ. • เช็กอิน",
-    total: 1248,
-    unit: "คน",
-  },
-  {
-    id: "report-shirt-orders",
-    title: "คำสั่งซื้อเสื้อพร้อมที่อยู่",
-    description: "ขนาด • จำนวน • ผู้รับ • โทรศัพท์ • ที่อยู่จัดส่ง",
-    total: 192,
-    unit: "รายการ",
-  },
-  {
-    id: "report-vendors",
-    title: "รายงานร้านค้า",
-    description: "สินค้าเดียว • จำนวน • Token • บาท • อัตรา",
-    total: 4,
-    unit: "ร้าน",
-  },
-  {
-    id: "report-token-topups",
-    title: "รายการเติม Token",
-    description: "ผู้เติม • บาทรับจริง • Token • สลิป • ผู้ดูแล",
-    total: 138,
-    unit: "รายการ",
-  },
-];
+type Cell = string | number | null | undefined;
 
-export default function Page({ slug }: { slug: string }) {
+// ส่งออก CSV ฝั่งเบราว์เซอร์ (ใส่ BOM ให้ Excel อ่านภาษาไทยถูก)
+function downloadCsv(filename: string, rows: Cell[][]) {
+  const esc = (v: Cell) => {
+    if (v === null || v === undefined) return "";
+    let s = String(v);
+
+    if (typeof v === "string" && /^[=+\-@]/.test(s)) s = `'${s}`;
+    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const csv = "\uFEFF" + rows.map((r) => r.map(esc).join(",")).join("\r\n");
+  const url = URL.createObjectURL(
+    new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+  );
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+const num = (v?: string | number | null) =>
+  v === null || v === undefined ? "-" : Number(v).toLocaleString("th-TH");
+
+export default function Page() {
+  const { slug } = useParams<{ slug: string }>();
+
+  const [event, setEvent] = useState<EventDetail | null>(null);
+  const [tickets, setTickets] = useState<EventTicketItem[]>([]);
+  const [stores, setStores] = useState<
+    { id: string; name: string; detail: StoreDetail | null }[]
+  >([]);
+  const [overview, setOverview] = useState<OverviewReport | null>(null);
+  const [auditLog, setAuditLog] = useState<WalletHistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function load() {
+      const eventRes = await api.events.get(slug);
+      if (!eventRes.success) {
+        setError(eventRes.error.message);
+        setLoading(false);
+        return;
+      }
+      const ev = eventRes.data;
+      setEvent(ev);
+
+      const [ticketsRes, storeRes, overviewRes, auditRes] = await Promise.all([
+        api.events.tickets.list(ev.id),
+        Promise.all(ev.stores.map((s) => api.store.getMy(s.id))),
+        api.admin.reports.overview(),
+        api.admin.reports.auditLog(),
+      ]);
+
+      if (ticketsRes.success) setTickets(ticketsRes.data);
+      setStores(
+        ev.stores.map((s, i) => ({
+          id: s.id,
+          name: s.name,
+          detail: storeRes[i].success ? storeRes[i].data : null,
+        })),
+      );
+      if (overviewRes.success) setOverview(overviewRes.data);
+      if (auditRes.success) setAuditLog(auditRes.data);
+      setLoading(false);
+    }
+    load();
+  }, [slug]);
+
+  if (loading) return <div className="p-4">กำลังโหลด...</div>;
+  if (error || !event) return <div className="p-4">{error ?? "ไม่พบงาน"}</div>;
+
+  const ticketRows = tickets.map((t) => ({
+    id: t.id,
+    name: t.name,
+    price: Number(t.price),
+    sold: t.sold,
+    quota: t.quota,
+    revenue: Number(t.price) * t.sold,
+  }));
+  const totalSold = ticketRows.reduce((s, r) => s + r.sold, 0);
+  const totalRevenue = ticketRows.reduce((s, r) => s + r.revenue, 0);
+
+  // ยอดร้านค้า (ยอดโทเคนคงเหลือในกระเป๋าร้าน)
+  const storeRows = stores.map((s) => ({
+    id: s.id,
+    name: s.name,
+    product: s.detail?.product?.title ?? null,
+    price: s.detail?.product ? Number(s.detail.product.price) : null,
+    balance: s.detail ? Number(s.detail.walletBalance) : null,
+  }));
+  const totalStoreBalance = storeRows.reduce((s, r) => s + (r.balance ?? 0), 0);
+
+  // ---------- ส่งออก ---------- //
+  const exports = [
+    {
+      id: "tickets",
+      title: "ยอดขายบัตร",
+      description: "ประเภทบัตร • ราคา • ขายแล้ว • จำนวนทั้งหมด • รายได้",
+      total: ticketRows.length,
+      unit: "ประเภท",
+      run: () =>
+        downloadCsv(`${slug}-tickets.csv`, [
+          [
+            "ประเภทบัตร",
+            "ราคา (บาท)",
+            "ขายแล้ว",
+            "จำนวนทั้งหมด",
+            "รายได้ (บาท)",
+          ],
+          ...ticketRows.map((r) => [
+            r.name,
+            r.price,
+            r.sold,
+            r.quota,
+            r.revenue,
+          ]),
+        ]),
+    },
+    {
+      id: "stores",
+      title: "รายงานร้านค้า",
+      description: "ร้านค้า • สินค้า • ราคา • ยอด Token คงเหลือ",
+      total: storeRows.length,
+      unit: "ร้าน",
+      run: () =>
+        downloadCsv(`${slug}-stores.csv`, [
+          ["ร้านค้า", "สินค้า", "ราคา (Token)", "ยอด Token คงเหลือ"],
+          ...storeRows.map((r) => [r.name, r.product, r.price, r.balance]),
+        ]),
+    },
+    {
+      id: "audit",
+      title: "ความเคลื่อนไหวกระเป๋า Token",
+      description: "วันเวลา • ประเภท • สถานะ • จำนวน • ก่อน/หลัง • หมายเหตุ",
+      total: auditLog.length,
+      unit: "รายการ",
+      run: () =>
+        downloadCsv(`${slug}-wallet-audit.csv`, [
+          [
+            "วันเวลา",
+            "ประเภท",
+            "สถานะ",
+            "จำนวน",
+            "ก่อน",
+            "หลัง",
+            "อ้างอิง",
+            "หมายเหตุ",
+          ],
+          ...auditLog.map((h) => [
+            h.createdAt,
+            h.type,
+            h.status,
+            h.amount,
+            h.before,
+            h.after,
+            h.ref,
+            h.note,
+          ]),
+        ]),
+    },
+  ];
+
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
       <div className="w-full flex items-center justify-start">
@@ -74,7 +208,9 @@ export default function Page({ slug }: { slug: string }) {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}`}>
+                {event.title}
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>
@@ -94,268 +230,232 @@ export default function Page({ slug }: { slug: string }) {
             Export ข้อมูลสำหรับตรวจสอบและนำไปใช้งานภายนอก
           </div>
         </div>
-        {/* export data */}
+
+        {/* summary */}
+        <div className="w-full grid grid-cols-1 gap-3 md:grid-cols-2">
+          {/* บัตรของงานนี้ */}
+          <Badge
+            variant={"outline"}
+            className="p-4 w-full h-full flex flex-col items-start gap-2 rounded-[10px]"
+          >
+            <div className="flex flex-col items-start gap-0.5">
+              <div className="text-lg font-semibold">บัตรของงานนี้</div>
+              <div className="text-sm font-medium text-muted-foreground">
+                ประมาณจาก ราคา × จำนวนที่ขาย
+              </div>
+            </div>
+            <div className="w-full flex items-center justify-between text-sm">
+              <div className="text-muted-foreground">ขายแล้วทั้งหมด</div>
+              <div>{num(totalSold)} ใบ</div>
+            </div>
+            <div className="w-full border"></div>
+            <div className="w-full flex items-center justify-between text-sm font-semibold">
+              <div>รายได้จากบัตร</div>
+              <div>{num(totalRevenue)} บาท</div>
+            </div>
+          </Badge>
+
+          {/* ร้านค้า */}
+          <Badge
+            variant={"outline"}
+            className="p-4 w-full h-full flex flex-col items-start gap-2 rounded-[10px]"
+          >
+            <div className="flex flex-col items-start gap-0.5">
+              <div className="text-lg font-semibold">ยอด Token ร้านค้า</div>
+              <div className="text-sm font-medium text-muted-foreground">
+                ยอดคงเหลือในกระเป๋าของร้านในงานนี้
+              </div>
+            </div>
+            <div className="w-full flex items-center justify-between text-sm">
+              <div className="text-muted-foreground">จำนวนร้าน</div>
+              <div>{storeRows.length} ร้าน</div>
+            </div>
+            <div className="w-full border"></div>
+            <div className="w-full flex items-center justify-between text-sm font-semibold">
+              <div>Token คงเหลือรวม</div>
+              <div>{num(totalStoreBalance)} Token</div>
+            </div>
+          </Badge>
+        </div>
+
+        {/* overview (ทุกงาน) */}
+        {overview && (
+          <Badge
+            variant={"outline"}
+            className="p-4 w-full flex flex-col items-start gap-2 rounded-[10px]"
+          >
+            <div className="flex flex-col items-start gap-0.5">
+              <div className="text-lg font-semibold">ภาพรวมทั้งระบบ</div>
+              <div className="text-sm font-medium text-muted-foreground">
+                รวมทุกงาน ไม่ได้แยกเฉพาะงานนี้
+              </div>
+            </div>
+            <div className="w-full grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
+              <div>
+                <div className="text-muted-foreground">บัตรที่ถูกจอง</div>
+                <div className="font-semibold">
+                  {num(overview.totalTicketsSold)}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">เช็กอินแล้ว</div>
+                <div className="font-semibold">
+                  {num(overview.totalCheckedIn)}
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">
+                  ยอดออเดอร์ที่ชำระแล้ว
+                </div>
+                <div className="font-semibold">
+                  {num(overview.totalTicketRevenue)} บาท
+                </div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">ยอดร้านค้า</div>
+                <div className="font-semibold">
+                  {num(overview.totalStoreVolume)}
+                </div>
+              </div>
+            </div>
+          </Badge>
+        )}
+
+        {/* ยอดขายบัตรรายประเภท */}
         <Badge
           variant={"outline"}
-          className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5"
+          className="p-4 w-full flex flex-col items-start gap-2 rounded-[10px]"
         >
-          {/* หัวเรื่อง */}
-          <div className="flex flex-col items-start justify-center">
-            <div className="text-[16px] font-semibold text-black">
-              ชุดข้อมูลพร้อมส่งออก
-            </div>
-          </div>
-
-          {/* data */}
-          {/* mobile */}
-          <div className="w-full flex flex-col gap-2 md:hidden">
-            {reports.map((report) => {
-              return (
-                <Badge
-                  key={report.id}
-                  variant={"outline"}
-                  className="p-4 w-full flex flex-col items-start justify-center rounded-[10px] gap-2"
-                >
-                  <div className="text-[15px]">{report.title}</div>
-                  <div className="w-full flex items-center justify-between">
-                    <div className="text-muted-foreground">จำนวน</div>
-                    <div className="font-semibold">
-                      {report.total} {report.unit}
-                    </div>
-                  </div>
-                  <div className="w-full flex items-center justify-around gap-3">
-                    <Badge
-                      variant={"outline"}
-                      className="p-2 w-full flex-1 items-center justify-center text-sm! rounded-[10px] [&>svg]:size-4! gap-1"
-                    >
-                      <Download />
-                      CSV
-                    </Badge>
-                    <Badge
-                      variant={"outline"}
-                      className="p-2 w-full flex-1 items-center justify-center text-sm! rounded-[10px] [&>svg]:size-4! gap-1"
-                    >
-                      <Download />
-                      XLSX
-                    </Badge>
-                  </div>
-                </Badge>
-              );
-            })}
-          </div>
-
-          {/* desktop */}
-          <div className="hidden w-full items-center justify-around gap-3 md:flex">
-            <div className="w-full flex items-start justify-center gap-3">
-              {/* box 1 */}
-              <Badge
-                variant={"outline"}
-                className="p-4 w-full h-full flex-1 flex flex-col gap-2 rounded-[10px]"
-              >
-                <div className="w-full flex flex-col items-start justify-center gap-0.5">
-                  <div className="text-lg font-semibold">
-                    ยอดเงินรับที่ยืนยันแล้ว
-                  </div>
-                  <div className="text-sm font-medium text-muted-foreground">
-                    บัตร, เสื้อ และการเติม Token
-                  </div>
-                </div>
-                <div className="flex w-full flex-col items-start justify-center gap-1">
-                  <div className="w-full flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      บัตรอนุมัติ 960 ใบ
-                    </div>
-                    <div className="text-sm ">660,000 บาท</div>
-                  </div>
-                  <div className="w-full flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      เสื้ออนุมัติ 262 ตัว
-                    </div>
-                    <div className="text-sm ">78,600 บาท</div>
-                  </div>
-                  <div className="w-full flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      เติม Token 138 รายการ
-                    </div>
-                    <div className="text-sm ">34,500 บาท</div>
-                  </div>
-                </div>
-                <div className="w-full border"></div>
-                <div className="w-full flex items-center justify-between">
-                  <div className="text-sm ">เติม Token 138 รายการ</div>
-                  <div className="text-sm ">34,500 บาท</div>
-                </div>
-              </Badge>
-              {/* box 2 */}
-              <Badge
-                variant={"outline"}
-                className="p-4 w-full h-full flex-1 flex flex-col gap-2 rounded-[10px]"
-              >
-                <div className="flex flex-col items-start justify-center gap-0.5">
-                  <div className="text-lg font-semibold">ยอด Token ร้านค้า</div>
-                  <div className="text-sm font-medium text-muted-foreground">
-                    ไม่บวกซ้ำเป็นเงินรับใหม่
-                  </div>
-                </div>
-                <div className="flex w-full flex-col items-start justify-center gap-1">
-                  <div className="w-full flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      Token รวมจากบัตร + เติม
-                    </div>
-                    <div className="text-sm ">27,450 Token</div>
-                  </div>
-                  <div className="w-full flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      ใช้ซื้อสินค้าแล้ว
-                    </div>
-                    <div className="text-sm ">4,860 Token</div>
-                  </div>
-                  <div className="w-full flex items-center justify-between">
-                    <div className="text-sm text-muted-foreground">
-                      Token คงเหลือรวม
-                    </div>
-                    <div className="text-sm ">22,590 Token</div>
-                  </div>
-                </div>
-                <div className="w-full border"></div>
-                <div className="w-full flex items-center justify-between">
-                  <div className="text-sm ">ยอดร้านค้าเทียบบาท</div>
-                  <div className="text-sm ">48,600 บาท</div>
-                </div>
-              </Badge>
-            </div>
-          </div>
-          <Badge
-            variant={"outline"}
-            className="hidden p-4 w-full h-full flex-1 flex-col gap-2 rounded-[10px] md:flex"
-          >
-            <div className="w-full flex flex-col items-start justify-center">
-              <div className="text-lg font-semibold">รายงานยอดขายรายร้าน</div>
-              <div className="text-[14px] font-medium text-muted-foreground">
-                ยอดเทียบบาท = ยอด Token × 10 บาท / Token
-              </div>
-            </div>
-            {/* desktop screen */}
-            <div className="hidden w-full md:flex flex-col">
-              <Table>
-                <TableHeader className="bg-[#FAFAFA]">
-                  <TableRow className="text-[15px]">
-                    <TableHead className="text-muted-foreground font-normal">
-                      ร้านค้า / สินค้า
-                    </TableHead>
-                    <TableHead className="text-muted-foreground font-normal">
-                      ราคา / หน่วย
-                    </TableHead>
-                    <TableHead className="text-muted-foreground font-normal">
-                      จำนวนขาย
-                    </TableHead>
-                    <TableHead className="text-muted-foreground font-normal">
-                      ยอด Token
-                    </TableHead>
-                    <TableHead className="text-muted-foreground font-normal">
-                      เทียบเป็นบาท
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {vendors.map((vendor) => {
-                    return (
-                      <TableRow key={vendor.id}>
-                        <TableCell className="text-[16px] flex items-center justify-start">
-                          {vendor.name} / {vendor.food}
-                          <Badge
-                            variant={"ghost"}
-                            className="h-full my-5"
-                          ></Badge>
-                        </TableCell>
-                        <TableCell className="text-[16px]">
-                          {vendor.price} Token
-                        </TableCell>
-                        <TableCell className="text-[16px]">
-                          {vendor.quantity} {vendor.qtyUnit}
-                        </TableCell>
-                        <TableCell className="text-[16px]">
-                          {vendor.incomeTk} Token
-                        </TableCell>
-                        <TableCell className="text-[16px]">
-                          {vendor.incomeMn} Token
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-              <div className="w-full border-t"></div>
-              <div className="my-4 flex items-center justify-between">
-                <div className="flex items-center justify-center">
-                  <div className="flex items-center justify-center font-semibold text-[18px] gap-2">
-                    <div>รวม {vendors.length} ร้าน</div>
-                    <div className="font-semibold text-[18px]">1,190 หน่วย</div>
-                  </div>
-                </div>
-                <div className="flex items-center justify-between font-semibold text-[18px] gap-2">
-                  <div>4,860 Token</div>
-                  <Equal className="text-brand" />
-                  <div>48,600 Bath</div>
-                </div>
-              </div>
-            </div>
-          </Badge>
-
-          {/* export */}
-          <Badge
-            variant={"outline"}
-            className="hidden p-4 w-full h-full flex-1 flex-col gap-2 rounded-[10px] md:flex"
-          >
-            <Table>
-              <TableCaption>
-                สามารถเลือกได้ว่าจะส่งออกข้อมูลรูปแบบ CSV / XLSX
-              </TableCaption>
-              <TableHeader>
+          <div className="text-lg font-semibold">ยอดขายบัตรรายประเภท</div>
+          <Table>
+            <TableHeader className="bg-[#FAFAFA]">
+              <TableRow>
+                <TableHead>ประเภทบัตร</TableHead>
+                <TableHead>ราคา</TableHead>
+                <TableHead>ขายแล้ว / จำนวน</TableHead>
+                <TableHead className="text-right">รายได้</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {ticketRows.length === 0 ? (
                 <TableRow>
-                  <TableHead>ชุดรายงาน</TableHead>
-                  <TableHead>ข้อมูลสำคัญในไฟล์</TableHead>
-                  <TableHead>จำนวน</TableHead>
-                  <TableHead className="text-center">
-                    รูปแบบ / ดาวน์โหลด
-                  </TableHead>
+                  <TableCell
+                    colSpan={4}
+                    className="h-20 text-center text-muted-foreground"
+                  >
+                    ยังไม่มีบัตร
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {reports.map((r) => {
-                  return (
-                    <TableRow key={r.id}>
-                      <TableCell className="text-[16px] font-medium">
-                        {r.title}
-                      </TableCell>
-                      <TableCell className="text-[14px] font-medium text-muted-foreground">
-                        {r.description}
-                      </TableCell>
-                      <TableCell className="text-right">{r.total}</TableCell>
-                      <TableCell>
-                        <div className="w-full flex items-center justify-center gap-3">
-                          <Badge
-                            variant={"outline"}
-                            className="p-2 w-full flex-1 items-center justify-center text-sm! rounded-[10px] [&>svg]:size-4! gap-1 hover:bg-brand-hover hover:text-on-brand hover:cursor-pointer"
-                          >
-                            <Download />
-                            CSV
-                          </Badge>
-                          <Badge
-                            variant={"outline"}
-                            className="p-2 w-full flex-1 items-center justify-center text-sm! rounded-[10px] [&>svg]:size-4! gap-1 hover:bg-brand-hover hover:text-on-brand hover:cursor-pointer"
-                          >
-                            <Download />
-                            XLSX
-                          </Badge>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </Badge>
+              ) : (
+                ticketRows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>{r.name}</TableCell>
+                    <TableCell>{num(r.price)} บาท</TableCell>
+                    <TableCell>
+                      {r.sold} / {r.quota}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {num(r.revenue)} บาท
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Badge>
+
+        {/* ยอดร้านค้ารายร้าน */}
+        <Badge
+          variant={"outline"}
+          className="p-4 w-full flex flex-col items-start gap-2 rounded-[10px]"
+        >
+          <div className="text-lg font-semibold">รายงานรายร้าน</div>
+          <Table>
+            <TableHeader className="bg-[#FAFAFA]">
+              <TableRow>
+                <TableHead>ร้านค้า / สินค้า</TableHead>
+                <TableHead>ราคา / หน่วย</TableHead>
+                <TableHead className="text-right">ยอด Token คงเหลือ</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {storeRows.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={3}
+                    className="h-20 text-center text-muted-foreground"
+                  >
+                    ยังไม่มีร้านค้า
+                  </TableCell>
+                </TableRow>
+              ) : (
+                storeRows.map((r) => (
+                  <TableRow key={r.id}>
+                    <TableCell>
+                      {r.name}
+                      {r.product ? ` / ${r.product}` : ""}
+                    </TableCell>
+                    <TableCell>
+                      {r.price === null ? "-" : `${num(r.price)} Token`}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {r.balance === null ? "-" : `${num(r.balance)} Token`}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </Badge>
+
+        {/* export */}
+        <Badge
+          variant={"outline"}
+          className="p-4 w-full flex flex-col items-start gap-2 rounded-[10px]"
+        >
+          <div className="text-[16px] font-semibold text-black">
+            ชุดข้อมูลพร้อมส่งออก
+          </div>
+          <Table>
+            <TableCaption>ส่งออกเป็นไฟล์ CSV (เปิดใน Excel ได้)</TableCaption>
+            <TableHeader>
+              <TableRow>
+                <TableHead>ชุดรายงาน</TableHead>
+                <TableHead>ข้อมูลสำคัญในไฟล์</TableHead>
+                <TableHead>จำนวน</TableHead>
+                <TableHead className="text-center">ดาวน์โหลด</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {exports.map((r) => (
+                <TableRow key={r.id}>
+                  <TableCell className="text-[16px] font-medium">
+                    {r.title}
+                  </TableCell>
+                  <TableCell className="text-[14px] font-medium text-muted-foreground">
+                    {r.description}
+                  </TableCell>
+                  <TableCell>
+                    {r.total} {r.unit}
+                  </TableCell>
+                  <TableCell>
+                    <div className="w-full flex items-center justify-center">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="gap-1 hover:bg-brand-hover hover:text-on-brand"
+                        disabled={r.total === 0}
+                        onClick={r.run}
+                      >
+                        <Download />
+                        CSV
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </Badge>
       </div>
     </div>

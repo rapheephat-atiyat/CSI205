@@ -1,11 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-// import icons
+import { useParams } from "next/navigation";
 import { SearchIcon } from "lucide-react";
 
-// import ui
+// UI
 import { Badge } from "@/components/ui/badge";
 import {
   Breadcrumb,
@@ -24,349 +23,291 @@ import {
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Spinner } from "@/components/ui/spinner";
 
-// data
-type AuditLog = {
-  id: string;
-  timestamp: string;
-  action: string;
-  actor: {
-    name: string;
-    role: string;
-  };
-  relatedItem: {
-    label: string;
-    value: string;
-  };
-  changes: {
-    statusChange?: {
-      from: string;
-      to: string;
-    };
-    description?: string;
-    roleChange?: {
-      from: string;
-      to: string;
-    };
-    note?: string;
-  };
-  targetUrl?: string;
+import { WalletHistoryItem } from "@/lib/api-types";
+import { api } from "@/lib/api-client";
+
+// แปลง type เป็นภาษาไทย
+const typeLabel: Record<string, string> = {
+  TOPUP: "เติมเงิน",
+  PURCHASE: "ซื้อสินค้า",
+  REFUND: "คืนเงิน",
 };
-const auditLog: AuditLog[] = [
-  {
-    id: "log-001",
-    timestamp: "28 พ.ย. 69 · 18:35:40",
-    action: "อนุมัติชำระเงิน",
-    actor: {
-      name: "ธนกร รัตนชัย",
-      role: "Super admin",
-    },
-    relatedItem: {
-      label: "รายการที่เกี่ยวข้อง",
-      value: "RE2569-1047",
-    },
-    changes: {
-      statusChange: {
-        from: "รอตรวจ",
-        to: "อนุมัติแล้ว",
-      },
-      description: "ยอดรับ 1,000 บาท",
-    },
-    targetUrl: "/admin/payments/RE2569-1047",
-  },
-  {
-    id: "log-002",
-    timestamp: "28 พ.ย. 69 · 18:22:10",
-    action: "แก้สิทธิ์ผู้ดูแล",
-    actor: {
-      name: "พิมพ์ชนก ศรีสุข",
-      role: "Super admin",
-    },
-    relatedItem: {
-      label: "รายการที่เกี่ยวข้อง",
-      value: "มาลี สุขใจ",
-    },
-    changes: {
-      roleChange: {
-        from: "Vendor admin",
-        to: "คงเดิม",
-      },
-      note: "ผูกร้านครัวศิษย์เก่า",
-    },
-    targetUrl: "/admin/users/malee",
-  },
-  {
-    id: "log-003",
-    timestamp: "27 พ.ย. 69 · 14:10:05",
-    action: "อัปเดตข้อมูลร้านค้า",
-    actor: {
-      name: "สมชาย ใจดี",
-      role: "Admin",
-    },
-    relatedItem: {
-      label: "รายการที่เกี่ยวข้อง",
-      value: "ร้านอาหารอร่อยเหาะ",
-    },
-    changes: {
-      description: "เปลี่ยนเบอร์โทรศัพท์ติดต่อ",
-    },
-    targetUrl: "/admin/vendors/v-003",
-  },
-];
 
-export default function Page({ slug }: { slug: string }) {
-  const [search, setSearch] = useState<string>("");
+const statusLabel: Record<string, string> = {
+  COMPLETED: "สำเร็จ",
+  PENDING: "รอดำเนินการ",
+  REJECTED: "ถูกปฏิเสธ",
+};
+
+const statusColor: Record<string, string> = {
+  COMPLETED: "bg-green-100 text-green-800",
+  PENDING: "bg-yellow-100 text-yellow-800",
+  REJECTED: "bg-red-100 text-red-800",
+};
+
+export default function Page() {
+  const params = useParams();
+  const slug = params.slug as string;
+
+  const [search, setSearch] = useState("");
+  const [logs, setLogs] = useState<WalletHistoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    console.log(search);
-  }, [search]);
+    async function fetchLog() {
+      try {
+        setLoading(true);
+        const res = await api.admin.reports.auditLog();
+        if (res.success) {
+          setLogs(res.data);
+        } else {
+          setError(res.error.message);
+        }
+      } catch (err) {
+        setError("เกิดข้อผิดพลาดในการโหลดข้อมูล");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchLog();
+  }, []);
+
+  // Filter
+  const filteredLogs = logs.filter((log) => {
+    const q = search.toLowerCase();
+    return (
+      log.note?.toLowerCase().startsWith(q) ||
+      log.type.toLowerCase().startsWith(q) ||
+      log.ref?.toLowerCase().startsWith(q) ||
+      typeLabel[log.type]?.startsWith(search)
+    );
+  });
+
+  // จัดรูปแบบวันที่
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleString("th-TH", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  // จัดรูปแบบเงิน
+  const formatMoney = (value: string) => {
+    return Number(value).toLocaleString("th-TH", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
 
   return (
-    <>
-      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
-        <div className="w-full flex items-center justify-start">
-          {/* Breadcrumbs */}
-          <Breadcrumb>
-            <BreadcrumbList>
-              <BreadcrumbItem>
-                <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
-              </BreadcrumbItem>
-              <BreadcrumbSeparator />
-              <BreadcrumbItem>
-                <BreadcrumbPage>ประวัติการแก้ไข</BreadcrumbPage>
-              </BreadcrumbItem>
-            </BreadcrumbList>
-          </Breadcrumb>
+    <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+      {/* Breadcrumbs */}
+      <div className="w-full flex items-center justify-start">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>ประวัติ Wallet</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </div>
+
+      <div className="p-4 mx-auto w-full max-w-7xl flex flex-col items-start justify-center gap-4">
+        {/* หัวเรื่อง */}
+        <div className="flex flex-col items-start justify-center">
+          <div className="text-[24px] font-semibold text-black">
+            ประวัติ Wallet
+          </div>
+          <div className="text-[14px] font-medium text-muted-foreground">
+            รายการเติมเงิน / ซื้อสินค้า / คืนเงิน ทั้งหมด
+          </div>
         </div>
 
-        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col items-start justify-center gap-4">
-          {/* หัวเรื่อง */}
-          <div className="flex flex-col items-start justify-center">
-            <div className="text-[24px] font-semibold text-black">
-              ประวัติการแก้ไข
-            </div>
-            <div className="text-[14px] font-medium text-muted-foreground">
-              ตรวจสอบว่าใคร เปลี่ยนอะไร และเมื่อใด
-            </div>
+        {/* Container */}
+        <Badge
+          variant="outline"
+          className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5"
+        >
+          {/* Search */}
+          <div className="flex w-full flex-col items-start justify-center gap-1">
+            <FieldGroup className="flex lg:flex-row w-full">
+              <Field className="lg:flex-2 w-full">
+                <FieldLabel
+                  htmlFor="search-wallet-history"
+                  className="text-sm text-muted-foreground"
+                >
+                  ค้นหา
+                </FieldLabel>
+                <InputGroup className="w-full h-auto flex p-2">
+                  <InputGroupInput
+                    placeholder="ค้นหาหมายเหตุ, ประเภท, เลขที่อ้างอิง..."
+                    className="text-sm"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                  <InputGroupAddon>
+                    <SearchIcon className="text-muted-foreground" />
+                  </InputGroupAddon>
+                </InputGroup>
+              </Field>
+            </FieldGroup>
           </div>
 
-          {/*container*/}
+          {/* Content */}
           <Badge
-            variant={"outline"}
-            className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5"
+            variant="outline"
+            className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5 mt-2"
           >
-            {/* search box */}
-            <div className="flex w-full flex-col items-start justify-center">
-              <div className="flex w-full flex-col items-start justify-center gap-1">
-                <FieldGroup className="flex lg:flex-row">
-                  <Field className="lg:flex-2">
-                    <FieldLabel
-                      htmlFor="search-audit-log"
-                      className="text-sm text-muted-foreground"
+            {loading ? (
+              <div className="w-full flex justify-center py-12">
+                <Spinner className="size-8 text-brand" />
+              </div>
+            ) : error ? (
+              <div className="w-full text-center py-8 text-red-600">
+                {error}
+              </div>
+            ) : filteredLogs.length === 0 ? (
+              <div className="w-full text-center py-8 text-muted-foreground">
+                ไม่พบรายการ
+              </div>
+            ) : (
+              <>
+                {/* ===== Mobile View ===== */}
+                <div className="flex w-full flex-col gap-3 md:hidden">
+                  {filteredLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="flex flex-col gap-2 p-4 rounded-lg border bg-white"
                     >
-                      ค้นหา
-                    </FieldLabel>
-                    <InputGroup className="w-full h-auto flex p-2">
-                      <InputGroupInput
-                        placeholder="ค้นชื่อผู้แก้ไข"
-                        className="text-sm"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                      />
-                      <InputGroupAddon>
-                        <SearchIcon className="text-muted-foreground" />
-                      </InputGroupAddon>
-                      <InputGroupAddon
-                        align="inline-end"
-                        className="hidden lg:flex"
-                      ></InputGroupAddon>
-                    </InputGroup>
-                  </Field>
-                </FieldGroup>
-              </div>
-            </div>
-
-            {/*show audit log*/}
-            <Badge
-              variant={"outline"}
-              className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5"
-            >
-              {/* mobile */}
-              <div className="flex w-full flex-col items-start justify-center gap-1 md:hidden">
-                {auditLog
-                  .filter((log) => {
-                    return (
-                      log.actor.name.startsWith(search) ||
-                      log.relatedItem.value.startsWith(search)
-                    );
-                  })
-                  .map((log) => {
-                    return (
-                      <div
-                        key={log.id}
-                        className="flex w-full flex-col items-start justify-center gap-1 p-4 rounded-lg"
-                      >
+                      <div className="flex justify-between items-start">
                         <div className="text-xs text-muted-foreground">
-                          {log.timestamp}
+                          {formatDate(log.createdAt)}
                         </div>
-                        <div className="text-base font-semibold">
-                          {log.action}
-                        </div>
-                        <div className="text-sm text-muted-foreground">
-                          {log.actor.name} / {log.actor.role}
-                        </div>
-                        <div className="w-full flex items-center justify-between text-sm py-1">
-                          <span>{log.relatedItem.label}</span>
-                          <span className="font-medium">
-                            {log.relatedItem.value}
-                          </span>
-                        </div>
-
-                        {/* ส่วน Before -> After และรายละเอียดการเปลี่ยนแปลง */}
-                        <Badge
-                          variant={"outline"}
-                          className="p-3 w-full rounded-[8px] flex flex-col items-start gap-1 bg-muted/30"
+                        <span
+                          className={`text-xs px-2 py-0.5 rounded-full ${statusColor[log.status]}`}
                         >
-                          <div className="text-xs text-muted-foreground">
-                            ก่อน → หลัง
-                          </div>
-
-                          {/* กรณีมีการเปลี่ยนสถานะ */}
-                          {log.changes.statusChange && (
-                            <div className="text-sm font-medium">
-                              {log.changes.statusChange.from} →{" "}
-                              {log.changes.statusChange.to}
-                            </div>
-                          )}
-
-                          {/* กรณีมีการเปลี่ยนสิทธิ์ */}
-                          {log.changes.roleChange && (
-                            <div className="text-sm font-medium">
-                              {log.changes.roleChange.from} →{" "}
-                              {log.changes.roleChange.to}
-                            </div>
-                          )}
-
-                          {/* กรณีมีข้อความอธิบายเพิ่มเติม หรือ Note */}
-                          {log.changes.description && (
-                            <div className="text-sm">
-                              {log.changes.description}
-                            </div>
-                          )}
-                          {log.changes.note && (
-                            <div className="text-sm">{log.changes.note}</div>
-                          )}
-                        </Badge>
-                        <div className="mt-4 w-full border border-muted-foreground/70"></div>
+                          {statusLabel[log.status] || log.status}
+                        </span>
                       </div>
-                    );
-                  })}
-              </div>
-              {/* desktop */}
-              <div className="hidden w-full flex-col items-start justify-center gap-1 md:flex">
-                <Table>
-                  <TableHeader className="bg-[#FAFAFA]">
-                    <TableRow className="text-[15px]">
-                      <TableHead className="text-muted-foreground font-normal">
-                        วันเวลา
-                      </TableHead>
-                      <TableHead className="text-muted-foreground font-normal">
-                        ผู้กระทำ / บทบาท
-                      </TableHead>
-                      <TableHead className="text-muted-foreground font-normal">
-                        การกระทำ
-                      </TableHead>
-                      <TableHead className="text-muted-foreground font-normal">
-                        รายการที่เกี่ยวข้อง
-                      </TableHead>
-                      <TableHead className="text-muted-foreground font-normal">
-                        ก่อน → หลัง
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
 
-                  <TableBody>
-                    {auditLog
-                      .filter((log) => {
-                        return (
-                          log.actor.name.startsWith(search) ||
-                          log.relatedItem.value.startsWith(search)
-                        );
-                      })
-                      .map((log) => (
+                      <div className="font-semibold text-base">
+                        {typeLabel[log.type] || log.type}
+                      </div>
+
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">จำนวน: </span>
+                        <span className="font-medium">
+                          {formatMoney(log.amount)} บาท
+                        </span>
+                      </div>
+
+                      <div className="text-sm">
+                        <span className="text-muted-foreground">
+                          ก่อน → หลัง:{" "}
+                        </span>
+                        <span className="font-medium">
+                          {formatMoney(log.before)} → {formatMoney(log.after)}
+                        </span>
+                      </div>
+
+                      {log.note && (
+                        <div className="text-sm text-muted-foreground">
+                          {log.note}
+                        </div>
+                      )}
+
+                      <div className="text-xs text-muted-foreground mt-1">
+                        Ref: {log.ref}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ===== Desktop View ===== */}
+                <div className="hidden w-full md:block">
+                  <Table>
+                    <TableHeader className="bg-[#FAFAFA]">
+                      <TableRow className="text-[15px]">
+                        <TableHead className="text-muted-foreground font-normal">
+                          วันเวลา
+                        </TableHead>
+                        <TableHead className="text-muted-foreground font-normal">
+                          ประเภท
+                        </TableHead>
+                        <TableHead className="text-muted-foreground font-normal">
+                          สถานะ
+                        </TableHead>
+                        <TableHead className="text-muted-foreground font-normal text-right">
+                          จำนวนเงิน
+                        </TableHead>
+                        <TableHead className="text-muted-foreground font-normal">
+                          ก่อน → หลัง
+                        </TableHead>
+                        <TableHead className="text-muted-foreground font-normal">
+                          หมายเหตุ
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {filteredLogs.map((log) => (
                         <TableRow key={log.id} className="text-sm">
-                          {/* วันเวลา */}
                           <TableCell className="text-muted-foreground whitespace-nowrap">
-                            {log.timestamp}
+                            {formatDate(log.createdAt)}
                           </TableCell>
 
-                          {/* ผู้กระทำ / บทบาท */}
+                          <TableCell className="font-medium">
+                            {typeLabel[log.type] || log.type}
+                          </TableCell>
+
                           <TableCell>
-                            <div className="font-medium text-foreground">
-                              {log.actor.name}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                              {log.actor.role}
-                            </div>
+                            <span
+                              className={`text-xs px-2 py-0.5 rounded-full ${statusColor[log.status]}`}
+                            >
+                              {statusLabel[log.status] || log.status}
+                            </span>
                           </TableCell>
 
-                          {/* การกระทำ */}
-                          <TableCell className="font-medium text-foreground">
-                            {log.action}
+                          <TableCell className="text-right font-medium">
+                            {formatMoney(log.amount)}
                           </TableCell>
 
-                          {/* รายการที่เกี่ยวข้อง */}
-                          <TableCell>
-                            <div className="text-xs text-muted-foreground">
-                              {log.relatedItem.label}
-                            </div>
-                            <div className="font-medium">
-                              {log.relatedItem.value}
-                            </div>
+                          <TableCell className="text-xs">
+                            {formatMoney(log.before)} → {formatMoney(log.after)}
                           </TableCell>
 
-                          {/* ก่อน → หลัง */}
-                          <TableCell>
-                            <div className="flex flex-col gap-0.5 text-xs">
-                              {log.changes.statusChange && (
-                                <span className="font-medium">
-                                  {log.changes.statusChange.from} →{" "}
-                                  {log.changes.statusChange.to}
-                                </span>
-                              )}
-                              {log.changes.roleChange && (
-                                <span className="font-medium">
-                                  {log.changes.roleChange.from} →{" "}
-                                  {log.changes.roleChange.to}
-                                </span>
-                              )}
-                              {log.changes.description && (
-                                <span className="text-muted-foreground">
-                                  {log.changes.description}
-                                </span>
-                              )}
-                              {log.changes.note && (
-                                <span className="text-muted-foreground">
-                                  {log.changes.note}
-                                </span>
-                              )}
+                          <TableCell className="max-w-[280px]">
+                            <div className="truncate">{log.note || "-"}</div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              {log.ref}
                             </div>
                           </TableCell>
                         </TableRow>
                       ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </Badge>
+                    </TableBody>
+                  </Table>
+                </div>
+              </>
+            )}
           </Badge>
-        </div>
+        </Badge>
       </div>
-    </>
+    </div>
   );
 }

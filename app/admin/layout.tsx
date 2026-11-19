@@ -10,6 +10,8 @@ import { Lock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 
+export const instant = false;
+
 export default async function AdminLayout({
   children,
 }: {

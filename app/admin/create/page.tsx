@@ -46,6 +46,7 @@ import { useRouter } from "next/navigation";
 import { addDays } from "date-fns";
 import { EventInput } from "@/lib/api-types";
 import { api } from "@/lib/api-client";
+import { RichTextEditor } from "@/components/admin/RichTextEditor";
 
 function formatDate(d?: Date) {
   if (!d) return "";
@@ -239,19 +240,13 @@ export default function EventDetailForm() {
                     </Field>
 
                     {/* รายละเอียดงาน */}
-                    <Field>
-                      <FieldLabel
-                        htmlFor="event-description"
-                        className="text-[16px]"
-                      >
+                    <Field className="col-span-2">
+                      <FieldLabel className="text-[16px]">
                         รายละเอียดงาน *
                       </FieldLabel>
-                      <Textarea
-                        id="event-description"
-                        placeholder="รายละเอียดเกี่ยวกับงาน"
+                      <RichTextEditor
                         value={description}
-                        onChange={(e) => setDescription(e.target.value)}
-                        className="py-3 w-full h-auto min-h-30 font-light"
+                        onChange={setDescription}
                       />
                     </Field>
 
@@ -647,7 +642,7 @@ export default function EventDetailForm() {
               <Button
                 type="submit"
                 variant={"brand"}
-                className="p-3 flex-1"
+                className="p-3 flex-1 cursor-pointer"
                 disabled={submitting}
               >
                 {submitting ? "กำลังสร้าง..." : "สร้างงาน"}
