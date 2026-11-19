@@ -1,17 +1,7 @@
 "use client";
 
-import Image from "next/image";
-
 // import ui
 import { Badge } from "@/components/ui/badge";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
 import { Eye, Plus } from "lucide-react";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -63,6 +53,14 @@ export default function Page() {
     load();
   }, []);
 
+  const filteredEvents = events.filter((event) => {
+    const searchLower = search.toLowerCase();
+    return (
+      event.title.toLowerCase().startsWith(searchLower.trim()) ||
+      event.venue.toLowerCase().startsWith(searchLower.trim())
+    );
+  });
+
   return (
     <div className="p-4 mx-auto w-full flex flex-col items-center justify-start">
       {/* container */}
@@ -70,9 +68,6 @@ export default function Page() {
         {/* หัวเรื่อง */}
         <div className="flex flex-col items-start justify-center">
           <div className="text-[24px] font-semibold text-black">จัดการงาน</div>
-          <div className="text-[14px] font-medium text-muted-foreground">
-            ดูรายละเอียดและแก้ไข
-          </div>
         </div>
 
         {/* search event */}
@@ -141,48 +136,54 @@ export default function Page() {
                 </TableHeader>
                 <TableBody className="w-full">
                   {loading ? (
-                    <TableRow className="">
-                      <TableCell colSpan={4}>
+                    <TableRow>
+                      <TableCell colSpan={3}>
                         <div className="flex items-center justify-center py-4">
                           <Spinner className="size-8 text-brand" />
                         </div>
                       </TableCell>
                     </TableRow>
+                  ) : error ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={3}
+                        className="py-6 text-center text-destructive"
+                      >
+                        {error}
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredEvents.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={3}
+                        className="py-6 text-center text-muted-foreground"
+                      >
+                        ไม่พบรายการงานที่ค้นหา
+                      </TableCell>
+                    </TableRow>
                   ) : (
-                    events
-                      .filter((event) => {
-                        const searchLower = search.toLowerCase();
-                        return (
-                          event.title
-                            .toLowerCase()
-                            .startsWith(searchLower.trim()) ||
-                          event.venue
-                            .toLowerCase()
-                            .startsWith(searchLower.trim())
-                        );
-                      })
-                      .map((event) => (
-                        <TableRow key={event.id}>
-                          <TableCell className="w-auto min-w-80 text-[16px] overflow-hidden">
-                            {event.title}
-                          </TableCell>
-                          <TableCell className="w-auto text-[16px]">
-                            {event.venue}
-                          </TableCell>
-                          <TableCell className="w-30 text-right ">
-                            <Badge
-                              asChild
-                              variant={"outline"}
-                              className="p-3 mt-1 text-sm flex gap-1.5 items-center justify-center rounded-[10px] hover:cursor-pointer [&>svg]:size-4! hover:border-brand hover:text-brand! ease-in-out"
-                            >
-                              <Link href={`/admin/${event.slug}`}>
-                                <Eye />
-                                ดูรายละเอียด
-                              </Link>
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                    filteredEvents.map((event) => (
+                      <TableRow key={event.id}>
+                        <TableCell className="w-auto min-w-80 text-[16px] overflow-hidden">
+                          {event.title}
+                        </TableCell>
+                        <TableCell className="w-auto text-[16px]">
+                          {event.venue}
+                        </TableCell>
+                        <TableCell className="w-30 text-right">
+                          <Badge
+                            asChild
+                            variant="outline"
+                            className="p-3 mt-1 text-sm flex gap-1.5 items-center justify-center rounded-[10px] hover:cursor-pointer [&>svg]:size-4! hover:border-brand hover:text-brand! ease-in-out"
+                          >
+                            <Link href={`/admin/${event.slug}`}>
+                              <Eye />
+                              ดูรายละเอียด
+                            </Link>
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
                   )}
                 </TableBody>
               </Table>
