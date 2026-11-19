@@ -90,12 +90,12 @@ export function VendorDashboardClient() {
           </div>
         </div>
 
-        <Badge
+        {/* <Badge
           className="hover:cursor-pointer rounded-3xl p-5 bg-brand text-white text-sm"
           variant="secondary"
         >
           แสกนจ่ายสินค้า
-        </Badge>
+        </Badge> */}
       </div>
 
       {/* การ์ดสรุป 3 ใบ */}

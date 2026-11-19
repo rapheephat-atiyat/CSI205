@@ -1,8 +1,9 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, ChevronDown, ChevronRight, Store } from "lucide-react";
+import { ArrowLeft, ChevronRight, Store } from "lucide-react";
 import type { StoreDetail } from "@/lib/api-types";
 
 export interface VendorStore {
@@ -80,6 +81,7 @@ export function VendorStoreProvider({
     router.push("/vendor");
   };
 
+  // เคลียร์ร้านที่เลือกเพื่อให้กลับมาหน้า StoreSelectionGate (เลือกร้านค้า)
   const clearStore = () => {
     setSelectedStore(null);
     sessionStorage.removeItem("active_vendor_store_id");
@@ -121,16 +123,13 @@ function StoreSelectionGate({
           <ChevronRight className="size-3.5 text-slate-400" />
         </div>
 
-        {/* <div className="flex items-center gap-4">
-          <span>21 ต.ค. 2569</span>
-          <button type="button" className="text-slate-500 hover:text-slate-800">
-            <Bell className="size-4" />
-          </button>
-          <div className="flex items-center gap-1 font-semibold text-slate-800 cursor-pointer">
-            <span>TH</span>
-            <ChevronDown className="size-3.5" />
-          </div>
-        </div> */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-black hover:text-white bg-brand hover:bg-brand/90 border border-slate-200/80 px-3 py-1.5 rounded-lg transition-colors"
+        >
+          <ArrowLeft className="size-3.5" />
+          กลับหน้าหลัก
+        </Link>
       </header>
 
       {/* พื้นที่เนื้อหาหลัก */}
