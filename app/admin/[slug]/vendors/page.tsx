@@ -380,7 +380,7 @@ export default function Page() {
               type="button"
               variant="outline"
               onClick={openCreate}
-              className="h-auto p-3 border-brand text-brand hover:bg-brand hover:text-on-brand font-semibold text-[16px] rounded-[10px] gap-1.5 [&>svg]:size-5!"
+              className="h-auto p-3 border-brand text-brand hover:bg-brand hover:text-on-brand font-semibold text-[16px] rounded-[10px] gap-1.5 [&>svg]:size-5! cursor-pointer"
             >
               <Plus />
               สร้างร้านค้า
@@ -439,7 +439,7 @@ export default function Page() {
             <Field className="lg:flex-1">
               <FieldLabel
                 htmlFor="sort-vendor"
-                className="text-sm text-muted-foreground"
+                className="text-sm text-muted-foreground "
               >
                 เรียงตาม
               </FieldLabel>
@@ -447,7 +447,7 @@ export default function Page() {
                 id="sort-vendor"
                 value={sortKey}
                 onChange={(e) => setSortKey(e.target.value as SortKey)}
-                className={`${selectClass} h-12`}
+                className={`${selectClass} h-12 cursor-pointer`}
               >
                 <option value="name">ชื่อร้าน (ก-ฮ)</option>
                 <option value="income-desc">รายได้ มาก → น้อย</option>
@@ -532,6 +532,7 @@ export default function Page() {
                               variant="outline"
                               disabled={Boolean(usersError)}
                               onClick={() => openAssignVendor(vendor)}
+                              className="cursor-pointer"
                             >
                               <Plus />
                               เพิ่ม Vendor

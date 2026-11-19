@@ -319,10 +319,10 @@ export default function PaymentsPage() {
                         </TableCell>
 
                         <TableCell>
-                          <p className="font-medium">{order.buyerName}</p>
-                          <p className="text-xs text-muted-foreground">
+                          <div className="font-medium">{order.buyerName}</div>
+                          <div className="text-xs text-muted-foreground">
                             {order.buyerEmail}
-                          </p>
+                          </div>
                         </TableCell>
 
                         <TableCell className="text-right tabular-nums">
@@ -340,7 +340,7 @@ export default function PaymentsPage() {
                           {order.status === "PAID" && (
                             <Badge
                               variant="outline"
-                              className="bg-green-50 text-green-700 border-green-300 gap-1 font-normal"
+                              className="flex items-center justify-center bg-green-50 text-green-700 border-green-300 gap-1 font-normal"
                             >
                               <CheckCircle2 className="size-3.5" />
                               ชำระแล้ว
@@ -349,7 +349,7 @@ export default function PaymentsPage() {
                           {order.status === "PENDING" && (
                             <Badge
                               variant="outline"
-                              className="bg-amber-50 text-amber-700 border-amber-300 gap-1 font-normal"
+                              className="flex items-center justify-center bg-amber-50 text-amber-700 border-amber-300 gap-1 font-normal"
                             >
                               <Clock className="size-3.5" />
                               {order.hasPaymentSlip
@@ -360,7 +360,7 @@ export default function PaymentsPage() {
                           {order.status === "CANCELLED" && (
                             <Badge
                               variant="outline"
-                              className="bg-red-50 text-red-700 border-red-300 gap-1 font-normal"
+                              className="flex items-center justify-center bg-red-50 text-red-700 border-red-300 gap-1 font-normal"
                             >
                               <XCircle className="size-3.5" />
                               ยกเลิกแล้ว

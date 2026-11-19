@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api-client";
-import { EventDetail } from "@/lib/api-types";
+import type { EventDetail, EventOverviewReport } from "@/lib/api-types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Stat = {
@@ -46,6 +46,8 @@ export default function AdminDashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [stores, setStores] = useState<EventDetail["stores"]>([]);
+  const [overview, setOverview] = useState<EventOverviewReport | null>(null);
+  const [overviewError, setOverviewError] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -55,6 +57,8 @@ export default function AdminDashboardPage() {
       setError(null);
       setEvent(null);
       setStores([]);
+      setOverview(null);
+      setOverviewError(null);
 
       const res = await api.events.get(`${slug}`);
       if (!active) return;
@@ -67,6 +71,15 @@ export default function AdminDashboardPage() {
       setEvent(res.data);
       setStores(res.data.stores);
       setLoading(false);
+
+      const overviewRes = await api.admin.eventOverview(res.data.id);
+      if (!active) return;
+      if (!overviewRes.success) {
+        setOverviewError(overviewRes.error.message);
+        return;
+      }
+
+      setOverview(overviewRes.data);
     }
     load();
 
@@ -88,6 +101,14 @@ export default function AdminDashboardPage() {
       )
     : null;
   const unavailableValue = error ? "—" : "0";
+  const pendingOrderCount =
+    overview?.pendingOrders.toLocaleString("th-TH") ?? "—";
+  const pendingTicketCount =
+    overview?.pendingTickets.toLocaleString("th-TH") ?? "—";
+  const pendingAmount =
+    overview === null
+      ? "—"
+      : Number(overview.pendingAmount).toLocaleString("th-TH");
 
   const stats: Stat[] = [
     {
@@ -179,6 +200,11 @@ export default function AdminDashboardPage() {
       {error && (
         <div role="alert" className="text-sm text-destructive">
           {error}
+        </div>
+      )}
+      {overviewError && (
+        <div role="alert" className="text-sm text-destructive">
+          โหลดสถานะรอตรวจไม่สำเร็จ: {overviewError}
         </div>
       )}
 
@@ -348,11 +374,11 @@ export default function AdminDashboardPage() {
               </div>
               <Badge className="p-1 flex items-center justify-center bg-[#FFFBEB] text-[#92400E] text-[14px] rounded-[6px] [&>svg]:size-4! md:hidden">
                 <Clock />
-                {unavailableValue} รายการ
+                {pendingOrderCount} รายการ
               </Badge>
               <div className="hidden md:flex">
                 <div className="flex items-center justify-center gap-2 text-2xl font-semibold text-black">
-                  <div>{unavailableValue}</div>
+                  <div>{pendingOrderCount}</div>
                   <Badge className="[&>svg]:size-6! flex items-center justify-center bg-[#FFFBEB] text-[#92400E] text-[16px] rounded-[6px]">
                     <Clock />
                     รอตรวจ
@@ -368,7 +394,7 @@ export default function AdminDashboardPage() {
                   "font-bold text-black flex gap-1 md:text-lg",
                 )}
               >
-                {unavailableValue}
+                {pendingTicketCount}
                 <span className="font-normal md:text-lg">ใบ</span>
               </div>
             </div>
@@ -380,7 +406,7 @@ export default function AdminDashboardPage() {
                   "font-bold text-black flex gap-1 md:text-lg",
                 )}
               >
-                {unavailableValue}
+                {pendingAmount}
                 <span className="font-normal">บาท</span>
               </div>
             </div>
