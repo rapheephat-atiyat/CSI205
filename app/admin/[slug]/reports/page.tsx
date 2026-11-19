@@ -23,6 +23,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 // icon
 import { Download } from "lucide-react";
@@ -38,30 +40,11 @@ import type {
 
 type Cell = string | number | null | undefined;
 
-// ส่งออก CSV ฝั่งเบราว์เซอร์ (ใส่ BOM ให้ Excel อ่านภาษาไทยถูก)
-function downloadCsv(filename: string, rows: Cell[][]) {
-  const esc = (v: Cell) => {
-    if (v === null || v === undefined) return "";
-    let s = String(v);
-
-    if (typeof v === "string" && /^[=+\-@]/.test(s)) s = `'${s}`;
-    return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const csv = "\uFEFF" + rows.map((r) => r.map(esc).join(",")).join("\r\n");
-  const url = URL.createObjectURL(
-    new Blob([csv], { type: "text/csv;charset=utf-8;" }),
-  );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 const num = (v?: string | number | null) =>
   v === null || v === undefined ? "-" : Number(v).toLocaleString("th-TH");
 
 export default function Page() {
+  const [downLoadFinish, setDownLoadFinish] = useState(false);
   const { slug } = useParams<{ slug: string }>();
 
   const [event, setEvent] = useState<EventDetail | null>(null);
@@ -107,9 +90,6 @@ export default function Page() {
     load();
   }, [slug]);
 
-  if (loading) return <div className="p-4">กำลังโหลด...</div>;
-  if (error || !event) return <div className="p-4">{error ?? "ไม่พบงาน"}</div>;
-
   const ticketRows = tickets.map((t) => ({
     id: t.id,
     name: t.name,
@@ -121,7 +101,6 @@ export default function Page() {
   const totalSold = ticketRows.reduce((s, r) => s + r.sold, 0);
   const totalRevenue = ticketRows.reduce((s, r) => s + r.revenue, 0);
 
-  // ยอดร้านค้า (ยอดโทเคนคงเหลือในกระเป๋าร้าน)
   const storeRows = stores.map((s) => ({
     id: s.id,
     name: s.name,
@@ -136,70 +115,161 @@ export default function Page() {
     {
       id: "tickets",
       title: "ยอดขายบัตร",
-      description: "ประเภทบัตร • ราคา • ขายแล้ว • จำนวนทั้งหมด • รายได้",
+      description: "ประเภทบัตร / ราคา / ขายแล้ว / จำนวนทั้งหมด / รายได้",
       total: ticketRows.length,
       unit: "ประเภท",
-      run: () =>
-        downloadCsv(`${slug}-tickets.csv`, [
-          [
-            "ประเภทบัตร",
-            "ราคา (บาท)",
-            "ขายแล้ว",
-            "จำนวนทั้งหมด",
-            "รายได้ (บาท)",
-          ],
-          ...ticketRows.map((r) => [
-            r.name,
-            r.price,
-            r.sold,
-            r.quota,
-            r.revenue,
-          ]),
-        ]),
+      file: `${slug}-tickets`,
+      rows: [
+        ["ประเภทบัตร", "ราคา (บาท)", "ขายแล้ว", "จำนวนทั้งหมด", "รายได้ (บาท)"],
+        ...ticketRows.map((r) => [r.name, r.price, r.sold, r.quota, r.revenue]),
+      ] as Cell[][],
     },
     {
       id: "stores",
       title: "รายงานร้านค้า",
-      description: "ร้านค้า • สินค้า • ราคา • ยอด Token คงเหลือ",
+      description: "ร้านค้า / สินค้า / ราคา / ยอด Token คงเหลือ",
       total: storeRows.length,
       unit: "ร้าน",
-      run: () =>
-        downloadCsv(`${slug}-stores.csv`, [
-          ["ร้านค้า", "สินค้า", "ราคา (Token)", "ยอด Token คงเหลือ"],
-          ...storeRows.map((r) => [r.name, r.product, r.price, r.balance]),
-        ]),
+      file: `${slug}-stores`,
+      rows: [
+        ["ร้านค้า", "สินค้า", "ราคา (Token)", "ยอด Token คงเหลือ"],
+        ...storeRows.map((r) => [r.name, r.product, r.price, r.balance]),
+      ] as Cell[][],
     },
     {
       id: "audit",
       title: "ความเคลื่อนไหวกระเป๋า Token",
-      description: "วันเวลา • ประเภท • สถานะ • จำนวน • ก่อน/หลัง • หมายเหตุ",
+      description: "วันเวลา / ประเภท / สถานะ / จำนวน / ก่อน/หลัง / หมายเหตุ",
       total: auditLog.length,
       unit: "รายการ",
-      run: () =>
-        downloadCsv(`${slug}-wallet-audit.csv`, [
-          [
-            "วันเวลา",
-            "ประเภท",
-            "สถานะ",
-            "จำนวน",
-            "ก่อน",
-            "หลัง",
-            "อ้างอิง",
-            "หมายเหตุ",
-          ],
-          ...auditLog.map((h) => [
-            h.createdAt,
-            h.type,
-            h.status,
-            h.amount,
-            h.before,
-            h.after,
-            h.ref,
-            h.note,
-          ]),
+      file: `${slug}-wallet-audit`,
+      rows: [
+        [
+          "วันเวลา",
+          "ประเภท",
+          "สถานะ",
+          "จำนวน",
+          "ก่อน",
+          "หลัง",
+          "อ้างอิง",
+          "หมายเหตุ",
+        ],
+        ...auditLog.map((h) => [
+          h.createdAt,
+          h.type,
+          h.status,
+          Number(h.amount),
+          Number(h.before),
+          Number(h.after),
+          h.ref,
+          h.note,
         ]),
+      ] as Cell[][],
     },
   ];
+
+  useEffect(() => {
+    if (!downLoadFinish) return;
+
+    toast.success("โหลดไฟล์สำเร็จ", {
+      position: "bottom-right",
+      className: "text-green-400!",
+    });
+
+    setDownLoadFinish(false);
+  }, [downLoadFinish]);
+
+  function downloadCsv(filename: string, rows: Cell[][]) {
+    const esc = (v: Cell) => {
+      if (v === null || v === undefined) return "";
+      let s = String(v);
+      if (typeof v === "string" && /^[=+\-@]/.test(s)) s = `'${s}`;
+      return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = "\uFEFF" + rows.map((r) => r.map(esc).join(",")).join("\r\n");
+    const url = URL.createObjectURL(
+      new Blob([csv], { type: "text/csv;charset=utf-8;" }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    setTimeout(() => {
+      setDownLoadFinish(true);
+    }, 3000);
+  }
+
+  async function downloadXlsx(
+    filename: string,
+    rows: Cell[][],
+    sheetName: string,
+  ) {
+    const ExcelJS = (await import("exceljs")).default;
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet(sheetName.slice(0, 31));
+
+    ws.addRows(rows.map((r) => r.map((v) => v ?? "")));
+
+    ws.getRow(1).font = { bold: true };
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+    ws.columns.forEach((col, i) => {
+      const longest = Math.max(
+        ...rows.map((r) => String(r[i] ?? "").length),
+        8,
+      );
+      col.width = Math.min(longest + 2, 50);
+    });
+
+    const buffer = await wb.xlsx.writeBuffer();
+    const url = URL.createObjectURL(
+      new Blob([buffer], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    setDownLoadFinish(true);
+  }
+
+  if (loading) {
+    return (
+      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+        {/* breadcrumb */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24 bg-on-brand" />
+          <Skeleton className="h-4 w-4 bg-on-brand" />
+          <Skeleton className="h-4 w-32 bg-on-brand" />
+        </div>
+
+        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 bg-on-brand" />
+            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
+          </div>
+
+          {/* การ์ดสรุป 2 ใบ */}
+          <div className="w-full grid grid-cols-1 gap-3 md:grid-cols-2">
+            <Skeleton className="h-36 w-full rounded-[10px] bg-on-brand" />
+            <Skeleton className="h-36 w-full rounded-[10px] bg-on-brand" />
+          </div>
+
+          {/* ตารางบัตร / ร้านค้า / ส่งออก */}
+          <Skeleton className="h-56 w-full rounded-[10px] bg-on-brand" />
+          <Skeleton className="h-56 w-full rounded-[10px] bg-on-brand" />
+          <Skeleton className="h-48 w-full rounded-[10px] bg-on-brand" />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !event) {
+    return <div className="p-4">{error ?? "ไม่พบงาน"}</div>;
+  }
 
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -209,7 +279,7 @@ export default function Page() {
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink href={`/admin/${slug}`}>
-                {event.title}
+                {event?.title}
               </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
@@ -239,17 +309,14 @@ export default function Page() {
             className="p-4 w-full h-full flex flex-col items-start gap-2 rounded-[10px]"
           >
             <div className="flex flex-col items-start gap-0.5">
-              <div className="text-lg font-semibold">บัตรของงานนี้</div>
-              <div className="text-sm font-medium text-muted-foreground">
-                ประมาณจาก ราคา × จำนวนที่ขาย
-              </div>
+              <div className="text-lg font-semibold">บัตร</div>
             </div>
             <div className="w-full flex items-center justify-between text-sm">
               <div className="text-muted-foreground">ขายแล้วทั้งหมด</div>
               <div>{num(totalSold)} ใบ</div>
             </div>
             <div className="w-full border"></div>
-            <div className="w-full flex items-center justify-between text-sm font-semibold">
+            <div className="w-full flex items-center justify-between text-sm">
               <div>รายได้จากบัตร</div>
               <div>{num(totalRevenue)} บาท</div>
             </div>
@@ -277,49 +344,6 @@ export default function Page() {
             </div>
           </Badge>
         </div>
-
-        {/* overview (ทุกงาน) */}
-        {overview && (
-          <Badge
-            variant={"outline"}
-            className="p-4 w-full flex flex-col items-start gap-2 rounded-[10px]"
-          >
-            <div className="flex flex-col items-start gap-0.5">
-              <div className="text-lg font-semibold">ภาพรวมทั้งระบบ</div>
-              <div className="text-sm font-medium text-muted-foreground">
-                รวมทุกงาน ไม่ได้แยกเฉพาะงานนี้
-              </div>
-            </div>
-            <div className="w-full grid grid-cols-2 gap-2 text-sm md:grid-cols-4">
-              <div>
-                <div className="text-muted-foreground">บัตรที่ถูกจอง</div>
-                <div className="font-semibold">
-                  {num(overview.totalTicketsSold)}
-                </div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">เช็กอินแล้ว</div>
-                <div className="font-semibold">
-                  {num(overview.totalCheckedIn)}
-                </div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">
-                  ยอดออเดอร์ที่ชำระแล้ว
-                </div>
-                <div className="font-semibold">
-                  {num(overview.totalTicketRevenue)} บาท
-                </div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">ยอดร้านค้า</div>
-                <div className="font-semibold">
-                  {num(overview.totalStoreVolume)}
-                </div>
-              </div>
-            </div>
-          </Badge>
-        )}
 
         {/* ยอดขายบัตรรายประเภท */}
         <Badge
@@ -417,7 +441,7 @@ export default function Page() {
             ชุดข้อมูลพร้อมส่งออก
           </div>
           <Table>
-            <TableCaption>ส่งออกเป็นไฟล์ CSV (เปิดใน Excel ได้)</TableCaption>
+            <TableCaption>เลือกส่งออกข้อมูลรูปแบบ CSV หรือ XLSX</TableCaption>
             <TableHeader>
               <TableRow>
                 <TableHead>ชุดรายงาน</TableHead>
@@ -439,16 +463,30 @@ export default function Page() {
                     {r.total} {r.unit}
                   </TableCell>
                   <TableCell>
-                    <div className="w-full flex items-center justify-center">
+                    <div className="w-full flex items-center justify-center gap-3">
                       <Button
                         type="button"
                         variant="outline"
-                        className="gap-1 hover:bg-brand-hover hover:text-on-brand"
+                        className="gap-1 hover:bg-brand-hover hover:text-on-brand cursor-pointer"
                         disabled={r.total === 0}
-                        onClick={r.run}
+                        onClick={() => downloadCsv(`${r.file}.csv`, r.rows)}
                       >
                         <Download />
                         CSV
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="gap-1 hover:bg-brand-hover hover:text-on-brand cursor-pointer"
+                        disabled={r.total === 0}
+                        onClick={() =>
+                          downloadXlsx(`${r.file}.xlsx`, r.rows, r.title).catch(
+                            () => toast.error("ส่งออก XLSX ไม่สำเร็จ"),
+                          )
+                        }
+                      >
+                        <Download />
+                        XLSX
                       </Button>
                     </div>
                   </TableCell>

@@ -47,6 +47,8 @@ import type {
   EventTicketInput,
   EventTicketItem,
 } from "@/lib/api-types";
+import { toast } from "sonner";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export default function Page() {
   const { slug } = useParams<{ slug: string }>();
@@ -117,14 +119,21 @@ export default function Page() {
 
     if (!res.success) return alert(res.error.message);
     setTicketOpen(false);
+    toast.success("เพิ่มบัตรสำเร็จ", {
+      position: "top-center",
+      className: "text-green-800!",
+    });
     load();
   }
 
   async function handleDeleteTicket(ticket: EventTicketItem) {
     if (!event) return;
-    if (!confirm(`ลบบัตร "${ticket.name}" ?`)) return;
     const res = await api.events.tickets.drop(event.id, ticket.id);
     if (!res.success) return alert(res.error.message);
+    toast.success("ลบสำเร็จ", {
+      position: "top-center",
+      className: "text-green-800!",
+    });
     load();
   }
 
@@ -182,19 +191,49 @@ export default function Page() {
 
     if (!res.success) return alert(res.error.message);
     setSouvenirOpen(false);
+    toast.success("เพิ่มของที่ระลึกสำเร็จ", {
+      position: "top-center",
+      className: "text-green-800!",
+    });
     load();
   }
 
   async function handleDeleteSouvenir(souvenir: EventSouvenirItem) {
     if (!event) return;
-    if (!confirm(`ลบ "${souvenir.name}" ?`)) return;
     const res = await api.events.souvenirs.drop(event.id, souvenir.id);
     if (!res.success) return alert(res.error.message);
     load();
+    toast.success("ลบสำเร็จ", {
+      position: "top-center",
+      className: "text-green-800!",
+    });
   }
 
   // ---------- UI ---------- //
-  if (loading) return <div className="p-4">กำลังโหลด...</div>;
+  if (loading)
+    return (
+      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+        {/* breadcrumb */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24 bg-on-brand" />
+          <Skeleton className="h-4 w-4 bg-on-brand" />
+          <Skeleton className="h-4 w-32 bg-on-brand" />
+        </div>
+        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 bg-on-brand" />
+            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
+          </div>
+
+          {/* การ์ดสรุป 2 ใบ */}
+          <div className="w-full flex flex-col items-center justify-center gap-4">
+            <Skeleton className="h-140 w-full rounded-[10px] bg-on-brand" />
+            <Skeleton className="h-140 w-full rounded-[10px] bg-on-brand" />
+          </div>
+        </div>
+      </div>
+    );
   if (error && !event) return <div className="p-4">{error}</div>;
 
   return (
@@ -303,6 +342,7 @@ export default function Page() {
                             variant="ghost"
                             size="icon"
                             aria-label="ลบบัตร"
+                            className="cursor-pointer hover:text-brand hover:bg-brand/10"
                             onClick={() => handleDeleteTicket(ticket)}
                           >
                             <Trash2 />
@@ -396,6 +436,7 @@ export default function Page() {
                             variant="ghost"
                             size="icon"
                             aria-label="ลบของที่ระลึก"
+                            className="cursor-pointer hover:text-brand hover:bg-brand/10"
                             onClick={() => handleDeleteSouvenir(souvenir)}
                           >
                             <Trash2 />

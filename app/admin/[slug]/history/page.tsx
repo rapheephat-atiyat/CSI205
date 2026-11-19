@@ -32,6 +32,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 import { WalletHistoryItem } from "@/lib/api-types";
 import { api } from "@/lib/api-client";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // แปลง type เป็นภาษาไทย
 const typeLabel: Record<string, string> = {
@@ -85,9 +86,9 @@ export default function Page() {
   const filteredLogs = logs.filter((log) => {
     const q = search.toLowerCase();
     return (
-      log.note?.toLowerCase().startsWith(q) ||
-      log.type.toLowerCase().startsWith(q) ||
-      log.ref?.toLowerCase().startsWith(q) ||
+      log.note?.toLowerCase().startsWith(q.trim()) ||
+      log.type.toLowerCase().startsWith(q.trim()) ||
+      log.ref?.toLowerCase().startsWith(q.trim()) ||
       typeLabel[log.type]?.startsWith(search)
     );
   });
@@ -110,6 +111,30 @@ export default function Page() {
       maximumFractionDigits: 2,
     });
   };
+
+  if (loading)
+    return (
+      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+        {/* breadcrumb */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24 bg-on-brand" />
+          <Skeleton className="h-4 w-4 bg-on-brand" />
+          <Skeleton className="h-4 w-32 bg-on-brand" />
+        </div>
+        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 bg-on-brand" />
+            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
+          </div>
+
+          {/* การ์ด 1 ใบ */}
+          <div className="w-full flex flex-col items-center justify-center gap-4">
+            <Skeleton className="h-140 w-full rounded-[10px] bg-on-brand" />
+          </div>
+        </div>
+      </div>
+    );
 
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -135,7 +160,7 @@ export default function Page() {
             ประวัติ Wallet
           </div>
           <div className="text-[14px] font-medium text-muted-foreground">
-            รายการเติมเงิน / ซื้อสินค้า / คืนเงิน ทั้งหมด
+            รายการเติมเงิน / ซื้อสินค้า ทั้งหมด
           </div>
         </div>
 
@@ -240,31 +265,30 @@ export default function Page() {
                 </div>
 
                 {/* ===== Desktop View ===== */}
-                <div className="hidden w-full md:block">
+                <div className="hidden w-full max-h-[600px] overflow-y-auto md:block">
                   <Table>
                     <TableHeader className="bg-[#FAFAFA]">
                       <TableRow className="text-[15px]">
-                        <TableHead className="text-muted-foreground font-normal">
+                        <TableHead className="text-muted-foreground font-normal w-[180px]">
                           วันเวลา
                         </TableHead>
-                        <TableHead className="text-muted-foreground font-normal">
+                        <TableHead className="text-muted-foreground font-normal w-[100px]">
                           ประเภท
                         </TableHead>
-                        <TableHead className="text-muted-foreground font-normal">
+                        <TableHead className="text-muted-foreground font-normal w-[120px]">
                           สถานะ
                         </TableHead>
-                        <TableHead className="text-muted-foreground font-normal text-right">
+                        <TableHead className="text-muted-foreground font-normal text-right w-[130px]">
                           จำนวนเงิน
                         </TableHead>
-                        <TableHead className="text-muted-foreground font-normal">
+                        <TableHead className="text-muted-foreground font-normal w-auto">
                           ก่อน → หลัง
                         </TableHead>
-                        <TableHead className="text-muted-foreground font-normal">
+                        <TableHead className="text-muted-foreground font-normal w-[330px]">
                           หมายเหตุ
                         </TableHead>
                       </TableRow>
                     </TableHeader>
-
                     <TableBody>
                       {filteredLogs.map((log) => (
                         <TableRow key={log.id} className="text-sm">
@@ -277,11 +301,11 @@ export default function Page() {
                           </TableCell>
 
                           <TableCell>
-                            <span
-                              className={`text-xs px-2 py-0.5 rounded-full ${statusColor[log.status]}`}
+                            <Badge
+                              className={`p-2 text-xs px-2 py-0.5 rounded-full ${statusColor[log.status]}`}
                             >
                               {statusLabel[log.status] || log.status}
-                            </span>
+                            </Badge>
                           </TableCell>
 
                           <TableCell className="text-right font-medium">

@@ -12,13 +12,10 @@ import {
   Coins,
   SquareArrowOutUpRight,
   ClipboardCheck,
-  ArrowBigRight,
-  Equal,
 } from "lucide-react";
 import {
   Table,
   TableBody,
-  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
@@ -29,14 +26,13 @@ import { EnterEventCard } from "@/components/admin/EnterEventCard";
 import {
   Breadcrumb,
   BreadcrumbItem,
-  BreadcrumbLink,
   BreadcrumbList,
   BreadcrumbPage,
-  BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api-client";
 import { EventDetail, OverviewReport } from "@/lib/api-types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Stat = {
   icon: LucideIcon;
@@ -45,66 +41,12 @@ type Stat = {
   unit: string;
 };
 
-export type Vendor = {
-  id: number;
-  name: string;
-  food: string;
-  price: number;
-  quantity: number;
-  qtyUnit: string;
-  incomeTk: number;
-  incomeMn: number;
-};
-
-export const vendors: Vendor[] = [
-  {
-    id: 1,
-    name: "ครัวศิษย์เก่า",
-    food: "ข้าวกะเพรา",
-    price: 6,
-    quantity: 420,
-    qtyUnit: "จาน",
-    incomeTk: 2520,
-    incomeMn: 25200,
-  },
-  {
-    id: 2,
-    name: "กาแฟสนาม",
-    food: "กาแฟเย็น",
-    price: 4,
-    quantity: 310,
-    qtyUnit: "แก้ว",
-    incomeTk: 1240,
-    incomeMn: 12400,
-  },
-  {
-    id: 3,
-    name: "น้ำใจรุ่นพี่",
-    food: "น้ำสมุนไพร",
-    price: 2,
-    quantity: 280,
-    qtyUnit: "แก้ว",
-    incomeTk: 560,
-    incomeMn: 5600,
-  },
-  {
-    id: 4,
-    name: "ขนมบ้านเรา",
-    food: "ขนมไทย",
-    price: 3,
-    quantity: 180,
-    qtyUnit: "ชุด",
-    incomeTk: 540,
-    incomeMn: 5400,
-  },
-];
-
 export default function AdminDashboardPage() {
   const { slug } = useParams();
   const [event, setEvent] = useState<EventDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [stores, setStores] = useState<EventDetail["stores"]>([]);
 
   // overview report
   const [report, setReport] = useState<OverviewReport | null>(null);
@@ -124,17 +66,18 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     async function load() {
       const res = await api.events.get(`${slug}`);
-      if (res.success) setEvent(res.data);
-      else setError(res.error.message);
+      if (res.success) {
+        setEvent(res.data);
+        setStores(res.data.stores);
+      } else {
+        setError(res.error.message);
+      }
       setLoading(false);
     }
     load();
   }, [slug]);
 
-  useEffect(() => {
-    console.log(report);
-  }, [report]);
-  let progress = report
+  const progress = report
     ? (report.totalCheckedIn / report.totalTicketsSold) * 100
     : 0;
 
@@ -165,6 +108,44 @@ export default function AdminDashboardPage() {
     },
   ];
 
+  if (loading)
+    return (
+      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+        {/* breadcrumb */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24 bg-on-brand" />
+          <Skeleton className="h-4 w-4 bg-on-brand" />
+          <Skeleton className="h-4 w-32 bg-on-brand" />
+        </div>
+        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 bg-on-brand" />
+            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
+          </div>
+
+          {/* การ์ด 4 ใบ */}
+          <div className="w-full grid grid-cols-4 gap-4">
+            <Skeleton className="w-auto h-40 rounded-[10px] bg-on-brand" />
+            <Skeleton className="w-auto h-40 rounded-[10px] bg-on-brand" />
+            <Skeleton className="w-auto h-40 rounded-[10px] bg-on-brand" />
+            <Skeleton className="w-auto h-40 rounded-[10px] bg-on-brand" />
+          </div>
+
+          {/* การ์ด 2 ใบ */}
+          <div className="w-full flex flex-row gap-4">
+            <Skeleton className="w-full flex-2 h-100 rounded-[10px] bg-on-brand" />
+            <Skeleton className="w-full flex-1 h-100 rounded-[10px] bg-on-brand" />
+          </div>
+
+          {/* การ์ด 2 ใบ */}
+          <div className="w-full flex flex-row gap-4">
+            <Skeleton className="w-full h-100 rounded-[10px] bg-on-brand" />
+          </div>
+        </div>
+      </div>
+    );
+
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 md:p-6 lg:scrollbar-none">
       {/* Breadcrumbs */}
@@ -172,9 +153,7 @@ export default function AdminDashboardPage() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbPage>
-                {loading ? "Loading..." : event?.title}
-              </BreadcrumbPage>
+              <BreadcrumbPage>{event?.title}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
@@ -189,6 +168,11 @@ export default function AdminDashboardPage() {
           <span>คืนสู่เหย้า 2569</span>
         </p>
       </div>
+      {error && (
+        <div role="alert" className="text-sm text-destructive">
+          {error}
+        </div>
+      )}
 
       {/* event detail cards */}
       <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
@@ -364,48 +348,40 @@ export default function AdminDashboardPage() {
               "text-lg text-black font-semibold md:text-xl",
             )}
           >
-            ยอดขายรายร้าน
+            ร้านค้าในงาน
           </div>
-          {vendors.map((vendor) => {
-            return (
-              <div
-                key={vendor.name}
-                className="w-full flex flex-col items-start justify-center gap-2 md:hidden"
-              >
+          {stores.length === 0 ? (
+            <div className="w-full py-4 text-center text-muted-foreground">
+              ยังไม่มีร้านค้าในงานนี้
+            </div>
+          ) : (
+            stores.map((store) => {
+              return (
                 <div
-                  className={cn(
-                    styles.text,
-                    "text-[14px] font-medium text-black md:text-lg",
-                  )}
+                  key={store.id}
+                  className="w-full flex flex-col items-start justify-center gap-2 md:hidden"
                 >
-                  {vendor.name}
-                </div>
-                <div
-                  className={cn(
-                    styles.text,
-                    "flex items-center justify-center gap-1 md:text-[14px]",
-                  )}
-                >
-                  {vendor.food}
-                  <div className="flex gap-1 font-semibold">
-                    {vendor.incomeTk}
-                    <span>Token</span>
+                  <div
+                    className={cn(
+                      styles.text,
+                      "text-[14px] font-medium text-black md:text-lg",
+                    )}
+                  >
+                    {store.name}
                   </div>
+                  <div
+                    className={cn(
+                      styles.text,
+                      "flex items-center justify-center gap-1 md:text-[14px]",
+                    )}
+                  >
+                    {store.description ?? "ยังไม่มีรายละเอียดร้านค้า"}
+                  </div>
+                  <div className="w-full border-b"></div>
                 </div>
-
-                <div
-                  className={cn(
-                    styles.text,
-                    "w-full flex items-center justify-between text-[16px] font-semibold text-black md:text-lg",
-                  )}
-                >
-                  <div>{vendor.incomeTk} Token</div>
-                  <div>{vendor.incomeMn} Bath</div>
-                </div>
-                <div className="w-full border-b"></div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
 
           {/* desktop screen */}
           <div className="hidden w-full md:flex flex-col">
@@ -413,44 +389,26 @@ export default function AdminDashboardPage() {
               <TableHeader className="bg-[#FAFAFA]">
                 <TableRow className="text-[15px]">
                   <TableHead className="text-muted-foreground font-normal">
-                    ร้านค้า / สินค้า
+                    ร้านค้า
                   </TableHead>
                   <TableHead className="text-muted-foreground font-normal">
-                    ราคา / หน่วย
-                  </TableHead>
-                  <TableHead className="text-muted-foreground font-normal">
-                    จำนวนขาย
-                  </TableHead>
-                  <TableHead className="text-muted-foreground font-normal">
-                    ยอด Token
-                  </TableHead>
-                  <TableHead className="text-muted-foreground font-normal">
-                    เทียบเป็นบาท
+                    รายละเอียดร้านค้า
                   </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {vendors.map((vendor) => {
+                {stores.map((store) => {
                   return (
-                    <TableRow key={vendor.id}>
+                    <TableRow key={store.id}>
                       <TableCell className="text-[16px] flex items-center justify-start">
-                        {vendor.name} / {vendor.food}
+                        {store.name}
                         <Badge
                           variant={"ghost"}
                           className="h-full my-5"
                         ></Badge>
                       </TableCell>
                       <TableCell className="text-[16px]">
-                        {vendor.price} Token
-                      </TableCell>
-                      <TableCell className="text-[16px]">
-                        {vendor.quantity} {vendor.qtyUnit}
-                      </TableCell>
-                      <TableCell className="text-[16px]">
-                        {vendor.incomeTk} Token
-                      </TableCell>
-                      <TableCell className="text-[16px]">
-                        {vendor.incomeMn} Token
+                        {store.description ?? "ยังไม่มีรายละเอียดร้านค้า"}
                       </TableCell>
                     </TableRow>
                   );
@@ -461,14 +419,8 @@ export default function AdminDashboardPage() {
             <div className="my-4 flex items-center justify-between">
               <div className="flex items-center justify-center">
                 <div className="flex items-center justify-center font-semibold text-[18px] gap-2">
-                  <div>รวม {vendors.length} ร้าน</div>
-                  <div className="font-semibold text-[18px]">1,190 หน่วย</div>
+                  <div>รวม {stores.length} ร้าน</div>
                 </div>
-              </div>
-              <div className="flex items-center justify-between font-semibold text-[18px] gap-2">
-                <div>4,860 Token</div>
-                <Equal className="text-brand" />
-                <div>48,600 Bath</div>
               </div>
             </div>
           </div>
@@ -480,14 +432,8 @@ export default function AdminDashboardPage() {
               "w-full flex flex-col items-start justify-between text-lg font-semibold text-black md:hidden",
             )}
           >
-            <div className="md:text-2xl md:font-semibold">รวม 4,860 Token</div>
-            <div className={cn("w-full flex items-center justify-between p-2")}>
-              <div className={cn(styles.text, "md:text-[16px] text-brand-ho")}>
-                แปลงเป็น
-              </div>
-              <div className="md:text-2xl md:font-semibol text-brand">
-                48,600 บาท
-              </div>
+            <div className="md:text-2xl md:font-semibold">
+              รวม {stores.length} ร้าน
             </div>
           </div>
           <Badge

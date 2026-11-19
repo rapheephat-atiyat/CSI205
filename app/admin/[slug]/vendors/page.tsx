@@ -45,6 +45,7 @@ import { Plus, SearchIcon } from "lucide-react";
 
 import { api } from "@/lib/api-client";
 import type { EventDetail, StoreDetail, User } from "@/lib/api-types";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Store = EventDetail["stores"][number];
 
@@ -70,8 +71,6 @@ export default function Page() {
     setEvent(res.data);
     setVendors(res.data.stores);
 
-    // ดึงรายได้ (walletBalance) และสินค้าของแต่ละร้าน
-    // ร้านไหนไม่มีสิทธิ์ดู จะไม่อยู่ใน map และแสดงเป็น "-"
     const results = await Promise.all(
       res.data.stores.map((s) => api.store.getMy(s.id)),
     );
@@ -92,7 +91,6 @@ export default function Page() {
     load();
   }, [slug]);
 
-  // ผู้ดูแลร้าน = ผู้ใช้ที่มีบทบาท VENDOR ผูกกับร้านนั้น
   function managersOf(storeId: string) {
     const names = users
       .filter((u) =>
@@ -102,7 +100,6 @@ export default function Page() {
     return names.length ? names.join(", ") : "-";
   }
 
-  // ---------- สร้างร้านค้า ---------- //
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
@@ -132,7 +129,29 @@ export default function Page() {
   }
 
   // ---------- UI ---------- //
-  if (loading) return <div className="p-4">กำลังโหลด...</div>;
+  if (loading)
+    return (
+      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+        {/* breadcrumb */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24 bg-on-brand" />
+          <Skeleton className="h-4 w-4 bg-on-brand" />
+          <Skeleton className="h-4 w-32 bg-on-brand" />
+        </div>
+        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 bg-on-brand" />
+            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
+          </div>
+
+          {/* การ์ด 1 ใบ */}
+          <div className="w-full flex flex-col items-center justify-center gap-4">
+            <Skeleton className="h-140 w-full rounded-[10px] bg-on-brand" />
+          </div>
+        </div>
+      </div>
+    );
   if (error || !event) return <div className="p-4">{error ?? "ไม่พบงาน"}</div>;
 
   const fmt = (v?: string | null) =>
@@ -143,7 +162,9 @@ export default function Page() {
   );
 
   const keyword = search.trim().toLowerCase();
-  const filtered = vendors.filter((v) => v.name.toLowerCase().includes(keyword));
+  const filtered = vendors.filter((v) =>
+    v.name.toLowerCase().includes(keyword),
+  );
 
   return (
     <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
@@ -298,7 +319,9 @@ export default function Page() {
                   />
                 </Field>
                 <Field>
-                  <FieldLabel htmlFor="store-description">รายละเอียด</FieldLabel>
+                  <FieldLabel htmlFor="store-description">
+                    รายละเอียด
+                  </FieldLabel>
                   <Input
                     id="store-description"
                     placeholder="อาหารอีสาน เครื่องดื่ม"

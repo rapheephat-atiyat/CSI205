@@ -53,8 +53,8 @@ import {
 import { api } from "@/lib/api-client";
 import type { EventDetail, User, UserRoleAssignment } from "@/lib/api-types";
 import type { Permission } from "@/lib/permissions";
+import { Skeleton } from "@/components/ui/skeleton";
 
-// สิทธิ์เริ่มต้นของแต่ละบทบาทที่กำหนดจากหน้านี้
 const DEFAULT_PERMISSIONS: Record<"ADMIN" | "STAFF", Permission[]> = {
   ADMIN: [],
   STAFF: ["ticket.scan"] as Permission[],
@@ -105,7 +105,6 @@ export default function Page() {
     new Set(users.map(yearOf).filter((y): y is number => y !== null)),
   ).sort((a, b) => b - a);
 
-  // บทบาทที่เกี่ยวกับงานนี้ (ผูกกับงานนี้ หรือเป็นบทบาทระดับระบบ)
   function rolesInEvent(u: User): UserRoleAssignment[] {
     if (!event) return [];
     return u.roles.filter((r) => r.eventId === null || r.eventId === event.id);
@@ -126,7 +125,29 @@ export default function Page() {
   }
 
   // ---------- UI ---------- //
-  if (loading) return <div className="p-4">กำลังโหลด...</div>;
+  if (loading)
+    return (
+      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
+        {/* breadcrumb */}
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-4 w-24 bg-on-brand" />
+          <Skeleton className="h-4 w-4 bg-on-brand" />
+          <Skeleton className="h-4 w-32 bg-on-brand" />
+        </div>
+        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
+          {/* หัวเรื่อง */}
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-7 w-48 bg-on-brand" />
+            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
+          </div>
+
+          {/* การ์ด 1 ใบ */}
+          <div className="w-full flex flex-col items-center justify-center gap-4">
+            <Skeleton className="h-140 w-full rounded-[10px] bg-on-brand" />
+          </div>
+        </div>
+      </div>
+    );
   if (error && users.length === 0) return <div className="p-4">{error}</div>;
 
   const keyword = search.trim().toLowerCase();
@@ -252,10 +273,10 @@ export default function Page() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>ชื่อ</TableHead>
-                    <TableHead>บทบาทในงานนี้</TableHead>
-                    <TableHead>สถานะบัญชี</TableHead>
-                    <TableHead className="text-center">จัดการ</TableHead>
+                    <TableHead className="w-120">ชื่อ</TableHead>
+                    <TableHead className="w-30">บทบาทในงานนี้</TableHead>
+                    <TableHead className="w-30">สถานะบัญชี</TableHead>
+                    <TableHead className="text-center w-auto">จัดการ</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -282,10 +303,19 @@ export default function Page() {
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               {roles.length === 0 ? (
-                                <Badge variant="outline">USER</Badge>
+                                <Badge
+                                  variant="outline"
+                                  className="p-2 w-20 rounded-[10px]"
+                                >
+                                  USER
+                                </Badge>
                               ) : (
                                 roles.map((r) => (
-                                  <Badge key={r.id} variant="outline">
+                                  <Badge
+                                    key={r.id}
+                                    variant="outline"
+                                    className="p-2 w-20 rounded-[10px]"
+                                  >
                                     {r.role}
                                   </Badge>
                                 ))
