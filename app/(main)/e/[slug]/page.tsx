@@ -5,13 +5,12 @@ import { ApiError } from "@/server/http/errors";
 import { getEventBySlug } from "@/server/services/event.service";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { Suspense } from "react";
 
 interface Props {
     params: Promise<{ slug: string }>;
 }
 
-async function Content({ params }: Props) {
+export default async function EventPage({ params }: Props) {
     await connection();
     const { slug } = await params;
     let event: EventDetail;
@@ -25,12 +24,4 @@ async function Content({ params }: Props) {
     }
 
     return <EventClient event={event} key={event.id} description={<EventDescription html={event.description} />} />;
-}
-
-export default function page({ params }: Props) {
-    return (
-        <Suspense fallback={<div>กำลังโหลดข้อมูลงาน...</div>}>
-            <Content params={params} />
-        </Suspense>
-    );
 }
