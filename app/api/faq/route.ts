@@ -1,11 +1,11 @@
 import { connection } from "next/server";
 import { withHandler } from "@/server/http/handler";
 import { success } from "@/server/http/response";
-import { getPublishedFaq } from "@/server/services/faq.service";
+import { getPublicFaq } from "@/server/cache/public-content";
 
 export const GET = withHandler(async () => {
     await connection();
-    const response = success(await getPublishedFaq());
+    const response = success(await getPublicFaq());
     response.headers.set("Cache-Control", "no-store");
     return response;
 });

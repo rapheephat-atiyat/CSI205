@@ -7,7 +7,6 @@ import { souvenirVariantKey } from "@/lib/souvenirs";
 import { cn } from "cn";
 import { CloudOff, ReceiptText } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
 
 const filters = [
     { value: "", label: "ทั้งหมด" },
@@ -24,12 +23,10 @@ const orderStatus = (order: OrderDetail) => {
 };
 
 export default function Content({ filter, orders, events }: { filter: string, orders: OrderDetail[], events: EventSummary[] }) {
-    const [loading, setLoading] = useState<boolean>(true);
 
     const visibleOrders = filter ? orders.filter((or) => or.status == filter) : orders;
     const eventsById = new Map(events.map((event) => [event.id, event]));
 
-    console.log(visibleOrders);
 
 
     return (
@@ -70,7 +67,6 @@ export default function Content({ filter, orders, events }: { filter: string, or
             )}
             {visibleOrders.map((order) => {
                 const event = eventsById.get(order.eventId);
-                console.log(event);
 
                 return (
                     <BookCard key={order.id} title={event?.title ?? "งานที่สั่งซื้อ"}>

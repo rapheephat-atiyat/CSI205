@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import type { Html5Qrcode } from "html5-qrcode";
 import { useVendorStore } from "@/components/vendor/vendor-store-context";
 import { Camera, CheckCircle2, Keyboard, X, XCircle } from "lucide-react";
 
@@ -20,12 +20,14 @@ export function ScannerBox() {
   } | null>(null);
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
+  const cameraRequestRef = useRef(0);
 
   const storeName = selectedStore?.name ?? "ร้านค้า";
   const productTitle = selectedStore?.product?.title ?? "สินค้าของร้าน";
   const productPrice = Number(selectedStore?.product?.price ?? 0);
 
   const stopCamera = async () => {
+    cameraRequestRef.current++;
     if (scannerRef.current) {
       try {
         await scannerRef.current.stop();
@@ -41,6 +43,7 @@ export function ScannerBox() {
 
   useEffect(() => {
     return () => {
+      cameraRequestRef.current = -1;
       if (scannerRef.current) {
         scannerRef.current.stop().catch(() => {});
       }
@@ -78,10 +81,14 @@ export function ScannerBox() {
     }
 
     setIsCameraOpen(true);
+    const requestId = ++cameraRequestRef.current;
 
     requestAnimationFrame(async () => {
       try {
+        const { Html5Qrcode } = await import("html5-qrcode");
+        if (requestId !== cameraRequestRef.current) return;
         const devices = await Html5Qrcode.getCameras();
+        if (requestId !== cameraRequestRef.current) return;
         if (!devices || devices.length === 0) {
           setCameraError(
             "ไม่พบอุปกรณ์กล้องบนเครื่องนี้ — กรุณากรอกรหัส QR ในช่องด้านล่างแทน"
@@ -112,7 +119,12 @@ export function ScannerBox() {
           },
           () => {}
         );
+        if (requestId !== cameraRequestRef.current) {
+          await html5QrCode.stop();
+          html5QrCode.clear();
+        }
       } catch (err) {
+        if (requestId !== cameraRequestRef.current) return;
         console.error("Camera start error:", err);
         const rawMsg =
           err instanceof Error ? `${err.name}: ${err.message}` : String(err);
