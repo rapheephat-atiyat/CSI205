@@ -32,10 +32,7 @@ import { Download } from "lucide-react";
 import { api } from "@/lib/api-client";
 import type {
   EventDetail,
-  EventTicketItem,
-  OverviewReport,
   StoreDetail,
-  WalletHistoryItem,
 } from "@/lib/api-types";
 
 type Cell = string | number | null | undefined;
@@ -48,12 +45,9 @@ export default function Page() {
   const { slug } = useParams<{ slug: string }>();
 
   const [event, setEvent] = useState<EventDetail | null>(null);
-  const [tickets, setTickets] = useState<EventTicketItem[]>([]);
   const [stores, setStores] = useState<
     { id: string; name: string; detail: StoreDetail | null }[]
   >([]);
-  const [overview, setOverview] = useState<OverviewReport | null>(null);
-  const [auditLog, setAuditLog] = useState<WalletHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -68,14 +62,9 @@ export default function Page() {
       const ev = eventRes.data;
       setEvent(ev);
 
-      const [ticketsRes, storeRes, overviewRes, auditRes] = await Promise.all([
-        api.events.tickets.list(ev.id),
-        Promise.all(ev.stores.map((s) => api.store.getMy(s.id))),
-        api.admin.reports.overview(),
-        api.admin.reports.auditLog(),
-      ]);
-
-      if (ticketsRes.success) setTickets(ticketsRes.data);
+      const storeRes = await Promise.all(
+        ev.stores.map((s) => api.store.getMy(s.id)),
+      );
       setStores(
         ev.stores.map((s, i) => ({
           id: s.id,
@@ -83,14 +72,12 @@ export default function Page() {
           detail: storeRes[i].success ? storeRes[i].data : null,
         })),
       );
-      if (overviewRes.success) setOverview(overviewRes.data);
-      if (auditRes.success) setAuditLog(auditRes.data);
       setLoading(false);
     }
     load();
   }, [slug]);
 
-  const ticketRows = tickets.map((t) => ({
+  const ticketRows = (event?.tickets ?? []).map((t) => ({
     id: t.id,
     name: t.name,
     price: Number(t.price),
@@ -134,36 +121,6 @@ export default function Page() {
       rows: [
         ["ร้านค้า", "สินค้า", "ราคา (Token)", "ยอด Token คงเหลือ"],
         ...storeRows.map((r) => [r.name, r.product, r.price, r.balance]),
-      ] as Cell[][],
-    },
-    {
-      id: "audit",
-      title: "ความเคลื่อนไหวกระเป๋า Token",
-      description: "วันเวลา / ประเภท / สถานะ / จำนวน / ก่อน/หลัง / หมายเหตุ",
-      total: auditLog.length,
-      unit: "รายการ",
-      file: `${slug}-wallet-audit`,
-      rows: [
-        [
-          "วันเวลา",
-          "ประเภท",
-          "สถานะ",
-          "จำนวน",
-          "ก่อน",
-          "หลัง",
-          "อ้างอิง",
-          "หมายเหตุ",
-        ],
-        ...auditLog.map((h) => [
-          h.createdAt,
-          h.type,
-          h.status,
-          Number(h.amount),
-          Number(h.before),
-          Number(h.after),
-          h.ref,
-          h.note,
-        ]),
       ] as Cell[][],
     },
   ];

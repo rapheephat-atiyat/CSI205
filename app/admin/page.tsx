@@ -7,13 +7,22 @@ import { Role } from "@/server/database/enums/role.enum";
 
 export default async function AdminPage() {
   const user = await requirePageUser("/admin");
-  const assignedAdminRoles = user.userRoles.filter(
-    (assignment) => assignment.role === Role.ADMIN && assignment.eventId,
-  );
+  const assignedAdminEventIds = [
+    ...new Set(
+      user.userRoles
+        .filter(
+          (assignment) =>
+            assignment.role === Role.ADMIN &&
+            assignment.eventId &&
+            !assignment.storeId,
+        )
+        .map((assignment) => assignment.eventId),
+    ),
+  ];
+  const assignedEventId =
+    assignedAdminEventIds.length === 1 ? assignedAdminEventIds[0] : null;
 
-  const assignedEventId = assignedAdminRoles[0]?.eventId;
-
-  if (assignedAdminRoles.length === 1 && assignedEventId) {
+  if (assignedEventId) {
     const event = await (await getDatabase()).getRepository(Events).findOne({
       where: { id: assignedEventId },
       select: { id: true, slug: true },

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { cn } from "cn";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -21,8 +22,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
-import { EnterEventCard } from "@/components/admin/EnterEventCard";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -31,7 +30,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { useParams } from "next/navigation";
 import { api } from "@/lib/api-client";
-import { EventDetail, OverviewReport } from "@/lib/api-types";
+import { EventDetail } from "@/lib/api-types";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Stat = {
@@ -48,62 +47,71 @@ export default function AdminDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [stores, setStores] = useState<EventDetail["stores"]>([]);
 
-  // overview report
-  const [report, setReport] = useState<OverviewReport | null>(null);
   useEffect(() => {
-    async function loadReport() {
-      const res = await api.admin.reports.overview();
-      if (res.success) setReport(res.data);
-      else setError(res.error.message);
-    }
-    loadReport();
-  }, [slug]);
-  const styles = {
-    text: "text-muted-foreground text-sm font-light",
-  };
+    let active = true;
 
-  // effect to load event details
-  useEffect(() => {
     async function load() {
+      setLoading(true);
+      setError(null);
+      setEvent(null);
+      setStores([]);
+
       const res = await api.events.get(`${slug}`);
-      if (res.success) {
-        setEvent(res.data);
-        setStores(res.data.stores);
-      } else {
+      if (!active) return;
+      if (!res.success) {
         setError(res.error.message);
+        setLoading(false);
+        return;
       }
+
+      setEvent(res.data);
+      setStores(res.data.stores);
       setLoading(false);
     }
     load();
+
+    return () => {
+      active = false;
+    };
   }, [slug]);
 
-  const progress = report
-    ? (report.totalCheckedIn / report.totalTicketsSold) * 100
-    : 0;
+  const styles = {
+    text: "text-muted-foreground text-sm font-light",
+  };
+  const totalBookedTickets = event
+    ? event.tickets.reduce((total, ticket) => total + ticket.sold, 0)
+    : null;
+  const bookedTicketValue = event
+    ? event.tickets.reduce(
+        (total, ticket) => total + Number(ticket.price) * ticket.sold,
+        0,
+      )
+    : null;
+  const unavailableValue = error ? "—" : "0";
 
   const stats: Stat[] = [
     {
       icon: Users,
       label: "จำนวนบัตรที่ถูกจอง",
-      value: (report?.totalTicketsSold ?? 0).toLocaleString(),
+      value: totalBookedTickets?.toLocaleString("th-TH") ?? unavailableValue,
       unit: "ใบ",
     },
     {
       icon: ScanLine,
       label: "จำนวนเช็กอิน",
-      value: (report?.totalCheckedIn ?? 0).toLocaleString(),
+      value: unavailableValue,
       unit: "คน",
     },
     {
       icon: Ticket,
-      label: "ยอดออเดอร์ที่ชำระแล้ว",
-      value: (report?.totalTicketRevenue ?? 0).toLocaleString(),
-      unit: "ออเดอร์",
+      label: "มูลค่าบัตรที่ถูกจอง",
+      value: bookedTicketValue?.toLocaleString("th-TH") ?? unavailableValue,
+      unit: "บาท",
     },
     {
       icon: Coins,
       label: "ยอดร้านค้า",
-      value: (report?.totalStoreVolume ?? 0).toLocaleString(),
+      value: unavailableValue,
       unit: "Token",
     },
   ];
@@ -165,7 +173,7 @@ export default function AdminDashboardPage() {
         </h1>
         <p className={cn(styles.text, "text-xs sm:text-sm")}>
           ติดตามการลงทะเบียน การเข้างาน และยอดขายของ{" "}
-          <span>คืนสู่เหย้า 2569</span>
+          <span>{event?.title ?? "งานนี้"}</span>
         </p>
       </div>
       {error && (
@@ -205,6 +213,66 @@ export default function AdminDashboardPage() {
           </Badge>
         ))}
       </div>
+      <Badge
+        variant="outline"
+        className="flex h-auto w-full flex-col items-start gap-3 rounded-[10px] p-4"
+      >
+        <div className="flex w-full items-center justify-between gap-3">
+          <div className="text-lg font-semibold text-black">ประเภทบัตรในงาน</div>
+          <Link
+            href={`/admin/${slug}/tickets`}
+            className="text-sm font-medium text-brand hover:underline"
+          >
+            จัดการบัตร
+          </Link>
+        </div>
+        <div className="w-full overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-[#FAFAFA]">
+              <TableRow>
+                <TableHead>ประเภทบัตร</TableHead>
+                <TableHead>ราคา</TableHead>
+                <TableHead>จองแล้ว / โควตา</TableHead>
+                <TableHead>คงเหลือ</TableHead>
+                <TableHead>สถานะ</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!event?.tickets.length ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="h-20 text-center text-muted-foreground"
+                  >
+                    {error ? "โหลดข้อมูลบัตรไม่สำเร็จ" : "0 ประเภทบัตร"}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                event.tickets.map((ticket) => (
+                  <TableRow key={ticket.id}>
+                    <TableCell className="font-medium">{ticket.name}</TableCell>
+                    <TableCell>
+                      {Number(ticket.price).toLocaleString("th-TH")} บาท
+                    </TableCell>
+                    <TableCell>
+                      {ticket.sold.toLocaleString("th-TH")} /{" "}
+                      {ticket.quota.toLocaleString("th-TH")}
+                    </TableCell>
+                    <TableCell>
+                      {Math.max(ticket.quota - ticket.sold, 0).toLocaleString(
+                        "th-TH",
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {ticket.isActive ? "เปิดขาย" : "ปิดขาย"}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Badge>
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* enter event */}
         <div className="mx-auto flex w-full lg:flex-2">
@@ -221,29 +289,17 @@ export default function AdminDashboardPage() {
                 "text-2xl font-semibold text-black md:text-3xl lg:text-4xl",
               )}
             >
-              {report?.totalCheckedIn.toLocaleString() ?? 0} /
-              {report?.totalTicketsSold.toLocaleString() ?? 0}
-              <span className="lg:text-2xl">คน</span>
-            </div>
-            {/* Progress bar */}
-            <div className="w-full">
-              <Progress
-                value={progress}
-                className={`w-full h-1.5 ${progress === 0 ? "bg-muted-foreground/40" : "bg-muted-foreground/30"}`}
-              />
+              {unavailableValue} /{" "}
+              {totalBookedTickets?.toLocaleString("th-TH") ?? unavailableValue}
+              <span className="lg:text-2xl"> คน</span>
             </div>
             <div className="hidden w-full flex-col gap-4 md:flex">
-              {/* EnterEventCard components */}
-              <div className="w-full flex. items-center justify-center mx-auto">
-                <EnterEventCard />
-              </div>
               <div className="w-full flex items-start justify-between">
                 <div className="text-lg text-muted-foreground font-semibold">
                   ยังไม่เช็กอิน
                 </div>
                 <div className="flex items-center justify-center gap-2">
-                  <div className="text-lg font-semibold">276 คน</div>
-                  <div className="text-lg font-semibold">27.8%</div>
+                  <div className="text-lg font-semibold">{unavailableValue}</div>
                 </div>
               </div>
             </div>
@@ -252,7 +308,7 @@ export default function AdminDashboardPage() {
               <div className={"w-full flex items-start justify-between"}>
                 <div className={cn(styles.text)}>เช็กอินแล้ว</div>
                 <div className={cn(styles.text, "font-bold text-black")}>
-                  71.3%
+                  {unavailableValue}
                 </div>
               </div>
               <div className={"w-full flex items-start justify-between"}>
@@ -260,11 +316,10 @@ export default function AdminDashboardPage() {
                 <div
                   className={cn(styles.text, "font-bold text-black flex gap-1")}
                 >
-                  276
+                  {unavailableValue}
                   <span className="font-normal">คน</span>
                 </div>
               </div>
-              <div className={cn(styles.text)}>ยอดสะสม 16:00–18:42 น.</div>
             </div>
           </Badge>
         </div>
@@ -289,11 +344,11 @@ export default function AdminDashboardPage() {
               </div>
               <Badge className="p-1 flex items-center justify-center bg-[#FFFBEB] text-[#92400E] text-[14px] rounded-[6px] [&>svg]:size-4! md:hidden">
                 <Clock />
-                24 รายการ
+                {unavailableValue} รายการ
               </Badge>
               <div className="hidden md:flex">
                 <div className="flex items-center justify-center gap-2 text-2xl font-semibold text-black">
-                  <div>24</div>
+                  <div>{unavailableValue}</div>
                   <Badge className="[&>svg]:size-6! flex items-center justify-center bg-[#FFFBEB] text-[#92400E] text-[16px] rounded-[6px]">
                     <Clock />
                     รอตรวจ
@@ -309,7 +364,7 @@ export default function AdminDashboardPage() {
                   "font-bold text-black flex gap-1 md:text-lg",
                 )}
               >
-                44
+                {unavailableValue}
                 <span className="font-normal md:text-lg">ใบ</span>
               </div>
             </div>
@@ -321,7 +376,7 @@ export default function AdminDashboardPage() {
                   "font-bold text-black flex gap-1 md:text-lg",
                 )}
               >
-                38,200
+                {unavailableValue}
                 <span className="font-normal">บาท</span>
               </div>
             </div>
@@ -352,7 +407,7 @@ export default function AdminDashboardPage() {
           </div>
           {stores.length === 0 ? (
             <div className="w-full py-4 text-center text-muted-foreground">
-              ยังไม่มีร้านค้าในงานนี้
+              {error ? "โหลดร้านค้าไม่สำเร็จ" : "0 ร้านค้าในงานนี้"}
             </div>
           ) : (
             stores.map((store) => {

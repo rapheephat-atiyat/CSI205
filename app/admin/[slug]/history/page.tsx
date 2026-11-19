@@ -58,9 +58,27 @@ export default function Page() {
   const slug = params.slug as string;
 
   const [search, setSearch] = useState("");
+  const [eventTitle, setEventTitle] = useState<string | null>(null);
   const [logs, setLogs] = useState<WalletHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function fetchEvent() {
+      const res = await api.events.get(slug);
+      if (!active) return;
+      if (res.success) setEventTitle(res.data.title);
+      else setError(res.error.message);
+    }
+
+    fetchEvent();
+
+    return () => {
+      active = false;
+    };
+  }, [slug]);
 
   useEffect(() => {
     async function fetchLog() {
@@ -143,7 +161,9 @@ export default function Page() {
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
-              <BreadcrumbLink href={`/admin/${slug}`}>ภาพรวมงาน</BreadcrumbLink>
+              <BreadcrumbLink href={`/admin/${slug}`}>
+                {eventTitle ?? slug}
+              </BreadcrumbLink>
             </BreadcrumbItem>
             <BreadcrumbSeparator />
             <BreadcrumbItem>

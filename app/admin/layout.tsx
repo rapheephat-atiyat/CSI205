@@ -7,18 +7,11 @@ import { requirePageUser } from "@/server/auth/page-user";
 import SuperAdminTopbar from "@/components/admin/SuperAdminTopbar";
 import OnlyOnPath from "@/components/admin/OnlyOnPath";
 
-export default async function AdminLayout({
+export default function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const user = await requirePageUser("/admin");
-  const isAdmin = user.userRoles.some((r) => r.role === "ADMIN");
-
-  if (!isAdmin) {
-    redirect("/");
-  }
-
   return (
     <Suspense
       fallback={
@@ -27,16 +20,29 @@ export default async function AdminLayout({
         </div>
       }
     >
-      <TooltipProvider>
-        <SidebarProvider defaultOpen={false}>
-          <main className="bg-[#F5F5F5] w-full">
-            <OnlyOnPath path="/admin">
-              <SuperAdminTopbar />
-            </OnlyOnPath>
-            {children}
-          </main>
-        </SidebarProvider>
-      </TooltipProvider>
+      <AdminGate>{children}</AdminGate>
     </Suspense>
+  );
+}
+
+async function AdminGate({ children }: { children: React.ReactNode }) {
+  const user = await requirePageUser("/admin");
+  const isAdmin = user.userRoles.some((r) => r.role === "ADMIN");
+
+  if (!isAdmin) {
+    redirect("/");
+  }
+
+  return (
+    <TooltipProvider>
+      <SidebarProvider defaultOpen={false}>
+        <main className="bg-[#F5F5F5] w-full">
+          <OnlyOnPath path="/admin">
+            <SuperAdminTopbar />
+          </OnlyOnPath>
+          {children}
+        </main>
+      </SidebarProvider>
+    </TooltipProvider>
   );
 }

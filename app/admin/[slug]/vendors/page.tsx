@@ -44,6 +44,7 @@ import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Plus, SearchIcon } from "lucide-react";
 
 import { api } from "@/lib/api-client";
+import { PERMISSIONS } from "@/lib/permissions";
 import type { EventDetail, StoreDetail, User } from "@/lib/api-types";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -60,8 +61,10 @@ export default function Page() {
   const [details, setDetails] = useState<Record<string, StoreDetail>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [usersError, setUsersError] = useState<string | null>(null);
 
   async function load() {
+    setUsersError(null);
     const res = await api.events.get(slug);
     if (!res.success) {
       setError(res.error.message);
@@ -83,6 +86,7 @@ export default function Page() {
     // ใช้หาชื่อผู้ดูแลร้าน (ถ้าไม่มีสิทธิ์ดูรายชื่อผู้ใช้ ก็แสดงเป็น "-")
     const usersRes = await api.admin.users.list();
     if (usersRes.success) setUsers(usersRes.data);
+    else setUsersError(usersRes.error.message);
 
     setLoading(false);
   }
@@ -98,6 +102,57 @@ export default function Page() {
       )
       .map((u) => u.name);
     return names.length ? names.join(", ") : "-";
+  }
+
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [selectedStore, setSelectedStore] = useState<Store | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState("");
+  const [assigning, setAssigning] = useState(false);
+  const [assignError, setAssignError] = useState<string | null>(null);
+
+  const availableUsers = selectedStore
+    ? users.filter(
+        (user) =>
+          user.status === "ACTIVE" &&
+          !user.roles.some(
+            (role) =>
+              role.role === "VENDOR" && role.storeId === selectedStore.id,
+          ),
+      )
+    : [];
+
+  function openAssignVendor(store: Store) {
+    setSelectedStore(store);
+    setSelectedUserId("");
+    setAssignError(null);
+    setAssignOpen(true);
+  }
+
+  async function handleAssignVendor(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!event || !selectedStore || !selectedUserId) return;
+
+    setAssigning(true);
+    setAssignError(null);
+    const res = await api.admin.users.assignRole(selectedUserId, {
+      role: "VENDOR",
+      eventId: event.id,
+      storeId: selectedStore.id,
+      permissions: [PERMISSIONS.STORE_MANAGE, PERMISSIONS.STORE_SELL],
+    });
+    setAssigning(false);
+
+    if (!res.success) {
+      setAssignError(res.error.message);
+      return;
+    }
+
+    setUsers((current) =>
+      current.map((user) => (user.id === res.data.id ? res.data : user)),
+    );
+    setAssignOpen(false);
+    setSelectedStore(null);
+    setSelectedUserId("");
   }
 
   const [createOpen, setCreateOpen] = useState(false);
@@ -286,15 +341,119 @@ export default function Page() {
                             ? `${fmt(details[vendor.id].walletBalance)} Token`
                             : "-"}
                         </TableCell>
-                        <TableCell>{managersOf(vendor.id)}</TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-start gap-2">
+                            <span>{managersOf(vendor.id)}</span>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={Boolean(usersError)}
+                              onClick={() => openAssignVendor(vendor)}
+                            >
+                              <Plus />
+                              เพิ่ม Vendor
+                            </Button>
+                          </div>
+                        </TableCell>
                       </TableRow>
                     ))
                   )}
                 </TableBody>
               </Table>
             </div>
+            {usersError && (
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                โหลดรายชื่อผู้ใช้เพื่อผูก Vendor ไม่สำเร็จ: {usersError}
+              </p>
+            )}
           </div>
         </Badge>
+
+        <Dialog
+          open={assignOpen}
+          onOpenChange={(open) => {
+            setAssignOpen(open);
+            if (!open) {
+              setSelectedStore(null);
+              setSelectedUserId("");
+              setAssignError(null);
+            }
+          }}
+        >
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>เพิ่ม Vendor ให้ร้าน</DialogTitle>
+              <DialogDescription>
+                {selectedStore
+                  ? `เลือกรายชื่อผู้ใช้เพื่อผูกกับร้าน "${selectedStore.name}"`
+                  : "เลือกร้านค้าที่ต้องการผูก Vendor"}
+              </DialogDescription>
+            </DialogHeader>
+
+            <form onSubmit={handleAssignVendor}>
+              <FieldGroup>
+                <Field>
+                  <FieldLabel htmlFor="vendor-user">บัญชีผู้ใช้ *</FieldLabel>
+                  <select
+                    id="vendor-user"
+                    required
+                    value={selectedUserId}
+                    onChange={(e) => setSelectedUserId(e.target.value)}
+                    disabled={
+                      Boolean(usersError) || availableUsers.length === 0
+                    }
+                    className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <option value="" disabled>
+                      เลือกบัญชีผู้ใช้
+                    </option>
+                    {availableUsers.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} ({user.email})
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+              </FieldGroup>
+
+              {usersError ? (
+                <p role="alert" className="mt-3 text-sm text-destructive">
+                  {usersError}
+                </p>
+              ) : availableUsers.length === 0 ? (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  ไม่มีบัญชีผู้ใช้ที่ยังผูกกับร้านนี้ได้
+                </p>
+              ) : null}
+              {assignError && (
+                <p role="alert" className="mt-3 text-sm text-destructive">
+                  {assignError}
+                </p>
+              )}
+
+              <DialogFooter className="mt-4">
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    ยกเลิก
+                  </Button>
+                </DialogClose>
+                <Button
+                  type="submit"
+                  className="bg-brand hover:bg-brand-hover"
+                  disabled={
+                    assigning ||
+                    !selectedUserId ||
+                    Boolean(usersError) ||
+                    availableUsers.length === 0
+                  }
+                >
+                  {assigning ? "กำลังผูก Vendor..." : "ผูก Vendor"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* dialog create store */}
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>

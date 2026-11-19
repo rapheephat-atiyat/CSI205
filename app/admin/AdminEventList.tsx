@@ -29,7 +29,7 @@ type HeadEv = {
   place: string;
 };
 const headEv: HeadEv = {
-  caption: "รายการงานทั้งหมด",
+  caption: "รายการงานที่จัดการได้",
   name: "ชื่องาน",
   date: "วันเวลา",
   place: "สถานที่",
@@ -43,7 +43,7 @@ export default function AdminEventList() {
 
   useEffect(() => {
     async function load() {
-      const res = await api.events.list();
+      const res = await api.events.listManageable();
       if (res.success) {
         setEvents(res.data);
       } else setError(res.error.message);
@@ -113,7 +113,7 @@ export default function AdminEventList() {
           {/* หัวเรื่อง */}
           <div className="flex flex-col items-start justify-center">
             <div className="text-[18px] font-semibold text-black">
-              รายการงาน
+              งานที่จัดการได้
             </div>
           </div>
           <div className="w-full mt-4">
@@ -157,7 +157,9 @@ export default function AdminEventList() {
                         colSpan={3}
                         className="py-6 text-center text-muted-foreground"
                       >
-                        ไม่พบรายการงานที่ค้นหา
+                        {events.length === 0
+                          ? "บัญชีนี้ยังไม่มีงานที่จัดการได้"
+                          : "ไม่พบรายการงานที่ค้นหา"}
                       </TableCell>
                     </TableRow>
                   ) : (
