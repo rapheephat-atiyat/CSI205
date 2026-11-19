@@ -14,7 +14,10 @@ const eventNotFound = () => new ApiError("EVENT_NOT_FOUND", "ไม่พบง�
 
 export async function getEvents(): Promise<EventSummary[]> {
     const db = await getDatabase();
-    const events = await db.getRepository(Events).find({ order: { createdAt: "ASC", buyAt: "ASC" } });
+    const events = await db.getRepository(Events).find({
+        select: { id: true, slug: true, title: true, subTitle: true, thumbnail: true, venue: true, tags: true, buyAt: true, buyEndAt: true },
+        order: { createdAt: "ASC", buyAt: "ASC" },
+    });
     return events.map(toEventSummary);
 }
 

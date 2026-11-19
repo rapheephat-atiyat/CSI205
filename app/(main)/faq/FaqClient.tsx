@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { CircleHelp, LayoutGrid, Search, X } from "lucide-react";
-import { DynamicIcon, iconNames } from "lucide-react/dynamic";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -11,15 +10,10 @@ import type { FaqCategoryItem } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import FaqQuestion from "./FaqQuestion";
 
-function CategoryIcon({ name }: { name: string }) {
-    const icon = iconNames.find((iconName) => iconName === name);
-    return icon
-        ? <DynamicIcon name={icon} aria-hidden="true" className="size-4 shrink-0" fallback={() => <CircleHelp aria-hidden="true" className="size-4 shrink-0" />} />
-        : <CircleHelp aria-hidden="true" className="size-4 shrink-0" />;
-}
+export type FaqCategoryView = FaqCategoryItem & { iconNode: ReactNode };
 
 interface FaqClientProps {
-    categories: FaqCategoryItem[];
+    categories: FaqCategoryView[];
     loadError?: boolean;
 }
 
@@ -74,7 +68,7 @@ export default function FaqClient({ categories, loadError = false }: FaqClientPr
                 <aside className="min-w-0 md:sticky md:top-[calc(var(--navbar-height)+2rem)]">
                     <h2 className="mb-3 text-xs font-medium text-muted-foreground">เลือกหมวดคำถาม</h2>
                     <nav aria-label="หมวดคำถามที่พบบ่อย" className="flex flex-wrap gap-2 md:flex-col md:gap-1">
-                        {[{ id: null, name: "ทุกหมวด", icon: null, count: total }, ...categories.map((category) => ({ ...category, count: category.questions.length }))].map((category) => (
+                        {[{ id: null, name: "ทุกหมวด", iconNode: <LayoutGrid aria-hidden="true" className="size-4 shrink-0" />, count: total }, ...categories.map((category) => ({ ...category, count: category.questions.length }))].map((category) => (
                             <Button
                                 key={category.id ?? "all"}
                                 variant="ghost"
@@ -83,7 +77,7 @@ export default function FaqClient({ categories, loadError = false }: FaqClientPr
                                 onClick={() => setCategoryId(category.id)}
                                 className={cn("h-auto min-h-11 min-w-0 max-w-full justify-start gap-3 px-3 py-3 text-left font-normal whitespace-normal md:w-full", category.id === (selectedCategory?.id ?? null) && "bg-brand-soft font-medium text-brand hover:bg-brand-soft hover:text-brand")}
                             >
-                                {category.icon ? <CategoryIcon name={category.icon} /> : <LayoutGrid aria-hidden="true" className="size-4 shrink-0" />}
+                                {category.iconNode}
                                 <span className="min-w-0 wrap-break-word md:flex-1">{category.name}</span>
                                 <span className="ml-auto text-xs tabular-nums opacity-70">{category.count}</span>
                             </Button>

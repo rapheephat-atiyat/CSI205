@@ -1,12 +1,11 @@
 import Content from "@/app/(main)/account/orders/client";
 import Error from "@/app/(main)/account/orders/error";
 import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/lib/api-client";
-import { ApiResponse, OrderDetail } from "@/lib/api-types";
+import type { EventSummary, OrderDetail } from "@/lib/api-types";
 import { requirePageUser } from "@/server/auth/page-user";
-import { headers } from "next/headers";
+import { getPublicEvents } from "@/server/cache/public-content";
+import { getMyOrders } from "@/server/services/order.service";
 import { Suspense } from "react";
-import { toast } from "sonner";
 
 
 type Props = { searchParams: Promise<{ status?: string | string[] }> };
@@ -29,21 +28,18 @@ export default function page(props: Props) {
 async function OrdersContent({ searchParams }: Props) {
     const { status } = await searchParams;
     const filter = filters.find((item) => item.value === status)?.value ?? "";
-    await requirePageUser(filter ? `/account/orders?status=${filter}` : "/account/orders");
-    const cookie = (await headers()).get("cookie") ?? "";
-    const baseUrl = process.env.APP_URL ?? process.env.BETTER_AUTH_URL ?? "http://localhost:3000";
-    const [ordersR, eventsR] = await Promise.all([
-        fetch(`${baseUrl}/api/orders`, {
-            headers: { cookie },
-            cache: "no-store",
-        }),
-        api.events.list(),
-    ]);
-
-    const result: ApiResponse<OrderDetail[]> = await ordersR.json();
-    if (!result.success) {
-        return <Error message={result.error.message} />;
+    const user = await requirePageUser(filter ? `/account/orders?status=${filter}` : "/account/orders");
+    let orders: OrderDetail[] = [];
+    let events: EventSummary[] = [];
+    let loadFailed = false;
+    try {
+        [orders, events] = await Promise.all([
+            getMyOrders(user.id),
+            getPublicEvents().catch(() => []),
+        ]);
+    } catch {
+        loadFailed = true;
     }
-
-    return <Content filter={filter} orders={result.data} events={eventsR.success ? eventsR.data : []} />;
+    if (loadFailed) return <Error message="โหลดคำสั่งซื้อไม่สำเร็จ กรุณาลองใหม่อีกครั้ง" />;
+    return <Content filter={filter} orders={orders} events={events} />;
 }

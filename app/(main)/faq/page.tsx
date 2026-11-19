@@ -3,8 +3,9 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { FaqCategoryItem } from "@/lib/api-types";
-import { getPublishedFaq } from "@/server/services/faq.service";
+import { getPublicFaq } from "@/server/cache/public-content";
 import FaqClient from "./FaqClient";
+import FaqCategoryIcon from "./FaqCategoryIcon";
 
 export const metadata: Metadata = {
     title: "คำถามที่พบบ่อย - TUATUA",
@@ -15,11 +16,12 @@ async function FaqContent() {
     let categories: FaqCategoryItem[] = [];
     let loadError = false;
     try {
-        categories = await getPublishedFaq();
+        categories = await getPublicFaq();
     } catch {
         loadError = true;
     }
-    return <FaqClient categories={categories} loadError={loadError} />;
+    const categoryViews = categories.map((category) => ({ ...category, iconNode: <FaqCategoryIcon name={category.icon} /> }));
+    return <FaqClient categories={categoryViews} loadError={loadError} />;
 }
 
 function FaqSkeleton() {

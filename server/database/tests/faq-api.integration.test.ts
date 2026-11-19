@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 import { after, before, test } from "node:test";
 import { Pool } from "pg";
 import { DataSource } from "typeorm";
-import type { ApiResponse, FaqCategoryAdminItem, FaqCategoryItem, FaqQuestionAdminItem } from "@/lib/api-types";
+import type { ApiResponse, EventDetail, EventSummary, FaqCategoryAdminItem, FaqCategoryItem, FaqQuestionAdminItem } from "@/lib/api-types";
 import { createDatabaseOptions } from "../database.options";
 import { Events, User, UserRole } from "../entities";
 import { Role } from "../enums/role.enum";
@@ -227,6 +227,37 @@ test("FAQ HTTP API with real sessions and an isolated migrated database", { time
         ok(await request(`/api/admin/faq/categories/${hiddenCategory.id}`, "DELETE", undefined, adminCookie));
         denied(await request(`/api/admin/faq/categories/${hiddenCategory.id}`, "GET", undefined, adminCookie), 404, "FAQ_CATEGORY_NOT_FOUND");
         denied(await request(`/api/admin/faq/questions/${question.id}`, "DELETE", undefined, adminCookie), 404, "FAQ_QUESTION_NOT_FOUND");
+    });
+
+    await t.test("public FAQ reads reuse cache and admin edits invalidate it", async () => {
+        const publishedCategory = ok(await request<FaqCategoryAdminItem>("/api/admin/faq/categories", "POST", { name: "Cache verification", icon: "ticket", isPublished: true }, adminCookie), 201);
+        const item = ok(await request<FaqQuestionAdminItem>("/api/admin/faq/questions", "POST", { categoryId: publishedCategory.id, question: "Cached question", answer: "Original answer", isPublished: true }, adminCookie), 201);
+        const readAnswer = async () => ok(await request<FaqCategoryItem[]>("/api/faq")).find((entry) => entry.id === publishedCategory.id)?.questions.find((entry) => entry.id === item.id)?.answer;
+        assert.equal(await readAnswer(), "Original answer");
+        // A direct DB write bypasses invalidation, proving a repeated public read uses cache.
+        await source.query("UPDATE faq_questions SET answer = $1 WHERE id = $2", ["Direct DB edit", item.id]);
+        assert.equal(await readAnswer(), "Original answer");
+        ok(await request(`/api/admin/faq/questions/${item.id}`, "PATCH", { answer: "Admin published answer" }, adminCookie));
+        assert.equal(await readAnswer(), "Admin published answer");
+        ok(await request(`/api/admin/faq/categories/${publishedCategory.id}`, "PATCH", { isPublished: false }, adminCookie));
+        assert.equal(await readAnswer(), undefined);
+    });
+
+    await t.test("event create, edit and delete invalidate the public catalog", async () => {
+        const list = async () => ok(await request<EventSummary[]>("/api/events"));
+        const initialEvents = await list();
+        assert.deepEqual(initialEvents.map((item) => item.slug), ["faq-test"]);
+        const event = ok(await request<EventDetail>("/api/admin/events", "POST", {
+            slug: "cache-verification", title: "Original event", subTitle: "Test", banner: "", thumbnail: "", venue: "Test", description: "Test", tags: [],
+            buyAt: "2026-01-01T00:00:00.000Z", buyEndAt: "2027-01-01T00:00:00.000Z", minTicketQTY: 1, maxTicketQTY: 5,
+        }, adminCookie), 201);
+        assert.equal((await list()).find((item) => item.id === event.id)?.title, "Original event");
+        ok(await request(`/api/admin/events/${event.id}`, "PATCH", { title: "Updated event" }, adminCookie));
+        assert.equal((await list()).find((item) => item.id === event.id)?.title, "Updated event");
+        ok(await request(`/api/admin/events/${event.id}`, "DELETE", undefined, adminCookie));
+        assert.equal((await list()).some((item) => item.id === event.id), false);
+        ok(await request(`/api/admin/events/${initialEvents[0].id}`, "DELETE", undefined, adminCookie));
+        assert.deepEqual(await list(), [], "An empty catalog must not be replaced with demo events");
     });
 
     await t.test("suspending an admin invalidates access even with an existing session", async () => {

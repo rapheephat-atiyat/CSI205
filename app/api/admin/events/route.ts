@@ -6,6 +6,7 @@ import { withHandler } from "@/server/http/handler";
 import { readJson } from "@/server/http/request";
 import { success } from "@/server/http/response";
 import { createEvent, listManageableEvents } from "@/server/services/event.service";
+import { invalidatePublicEvents } from "@/server/cache/tags";
 
 export const GET = withHandler(async (req) => {
     const user = await requireUser(req);
@@ -15,5 +16,7 @@ export const GET = withHandler(async (req) => {
 export const POST = withHandler(async (req) => {
     await requirePermission(req, PERMISSIONS.EVENT_CREATE);
     const input = await readJson<EventInput>(req);
-    return success(await createEvent(input), 201);
+    const event = await createEvent(input);
+    invalidatePublicEvents();
+    return success(event, 201);
 });
