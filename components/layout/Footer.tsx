@@ -7,7 +7,6 @@ const footerGroups = [
         title: "ค้นหา",
         links: [
             { label: "งานทั้งหมด", href: "/events" },
-            { label: "วิธีใช้งาน", href: "/how-it-works" },
         ],
     },
     {
