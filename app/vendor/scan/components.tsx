@@ -113,7 +113,7 @@ export function ScannerBox() {
           () => {}
         );
       } catch (err) {
-        console.error("Camera start error:", err);
+        // ไม่ใช้ console.error เพื่อป้องกันหน้าต่าง Next.js Dev Overlay สีดำเด้งทับหน้าจอ
         const rawMsg =
           err instanceof Error ? `${err.name}: ${err.message}` : String(err);
 
@@ -121,7 +121,7 @@ export function ScannerBox() {
           setCameraError(
             "ยังไม่ได้รับสิทธิ์เปิดกล้อง — กรุณากดอนุญาตกล้องบนเบราว์เซอร์ หรือกรอกรหัส QR ด้านล่างแทน"
           );
-        } else if (rawMsg.includes("NotFoundError")) {
+        } else if (rawMsg.includes("NotFoundError") || rawMsg.includes("Requested device not found")) {
           setCameraError(
             "ไม่พบกล้องบนอุปกรณ์นี้ — กรุณากรอกรหัส QR ในช่องด้านล่างแทน"
           );
