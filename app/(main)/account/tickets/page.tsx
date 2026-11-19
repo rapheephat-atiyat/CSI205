@@ -6,6 +6,7 @@ import type { TicketItem } from "@/lib/api-types";
 import { requirePageUser } from "@/server/auth/page-user";
 import { getEvents } from "@/server/services/event.service";
 import { getMyTickets } from "@/server/services/order.service";
+import { Clock3 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -54,6 +55,12 @@ async function TicketsContent({ searchParams }: Props) {
                     <BookCard key={ticket.id} title={eventTitles.get(ticket.eventId) ?? "บัตรเข้างาน"}>
                         <Badge variant="secondary" className={ticket.status === "ACTIVE" ? "bg-brand-soft text-brand" : undefined}>{labels[ticket.status]}</Badge>
                         {qr && <Image src={qr} alt={`QR เข้างานสำหรับบัตร ${ticket.ticketCode}`} width={192} height={192} unoptimized className="mx-auto rounded-lg border bg-white" />}
+                        {ticket.status === "PENDING" && (
+                            <div className="mx-auto flex aspect-square w-full max-w-48 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted px-4 text-center text-muted-foreground">
+                                <Clock3 className="size-7 shrink-0" aria-hidden="true" />
+                                <p className="text-xs">QR จะแสดงเมื่อยืนยันการชำระ</p>
+                            </div>
+                        )}
                         <div className="space-y-1 text-sm">
                             <p className="font-medium wrap-anywhere">{[ticket.firstName, ticket.lastName].filter(Boolean).join(" ") || "ผู้เข้าร่วมงาน"}</p>
                             {ticket.ticketTypeName && <p className="text-muted-foreground wrap-anywhere">{ticket.ticketTypeName}</p>}
