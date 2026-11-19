@@ -20,7 +20,7 @@ const NAVBARLINKS: readonly NavbarLink[] = [
     { label: "หน้าหลัก", href: "/" },
     { label: "งานทั้งหมด", href: "/events" },
     { label: "วิธีใช้งาน", href: "/how-it-works" },
-    { label: "ช่วยเหลือ", href: "/help" },
+    { label: "ช่วยเหลือ", href: "/faq" },
 ]
 
 export default function Navabr() {
