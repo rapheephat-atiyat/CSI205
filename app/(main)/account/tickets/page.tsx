@@ -8,6 +8,7 @@ import { getEvents } from "@/server/services/event.service";
 import { getMyTickets } from "@/server/services/order.service";
 import Image from "next/image";
 import Link from "next/link";
+import { connection } from "next/server";
 import QRCode from "qrcode";
 import { Suspense } from "react";
 
@@ -28,6 +29,7 @@ export default function MyTicketsPage(props: Props) {
 
 async function TicketsContent({ searchParams }: Props) {
     const { order } = await searchParams;
+    await connection();
     const user = await requirePageUser(typeof order === "string" ? `/account/tickets?order=${encodeURIComponent(order)}` : "/account/tickets");
     const [tickets, events] = await Promise.all([getMyTickets(user.id), getEvents()]);
     const eventTitles = new Map(events.map((event) => [event.id, event.title]));
