@@ -117,7 +117,7 @@ export default function AttendeeSearchPage() {
                 </span>
                 <div className="flex gap-2">
                   <Button asChild variant="outline" size="sm">
-                    <Link href={`/staff/top-up?attendeeId=${encodeURIComponent(a.id)}`}>เติม Token</Link>
+                    <Link href="/staff/scanner">สแกน/เติม Token</Link>
                   </Button>
                   <Button asChild size="sm" className="bg-brand text-on-brand hover:bg-brand-hover">
                     <Link href="/staff/check-in">เช็กอิน/เอาท์</Link>

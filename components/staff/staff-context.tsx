@@ -10,21 +10,40 @@ import React, {
 import {
   attendees as seedAttendees,
   scanHistory as seedScanHistory,
+  staffProfile as defaultProfile,
   type Attendee,
   type AttendeeStatus,
   type ScanOutcome,
   type ScanRecord,
 } from "@/lib/staff-mock";
 import {
+  addTopUpUsed,
   getStoredAttendees,
   getStoredScans,
+  getStoredTopUpQuota,
   saveScanRecord,
   saveStoredAttendees,
 } from "@/lib/staff-storage";
+import { api } from "@/lib/api-client";
 
 export type CheckInResult = {
   outcome: "checked-in" | "checked-out" | "duplicate";
   attendee: Attendee | null;
+};
+
+export type StaffQuota = {
+  total: number;
+  used: number;
+  remaining: number;
+};
+
+export type TopUpResult = {
+  success: boolean;
+  error?: "invalid" | "overQuota" | "invalidAmount";
+  attendee?: Attendee;
+  amount?: number;
+  newBalance?: number;
+  remainingQuota?: number;
 };
 
 export interface StaffContextType {
@@ -34,10 +53,12 @@ export interface StaffContextType {
   checkedIn: number;
   checkedOut: number;
   waiting: number;
+  quota: StaffQuota;
   checkInOrOut: (attendeeId: string, action: "in" | "out") => CheckInResult;
   addScan: (record: Omit<ScanRecord, "id"> & { id?: string }) => ScanRecord;
   updateAttendeeTokens: (attendeeId: string, tokens: number) => void;
   setAttendees: (attendees: Attendee[] | ((prev: Attendee[]) => Attendee[])) => void;
+  topUpTokens: (attendeeIdOrTicket: string, amount: number) => Promise<TopUpResult>;
 }
 
 const StaffContext = createContext<StaffContextType | undefined>(undefined);
@@ -48,6 +69,31 @@ function nowTime(): string {
 
 let attendeesStore: Attendee[] = seedAttendees.map((a) => ({ ...a }));
 let scansStore: ScanRecord[] = seedScanHistory.map((s) => ({ ...s }));
+let quotaStore = {
+  total: defaultProfile.topUpQuotaTotal,
+  used: defaultProfile.topUpQuotaUsed,
+};
+let quotaSnapshot: StaffQuota = {
+  total: defaultProfile.topUpQuotaTotal,
+  used: defaultProfile.topUpQuotaUsed,
+  remaining: Math.max(defaultProfile.topUpQuotaTotal - defaultProfile.topUpQuotaUsed, 0),
+};
+const serverQuotaSnapshot: StaffQuota = {
+  total: defaultProfile.topUpQuotaTotal,
+  used: defaultProfile.topUpQuotaUsed,
+  remaining: Math.max(defaultProfile.topUpQuotaTotal - defaultProfile.topUpQuotaUsed, 0),
+};
+
+function updateQuotaSnapshot() {
+  const total = quotaStore.total;
+  const used = quotaStore.used;
+  quotaSnapshot = {
+    total,
+    used,
+    remaining: Math.max(total - used, 0),
+  };
+}
+
 let isInitialized = false;
 
 const listeners = new Set<() => void>();
@@ -68,6 +114,8 @@ function initStoreIfNeeded() {
     isInitialized = true;
     attendeesStore = getStoredAttendees();
     scansStore = getStoredScans();
+    quotaStore = getStoredTopUpQuota();
+    updateQuotaSnapshot();
   }
 }
 
@@ -89,6 +137,15 @@ function getScansServerSnapshot(): ScanRecord[] {
   return seedScanHistory;
 }
 
+function getQuotaSnapshot(): StaffQuota {
+  initStoreIfNeeded();
+  return quotaSnapshot;
+}
+
+function getQuotaServerSnapshot(): StaffQuota {
+  return serverQuotaSnapshot;
+}
+
 export function StaffProvider({ children }: { children: React.ReactNode }) {
   const attendees = useSyncExternalStore(
     subscribe,
@@ -100,6 +157,12 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
     subscribe,
     getScansSnapshot,
     getScansServerSnapshot
+  );
+
+  const quota = useSyncExternalStore(
+    subscribe,
+    getQuotaSnapshot,
+    getQuotaServerSnapshot
   );
 
   const total = attendees.length;
@@ -211,6 +274,66 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
     notify();
   }, []);
 
+  const topUpTokens = useCallback(
+    async (attendeeIdOrTicket: string, amount: number): Promise<TopUpResult> => {
+      initStoreIfNeeded();
+      if (!Number.isInteger(amount) || amount <= 0) {
+        return { success: false, error: "invalidAmount" };
+      }
+
+      const currentQuota = getStoredTopUpQuota();
+      const remaining = Math.max(currentQuota.total - currentQuota.used, 0);
+      if (amount > remaining) {
+        return { success: false, error: "overQuota", remainingQuota: remaining };
+      }
+
+      const clean = attendeeIdOrTicket.trim().toLowerCase();
+      const target = attendeesStore.find(
+        (a) => a.id.toLowerCase() === clean || a.ticketId.toLowerCase() === clean
+      );
+
+      if (!target) {
+        return { success: false, error: "invalid" };
+      }
+
+      let newBalance = (target.tokens ?? 0) + amount;
+
+      try {
+        const res = await api.staff.topUp({ attendeeId: target.id, amount });
+        if (res.success && res.data) {
+          newBalance = res.data.balance;
+        }
+      } catch {
+        // mock fallback
+      }
+
+      const updatedAttendee: Attendee = {
+        ...target,
+        tokens: newBalance,
+      };
+
+      const nextAttendees = attendeesStore.map((a) =>
+        a.id === target.id ? updatedAttendee : a
+      );
+      attendeesStore = nextAttendees;
+      saveStoredAttendees(nextAttendees);
+
+      addTopUpUsed(amount);
+      quotaStore = getStoredTopUpQuota();
+      updateQuotaSnapshot();
+      notify();
+
+      return {
+        success: true,
+        attendee: updatedAttendee,
+        amount,
+        newBalance,
+        remainingQuota: Math.max(quotaStore.total - quotaStore.used, 0),
+      };
+    },
+    []
+  );
+
   const value = useMemo(
     () => ({
       attendees,
@@ -219,10 +342,12 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
       checkedIn,
       checkedOut,
       waiting,
+      quota,
       checkInOrOut,
       addScan,
       updateAttendeeTokens,
       setAttendees,
+      topUpTokens,
     }),
     [
       attendees,
@@ -231,10 +356,12 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
       checkedIn,
       checkedOut,
       waiting,
+      quota,
       checkInOrOut,
       addScan,
       updateAttendeeTokens,
       setAttendees,
+      topUpTokens,
     ]
   );
 
