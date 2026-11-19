@@ -5,6 +5,7 @@ import { hasCheckoutPromptPay } from "@/server/services/checkout-payment";
 import { getEventBySlug, isEventSelling } from "@/server/services/event.service";
 import { releaseExpiredOrderHolds } from "@/server/services/order.service";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 type Props = {
@@ -21,6 +22,7 @@ export default function BookPage({ params }: Props) {
 
 async function LoadBookingEvent({ params }: Props) {
     const { slug } = await params;
+    await connection();
     const bookingUrl = `/e/${encodeURIComponent(slug)}/book`;
     const user = await requirePageUser(bookingUrl);
 

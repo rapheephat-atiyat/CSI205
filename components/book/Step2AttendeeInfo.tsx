@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { TicketAttendeeInput } from "@/lib/api-types";
-import type { HTMLInputTypeAttribute } from "react";
+import { attendeeFields } from "./attendee-fields";
 import type { BookingAttendee } from "./booking-types";
 
 type Props = {
@@ -23,14 +23,6 @@ export function Step2AttendeeInfo({ ticketAttendees, profile, onAttendeeChange }
         />
     ));
 }
-
-const attendeeFields = [
-    { name: "firstName", label: "ชื่อ", max: 255, autoComplete: "given-name" },
-    { name: "lastName", label: "นามสกุล", max: 255, autoComplete: "family-name" },
-    { name: "email", label: "อีเมล", type: "email", max: 255, autoComplete: "email" },
-    { name: "phone", label: "เบอร์โทรศัพท์", type: "tel", pattern: "[0-9]{9,10}", max: 10, autoComplete: "tel-national" },
-    { name: "graduationYear", label: "ปีที่จบ / รุ่น", max: 10 },
-] as const satisfies { name: keyof TicketAttendeeInput; label: string; type?: HTMLInputTypeAttribute; pattern?: string; max: number; autoComplete?: string }[];
 
 function AttendeeForm({ entry, index, profile, onChange }: {
     entry: BookingAttendee;
@@ -54,7 +46,7 @@ function AttendeeForm({ entry, index, profile, onChange }: {
                         <Label htmlFor={inputId}>{field.label}{required && <span className="text-brand" aria-hidden="true">*</span>}</Label>
                         <Input
                             id={inputId} className="h-11" required={required} maxLength={field.max} type={"type" in field ? field.type : "text"}
-                            pattern={"pattern" in field ? field.pattern : undefined}
+                            pattern={"pattern" in field ? field.pattern.source : undefined}
                             autoComplete={"autoComplete" in field ? `section-ticket${index} ${field.autoComplete}` : "off"}
                             value={attendee[field.name] ?? ""} onChange={(event) => onChange({ ...attendee, [field.name]: event.target.value })}
                         />
