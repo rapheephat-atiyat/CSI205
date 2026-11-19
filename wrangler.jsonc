@@ -20,5 +20,32 @@
     ],
     "images": {
         "binding": "IMAGES"
-    }
+    },
+    "kv_namespaces": [
+        {
+            "binding": "NEXT_INC_CACHE_KV",
+            "id": "9d4732708e4c4c2f80369f6fafe04f1a"
+        }
+    ],
+    "d1_databases": [
+        {
+            "binding": "NEXT_TAG_CACHE_D1",
+            "database_name": "csi205-next-tags",
+            "database_id": "0e720554-d811-4a07-8ba0-00299ddb8d67"
+        }
+    ],
+    "durable_objects": {
+        "bindings": [
+            {
+                "name": "NEXT_CACHE_DO_QUEUE",
+                "class_name": "DOQueueHandler"
+            }
+        ]
+    },
+    "migrations": [
+        {
+            "tag": "v1-cache-queue",
+            "new_sqlite_classes": ["DOQueueHandler"]
+        }
+    ]
 }

@@ -4,6 +4,7 @@ import { withHandler } from "@/server/http/handler";
 import { readJson } from "@/server/http/request";
 import { success } from "@/server/http/response";
 import { deleteFaqQuestion, getFaqQuestion, updateFaqQuestion } from "@/server/services/faq.service";
+import { invalidatePublicFaq } from "@/server/cache/tags";
 
 type Context = { params: Promise<{ id: string }> };
 
@@ -19,11 +20,15 @@ export const PATCH = withHandler(async (request, { params }: Context) => {
     await requireAdmin(request);
     const { id } = await params;
     const input = await readJson<UpdateFaqQuestionInput>(request);
-    return success(await updateFaqQuestion(id, input));
+    const question = await updateFaqQuestion(id, input);
+    invalidatePublicFaq();
+    return success(question);
 });
 
 export const DELETE = withHandler(async (request, { params }: Context) => {
     await requireAdmin(request);
     const { id } = await params;
-    return success(await deleteFaqQuestion(id));
+    const result = await deleteFaqQuestion(id);
+    invalidatePublicFaq();
+    return success(result);
 });

@@ -57,7 +57,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
             {/* แสดงการ์ดกิจกรรมทั้งหมด */}
             {initialEvents.length > 0 ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
-                    {initialEvents.map((event) => (
+                    {initialEvents.map((event, index) => (
                         <Link
                             key={event.id}
                             href={`/e/${encodeURIComponent(event.slug)}`}
@@ -75,6 +75,7 @@ export default function EventsClient({ initialEvents }: EventsClientProps) {
                                                 src={event.thumbnail}
                                                 alt={event.title}
                                                 fill
+                                                loading={index === 0 ? "eager" : "lazy"}
                                                 sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                                                 className="object-cover transition-transform duration-300 group-hover/card:scale-105"
                                                 unoptimized={!event.thumbnail.includes("images.unsplash.com")}

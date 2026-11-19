@@ -9,12 +9,17 @@ import { In, type EntityManager } from "typeorm";
 import { getEventSouvenirs } from "./event-souvenirs";
 import { readMoney } from "./money";
 import { toEventTicketItem } from "./ticket.service";
+import { recordAdminActivity } from "./admin-activity";
+import { readUuid } from "@/server/http/validation";
 
 const eventNotFound = () => new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
 
 export async function getEvents(): Promise<EventSummary[]> {
     const db = await getDatabase();
-    const events = await db.getRepository(Events).find({ order: { createdAt: "ASC", buyAt: "ASC" } });
+    const events = await db.getRepository(Events).find({
+        select: { id: true, slug: true, title: true, subTitle: true, thumbnail: true, venue: true, tags: true, buyAt: true, buyEndAt: true },
+        order: { createdAt: "ASC", buyAt: "ASC" },
+    });
     return events.map(toEventSummary);
 }
 
@@ -39,6 +44,7 @@ export async function listManageableEvents(user: User): Promise<EventSummary[]> 
 }
 
 export async function getEventById(id: string): Promise<EventDetail> {
+    readUuid(id, "รหัสงาน");
     const db = await getDatabase();
     return findEventDetail(db.manager, { id });
 }
@@ -54,7 +60,7 @@ async function findEventDetail(manager: EntityManager, where: { id: string } | {
     return toEventDetail(event, souvenirs);
 }
 
-export async function createEvent(input: EventInput): Promise<EventDetail> {
+export async function createEvent(input: EventInput, actorId?: string): Promise<EventDetail> {
     checkEventRules(input);
     const eventFields = readEventFields(input);
     if (!eventFields.slug || !eventFields.title) {
@@ -75,11 +81,13 @@ export async function createEvent(input: EventInput): Promise<EventDetail> {
         });
         const savedEvent = await manager.save(event);
         await saveEventSchedule(manager, savedEvent.id, input.sessions);
+        await recordAdminActivity(manager, actorId, savedEvent.id, "event.create", savedEvent.id);
         return findEventDetail(manager, { id: savedEvent.id });
     });
 }
 
-export async function updateEvent(id: string, input: Partial<EventInput>): Promise<EventDetail> {
+export async function updateEvent(id: string, input: Partial<EventInput>, actorId?: string): Promise<EventDetail> {
+    readUuid(id, "รหัสงาน");
     if (Object.keys(input).length === 0) {
         throw new ApiError("VALIDATION_ERROR", "ไม่มีข้อมูลที่ต้องแก้ไข", 422);
     }
@@ -106,20 +114,29 @@ export async function updateEvent(id: string, input: Partial<EventInput>): Promi
 
         const savedEvent = await eventRepo.save(event);
         await saveEventSchedule(manager, savedEvent.id, input.sessions);
+        await recordAdminActivity(manager, actorId, savedEvent.id, "event.update", savedEvent.id);
         return findEventDetail(manager, { id: savedEvent.id });
     });
 }
 
 function readEventFields(input: Partial<EventInput>) {
+    for (const key of ["title", "slug", "subTitle", "venue"] as const) {
+        const value = input[key];
+        if (value !== undefined && (typeof value !== "string" || value.length > 255 || ((key === "title" || key === "slug") && !value.trim()))) throw new ApiError("VALIDATION_ERROR", `${key} ไม่ถูกต้อง`, 422);
+    }
+    if (input.slug !== undefined && (!/^[\p{L}\p{N}][\p{L}\p{N}\p{M}._-]*$/u.test(input.slug) || ["create", "faq"].includes(input.slug))) throw new ApiError("VALIDATION_ERROR", "ชื่อใน URL ไม่ถูกต้องหรือถูกสงวนไว้", 422);
+    for (const key of ["description", "banner", "thumbnail"] as const) if (input[key] !== undefined && (typeof input[key] !== "string" || input[key].length > 2_800_000)) throw new ApiError("VALIDATION_ERROR", `${key} ไม่ถูกต้อง`, 422);
+    if (input.tags !== undefined && (!Array.isArray(input.tags) || input.tags.length > 50 || input.tags.some((tag) => typeof tag !== "string" || tag.length > 100))) throw new ApiError("VALIDATION_ERROR", "แท็กไม่ถูกต้อง", 422);
+    if (input.allowShipping !== undefined && typeof input.allowShipping !== "boolean") throw new ApiError("VALIDATION_ERROR", "การเปิดจัดส่งไม่ถูกต้อง", 422);
     return {
         slug: input.slug,
-        title: input.title,
+        title: input.title?.trim(),
         subTitle: input.subTitle,
         banner: input.banner,
         thumbnail: input.thumbnail,
         venue: input.venue,
         description: input.description,
-        tags: input.tags,
+        tags: input.tags?.map((tag) => tag.trim()).filter(Boolean),
         minTicketQTY: input.minTicketQTY,
         maxTicketQTY: input.maxTicketQTY,
         allowShipping: input.allowShipping,
@@ -164,7 +181,8 @@ async function saveEventSchedule(manager: EntityManager, eventId: string, input?
     if (sessions.length > 0) await manager.save(sessions);
 }
 
-export async function deleteEvent(id: string): Promise<{ id: string }> {
+export async function deleteEvent(id: string, actorId?: string): Promise<{ id: string }> {
+    readUuid(id, "รหัสงาน");
     const db = await getDatabase();
     if (await db.getRepository(Order).existsBy({ eventId: id })) {
         throw new ApiError("EVENT_HAS_ORDERS", "งานนี้มีออเดอร์แล้ว ลบไม่ได้", 409);
@@ -172,8 +190,12 @@ export async function deleteEvent(id: string): Promise<{ id: string }> {
     if (await db.getRepository(Store).existsBy({ eventId: id })) {
         throw new ApiError("EVENT_HAS_STORES", "งานนี้มีร้านค้าที่ผูกอยู่ ลบไม่ได้", 409);
     }
-    const result = await db.getRepository(Events).delete({ id });
-    if (!result.affected) throw eventNotFound();
+    await db.transaction(async (manager) => {
+        const event = await manager.findOne(Events, { where: { id }, lock: { mode: "pessimistic_write" } });
+        if (!event) throw eventNotFound();
+        await recordAdminActivity(manager, actorId, id, "event.delete", id, event.title);
+        await manager.delete(Events, { id });
+    });
     return { id };
 }
 

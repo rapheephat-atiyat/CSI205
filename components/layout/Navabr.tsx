@@ -21,7 +21,7 @@ export interface NavbarLink {
 const NAVBARLINKS: readonly NavbarLink[] = [
     { label: "หน้าหลัก", href: "/" },
     { label: "งานทั้งหมด", href: "/events" },
-    { label: "ช่วยเหลือ", href: "/help" },
+    { label: "ช่วยเหลือ", href: "/faq" },
 ]
 
 const PORTAL_LINKS = [

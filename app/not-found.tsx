@@ -63,7 +63,7 @@ export default function NotFound() {
                 <p className="mt-10 text-xs text-muted-foreground">
                     ต้องการความช่วยเหลือ?{" "}
                     <Link
-                        href="/help"
+                        href="/faq"
                         className="rounded-sm text-foreground underline decoration-border underline-offset-4 outline-none transition-colors hover:decoration-brand focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 motion-reduce:transition-none"
                     >
                         ไปที่ศูนย์ช่วยเหลือ

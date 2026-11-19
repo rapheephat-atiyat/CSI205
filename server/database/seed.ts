@@ -34,6 +34,7 @@ import {
 import { Role } from "./enums/role.enum";
 import { PERMISSIONS, type Permission } from "@/lib/permissions";
 import { seedCheckoutOrders, seedCheckoutSalesExamples } from "./seed-checkout";
+import { seedFaq } from "./seed-faq";
 
 const dayMs = 86_400_000;
 const demoSlip = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMfkAAAAASUVORK5CYII=";
@@ -1323,6 +1324,7 @@ async function runSeed() {
                 await assignRole(savedUsers[vendors[index].email], Role.VENDOR, permissions, { eventId: store.eventId, storeId: store.id });
             }
             await seedMoreWalletActivity(manager, demoGuests, userWallets, shops, topUpStaff, refundStaff, seededAt);
+            await seedFaq(manager);
         });
 
         console.log("✅ สร้างข้อมูล Mockup สำเร็จครบทุกตาราง!");
