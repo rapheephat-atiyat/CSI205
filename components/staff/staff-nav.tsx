@@ -47,13 +47,13 @@ function isItemActive(pathname: string, href: string) {
 }
 
 export function StaffSidebarNav({ ...props }: React.ComponentProps<typeof Sidebar>) {
-  const { state, setOpenMobile, setOpen } = useSidebar();
+  const { state, setOpenMobile } = useSidebar();
   const pathname = usePathname();
   const sidebarExpanded = state === "expanded";
 
   useEffect(() => {
-    setOpen(false);
-  }, [pathname, setOpen]);
+    setOpenMobile(false);
+  }, [pathname, setOpenMobile]);
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -90,7 +90,7 @@ export function StaffSidebarNav({ ...props }: React.ComponentProps<typeof Sideba
                       tooltip={item.label}
                       className={cn(
                         active &&
-                          "bg-brand text-on-brand font-semibold hover:bg-brand hover:text-on-brand"
+                          "bg-brand text-on-brand font-semibold hover:bg-brand hover:text-on-brand data-[active=true]:bg-brand data-[active=true]:text-on-brand data-[active=true]:hover:bg-brand-hover [&>svg]:text-on-brand"
                       )}
                     >
                       <Link href={item.href} onClick={() => setOpenMobile(false)}>
