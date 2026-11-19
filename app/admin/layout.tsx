@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
@@ -26,6 +27,8 @@ export default function AdminLayout({
 }
 
 async function AdminGate({ children }: { children: React.ReactNode }) {
+  // Wait before calling auth helpers that can be instrumented by Console Ninja.
+  await connection();
   const user = await requirePageUser("/admin");
   const isAdmin = user.userRoles.some((r) => r.role === "ADMIN");
 
