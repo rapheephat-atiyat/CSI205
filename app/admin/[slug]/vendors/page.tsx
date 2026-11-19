@@ -1,354 +1,63 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
-
-// import ui
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
-import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { toast } from "sonner";
+import type { AdminStore } from "@/lib/api-types";
+import { api } from "@/lib/api-client";
+import { PERMISSIONS } from "@/lib/permissions";
+import { useAdminAccess } from "@/components/admin/AdminAccess";
+import { AdminFeedback, apiData } from "@/components/admin/AdminFeedback";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-// icon
-import { Plus, SearchIcon } from "lucide-react";
+export default function VendorsPage() {
+    const { eventId, eventTitle, slug, can } = useAdminAccess();
+    const [stores, setStores] = useState<AdminStore[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [query, setQuery] = useState("");
+    const [revision, setRevision] = useState(0);
+    const [target, setTarget] = useState<AdminStore | "new" | null>(null);
+    function reload() { setLoading(true); setRevision((value) => value + 1); }
+    useEffect(() => {
+        let cancelled = false;
+        api.admin.stores.list(eventId).then(apiData).then((data) => { if (!cancelled) { setStores(data); setError(null); } })
+            .catch((cause: unknown) => { if (!cancelled) setError(cause instanceof Error ? cause.message : "โหลดร้านค้าไม่สำเร็จ"); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [eventId, revision]);
+    const filtered = stores.filter((store) => store.name.toLowerCase().includes(query.trim().toLowerCase()));
+    return <div className="mx-auto w-full max-w-7xl space-y-6 p-4 md:p-6"><header className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-2xl font-semibold">ร้านค้า</h1><p className="mt-2 text-sm text-muted-foreground">{eventTitle}</p></div><div className="flex gap-3"><Button variant="outline" className="min-h-11" onClick={reload}>รีเฟรช</Button><Button className="min-h-11 bg-brand text-on-brand hover:bg-brand-hover" onClick={() => setTarget("new")}>สร้างร้านค้า</Button></div></header>
+        <div className="space-y-2"><label htmlFor="store-search" className="text-sm font-medium">ค้นหาร้านค้า</label><Input id="store-search" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <AdminFeedback loading={loading} error={error} retry={reload} />
+        {!loading && !error && <div className="rounded-xl border bg-background p-4"><Table><TableHeader><TableRow><TableHead>ร้านค้า</TableHead><TableHead>สินค้า</TableHead><TableHead>Token คงเหลือ</TableHead><TableHead>ผู้ดูแลร้าน</TableHead><TableHead>จัดการ</TableHead></TableRow></TableHeader><TableBody>{filtered.length ? filtered.map((store) => <TableRow key={store.id}><TableCell className="font-medium">{store.name}</TableCell><TableCell>{store.product ? `${store.product.title} · ${store.product.price} Token` : "ยังไม่มีสินค้า"}</TableCell><TableCell className="tabular-nums">{Number(store.walletBalance).toLocaleString("th-TH", { minimumFractionDigits: 2 })}</TableCell><TableCell>{store.managers.map((manager) => manager.name).join(", ") || "ยังไม่ได้มอบหมาย"}</TableCell><TableCell><Button variant="outline" className="min-h-11" onClick={() => setTarget(store)}>แก้ไขร้านค้า</Button></TableCell></TableRow>) : <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground">ไม่พบร้านค้า</TableCell></TableRow>}</TableBody></Table>{can(PERMISSIONS.PERMISSION_MANAGE) && <Button asChild variant="outline" className="mt-4 min-h-11"><Link href={`/admin/${encodeURIComponent(slug)}/users`}>จัดการผู้ดูแลร้านในหน้าผู้ใช้และสิทธิ์</Link></Button>}</div>}
+        <Dialog open={target !== null} onOpenChange={(open) => { if (!open) setTarget(null); }}><DialogContent><DialogHeader><DialogTitle>{target === "new" ? "สร้างร้านค้า" : "แก้ไขร้านค้า"}</DialogTitle><DialogDescription>จัดการข้อมูลร้านค้าเฉพาะงานนี้ ร้านค้าที่มีประวัติธุรกรรมจะลบไม่ได้</DialogDescription></DialogHeader>{target && <StoreForm key={target === "new" ? "new" : target.id} store={target === "new" ? undefined : target} onSaved={() => { setTarget(null); reload(); }} />}</DialogContent></Dialog>
+    </div>;
+}
 
-import { api } from "@/lib/api-client";
-import type { EventDetail, StoreDetail, User } from "@/lib/api-types";
-import { Skeleton } from "@/components/ui/skeleton";
-
-type Store = EventDetail["stores"][number];
-
-export default function Page() {
-  const { slug } = useParams<{ slug: string }>();
-
-  const [search, setSearch] = useState("");
-  const [event, setEvent] = useState<EventDetail | null>(null);
-  const [vendors, setVendors] = useState<Store[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
-  // รายละเอียดร้าน (ยอดโทเคน/สินค้า) แยกตาม store id
-  const [details, setDetails] = useState<Record<string, StoreDetail>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  async function load() {
-    const res = await api.events.get(slug);
-    if (!res.success) {
-      setError(res.error.message);
-      setLoading(false);
-      return;
+function StoreForm({ store, onSaved }: { store?: AdminStore; onSaved: () => void }) {
+    const { eventId } = useAdminAccess();
+    const [name, setName] = useState(store?.name ?? "");
+    const [description, setDescription] = useState(store?.description ?? "");
+    const [busy, setBusy] = useState(false);
+    const [confirmed, setConfirmed] = useState(false);
+    async function save(event: React.FormEvent) {
+        event.preventDefault(); setBusy(true);
+        try { apiData(await (store ? api.admin.stores.update(eventId, store.id, { name, description }) : api.admin.stores.create(eventId, { name, description }))); toast.success("บันทึกร้านค้าแล้ว"); onSaved(); }
+        catch (cause) { toast.error(cause instanceof Error ? cause.message : "บันทึกร้านค้าไม่สำเร็จ"); }
+        finally { setBusy(false); }
     }
-    setEvent(res.data);
-    setVendors(res.data.stores);
-
-    const results = await Promise.all(
-      res.data.stores.map((s) => api.store.getMy(s.id)),
-    );
-    const map: Record<string, StoreDetail> = {};
-    results.forEach((r, i) => {
-      if (r.success) map[res.data.stores[i].id] = r.data;
-    });
-    setDetails(map);
-
-    // ใช้หาชื่อผู้ดูแลร้าน (ถ้าไม่มีสิทธิ์ดูรายชื่อผู้ใช้ ก็แสดงเป็น "-")
-    const usersRes = await api.admin.users.list();
-    if (usersRes.success) setUsers(usersRes.data);
-
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    load();
-  }, [slug]);
-
-  function managersOf(storeId: string) {
-    const names = users
-      .filter((u) =>
-        u.roles.some((r) => r.role === "VENDOR" && r.storeId === storeId),
-      )
-      .map((u) => u.name);
-    return names.length ? names.join(", ") : "-";
-  }
-
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newDescription, setNewDescription] = useState("");
-  const [creating, setCreating] = useState(false);
-
-  function openCreate() {
-    setNewName("");
-    setNewDescription("");
-    setCreateOpen(true);
-  }
-
-  async function handleCreate(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    if (!event) return;
-
-    setCreating(true);
-    const res = await api.store.create({
-      eventId: event.id,
-      name: newName.trim(),
-      description: newDescription.trim() || null,
-    });
-    setCreating(false);
-
-    if (!res.success) return alert(res.error.message);
-    setCreateOpen(false);
-    load();
-  }
-
-  // ---------- UI ---------- //
-  if (loading)
-    return (
-      <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
-        {/* breadcrumb */}
-        <div className="flex items-center gap-2">
-          <Skeleton className="h-4 w-24 bg-on-brand" />
-          <Skeleton className="h-4 w-4 bg-on-brand" />
-          <Skeleton className="h-4 w-32 bg-on-brand" />
-        </div>
-        <div className="p-4 mx-auto w-full max-w-7xl flex flex-col gap-4">
-          {/* หัวเรื่อง */}
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-7 w-48 bg-on-brand" />
-            <Skeleton className="h-4 w-80 max-w-full bg-on-brand" />
-          </div>
-
-          {/* การ์ด 1 ใบ */}
-          <div className="w-full flex flex-col items-center justify-center gap-4">
-            <Skeleton className="h-140 w-full rounded-[10px] bg-on-brand" />
-          </div>
-        </div>
-      </div>
-    );
-  if (error || !event) return <div className="p-4">{error ?? "ไม่พบงาน"}</div>;
-
-  const fmt = (v?: string | null) =>
-    v == null ? "-" : Number(v).toLocaleString("th-TH");
-  const totalIncome = Object.values(details).reduce(
-    (sum, d) => sum + Number(d.walletBalance),
-    0,
-  );
-
-  const keyword = search.trim().toLowerCase();
-  const filtered = vendors.filter((v) =>
-    v.name.toLowerCase().includes(keyword),
-  );
-
-  return (
-    <div className="p-4 w-full flex mx-auto flex-col items-start justify-center">
-      {/* Breadcrumbs */}
-      <div className="w-full flex items-center justify-start">
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbLink href={`/admin/${slug}`}>
-                {event.title}
-              </BreadcrumbLink>
-            </BreadcrumbItem>
-            <BreadcrumbSeparator />
-            <BreadcrumbItem>
-              <BreadcrumbPage>ร้านค้า</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      </div>
-
-      <div className="p-4 mx-auto w-full max-w-7xl flex flex-col items-start justify-center gap-4">
-        {/* หัวเรื่อง */}
-        <div className="w-full flex flex-row items-center justify-between">
-          <div>
-            <div className="text-[24px] font-semibold text-black">ร้านค้า</div>
-            <div className="text-[14px] font-medium text-muted-foreground">
-              ร้านมีสินค้าได้เพียง 1 รายการ
-            </div>
-          </div>
-          {/* create vendor */}
-          <Badge
-            onClick={openCreate}
-            variant={"outline"}
-            className="p-3 flex flex-row items-center border border-brand text-brand justify-center w-fit h-auto hover:bg-brand hover:text-on-brand font-semibold text-[16px] rounded-[10px] gap-1.5 hover:cursor-pointer transition ease-in [&>svg]:size-5!"
-          >
-            <Plus />
-            สร้างร้านค้า
-          </Badge>
-        </div>
-
-        {/* vendor */}
-        <Badge
-          variant={"outline"}
-          className="p-4 flex flex-col items-start justify-center w-full h-auto rounded-[10px] gap-1.5"
-        >
-          <div className="flex flex-col items-start justify-center">
-            <div className="text-[16px] font-semibold text-black">
-              ร้านค้าทั้งหมด ({vendors.length})
-            </div>
-            <div className="text-sm text-muted-foreground">
-              รายได้รวมทุกร้าน {fmt(String(totalIncome))} Token
-            </div>
-          </div>
-
-          <div className="flex w-full flex-col items-start justify-center gap-1">
-            <FieldGroup className="flex lg:flex-row">
-              <Field className="lg:flex-2">
-                <FieldLabel
-                  htmlFor="search-vendor"
-                  className="text-sm text-muted-foreground"
-                >
-                  ค้นหา
-                </FieldLabel>
-                <InputGroup className="w-full h-auto flex p-2">
-                  <InputGroupInput
-                    id="search-vendor"
-                    placeholder="ค้นหาชื่อร้าน"
-                    className="text-sm"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                  />
-                  <InputGroupAddon>
-                    <SearchIcon className="text-muted-foreground" />
-                  </InputGroupAddon>
-                </InputGroup>
-              </Field>
-            </FieldGroup>
-
-            <div className="mt-2 w-full">
-              <Table>
-                <TableCaption>รายชื่อร้านค้าในงาน</TableCaption>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>ร้านค้า</TableHead>
-                    <TableHead>สินค้า</TableHead>
-                    <TableHead>ราคา</TableHead>
-                    <TableHead>รายได้ร้าน</TableHead>
-                    <TableHead>ผู้ดูแลร้าน</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filtered.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={5}
-                        className="h-24 text-center text-muted-foreground"
-                      >
-                        {vendors.length === 0
-                          ? "ยังไม่มีร้านค้า"
-                          : "ไม่พบร้านค้าที่ค้นหา"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filtered.map((vendor) => (
-                      <TableRow key={vendor.id}>
-                        <TableCell className="font-medium">
-                          {vendor.name}
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {details[vendor.id]?.product?.title ?? "-"}
-                        </TableCell>
-                        <TableCell>
-                          {details[vendor.id]?.product
-                            ? `${fmt(details[vendor.id]!.product!.price)} Token`
-                            : "-"}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {details[vendor.id]
-                            ? `${fmt(details[vendor.id].walletBalance)} Token`
-                            : "-"}
-                        </TableCell>
-                        <TableCell>{managersOf(vendor.id)}</TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </div>
-        </Badge>
-
-        {/* dialog create store */}
-        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>สร้างร้านค้า</DialogTitle>
-              <DialogDescription>
-                เปิดร้านใหม่ในงาน "{event.title}"
-              </DialogDescription>
-            </DialogHeader>
-
-            <form className="w-full" onSubmit={handleCreate}>
-              <FieldGroup>
-                <Field>
-                  <FieldLabel htmlFor="store-name">ชื่อร้าน *</FieldLabel>
-                  <Input
-                    id="store-name"
-                    required
-                    placeholder="ร้านข้าวไก่ย่าง"
-                    value={newName}
-                    onChange={(e) => setNewName(e.target.value)}
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="store-description">
-                    รายละเอียด
-                  </FieldLabel>
-                  <Input
-                    id="store-description"
-                    placeholder="อาหารอีสาน เครื่องดื่ม"
-                    value={newDescription}
-                    onChange={(e) => setNewDescription(e.target.value)}
-                  />
-                </Field>
-              </FieldGroup>
-
-              <DialogFooter className="mt-4">
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">
-                    ยกเลิก
-                  </Button>
-                </DialogClose>
-                <Button
-                  type="submit"
-                  className="bg-brand hover:bg-brand-hover"
-                  disabled={creating}
-                >
-                  {creating ? "กำลังสร้าง..." : "สร้างร้านค้า"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-      </div>
-    </div>
-  );
+    async function remove() {
+        if (!store || !confirmed) return;
+        setBusy(true);
+        try { apiData(await api.admin.stores.delete(eventId, store.id)); toast.success("ลบร้านค้าแล้ว"); onSaved(); }
+        catch (cause) { toast.error(cause instanceof Error ? cause.message : "ลบร้านค้าไม่สำเร็จ"); }
+        finally { setBusy(false); }
+    }
+    return <form onSubmit={save} className="space-y-4"><fieldset disabled={busy} className="space-y-4"><div className="space-y-2"><label htmlFor="store-name" className="text-sm font-medium">ชื่อร้านค้า *</label><Input id="store-name" maxLength={255} required value={name} onChange={(event) => setName(event.target.value)} /></div><div className="space-y-2"><label htmlFor="store-description" className="text-sm font-medium">รายละเอียด</label><Textarea id="store-description" maxLength={5000} value={description} onChange={(event) => setDescription(event.target.value)} /></div><Button type="submit" disabled={busy} className="min-h-11 bg-brand text-on-brand hover:bg-brand-hover">{busy ? "กำลังบันทึก..." : "บันทึกร้านค้า"}</Button>{store && <div className="space-y-3 border-t pt-4"><label className="flex min-h-11 items-center gap-3 text-sm"><Checkbox checked={confirmed} onCheckedChange={(value) => setConfirmed(value === true)} />ยืนยันลบร้านค้า</label><Button type="button" variant="destructive" disabled={busy || !confirmed} onClick={remove}>ลบร้านค้า</Button></div>}</fieldset></form>;
 }

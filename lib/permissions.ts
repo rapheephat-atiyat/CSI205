@@ -4,6 +4,8 @@ export const PERMISSIONS = {
     EVENT_CREATE: "event.create",
     /** สิทธิ์แก้ไขงานเลี้ยงรุ่น */
     EVENT_UPDATE: "event.update",
+    /** ตรวจและอนุมัติหลักฐานชำระค่าบัตรภายในงาน */
+    ORDER_REVIEW: "order.review",
 
     /** สิทธิ์สแกนบัตรเข้างาน */
     TICKET_SCAN: "ticket.scan",
@@ -28,3 +30,16 @@ export const PERMISSIONS = {
 } as const
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS]
+
+export const EVENT_ADMIN_PERMISSIONS: Permission[] = [
+    PERMISSIONS.EVENT_UPDATE, PERMISSIONS.ORDER_REVIEW, PERMISSIONS.TICKET_SCAN,
+    PERMISSIONS.STORE_MANAGE, PERMISSIONS.REPORT_READ, PERMISSIONS.REPORT_EXPORT,
+    PERMISSIONS.PERMISSION_MANAGE,
+];
+
+export const PERMISSION_LABELS: Record<Permission, string> = {
+    "event.create": "สร้างงาน", "event.update": "แก้ไขงาน บัตร และของที่ระลึก", "order.review": "ตรวจชำระเงินและจัดส่ง",
+    "ticket.scan": "สแกนบัตรเข้างาน", "token.topup": "เติม Token", "token.refund.approve": "คืน Token",
+    "store.manage": "จัดการร้านค้า", "store.sell": "ขายสินค้า", "report.read": "อ่านรายงานและประวัติ",
+    "report.export": "ส่งออกรายงาน", "permission.manage": "จัดการบทบาทและสิทธิ์ในงาน",
+};

@@ -46,3 +46,12 @@ export async function requireAdmin(request: Request): Promise<User> {
     }
     return user;
 }
+
+export async function requireEventAdmin(request: Request, permission: Permission, eventId: string) {
+    const user = await requireUser(request);
+    const isAdmin = user.userRoles.some((role) => role.role === Role.ADMIN && role.storeId === null
+        && (role.eventId === null || role.eventId === eventId));
+    if (!isAdmin) throw new ApiError("FORBIDDEN", "คุณไม่มีสิทธิ์ดูแลงานนี้", 403);
+    checkPermission(user, permission, { eventId });
+    return user;
+}
