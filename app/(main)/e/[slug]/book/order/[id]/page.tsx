@@ -6,6 +6,7 @@ import { checkoutPaymentQr } from "@/server/services/checkout-payment";
 import { getEventBySlug } from "@/server/services/event.service";
 import { getMyOrder } from "@/server/services/order.service";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 type Props = { params: Promise<{ slug: string; id: string }> };
@@ -21,6 +22,7 @@ export default function BookingOrderPage({ params }: Props) {
 async function BookingOrder({ params }: Props) {
     const { slug, id } = await params;
     const path = `/e/${encodeURIComponent(slug)}/book/order/${encodeURIComponent(id)}`;
+    await connection();
     const user = await requirePageUser(path);
 
     const [event, order] = await Promise.all([getEventBySlug(slug), getMyOrder(user.id, id)]).catch((error: unknown) => {

@@ -3,6 +3,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { WalletDetail, WalletHistoryItem } from "@/lib/api-types";
 import { requirePageUser } from "@/server/auth/page-user";
 import { getUserWallet } from "@/server/services/wallet.service";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 export const metadata = { title: "กระเป๋าเงิน – TUATUA" };
@@ -16,6 +17,7 @@ export default function WalletPage() {
 }
 
 async function WalletContent() {
+    await connection();
     const user = await requirePageUser("/account/wallet");
     const wallet = await getUserWallet(user.id);
     return <WalletView wallet={wallet} />;

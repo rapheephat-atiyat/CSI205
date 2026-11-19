@@ -5,6 +5,7 @@ import type { EventDetail, OrderShippingInput, OrderSouvenirItem, TicketAttendee
 import { souvenirVariantKey, ticketCanReceiveSouvenir } from "@/lib/souvenirs";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
+import { getAttendeeStatus, type AttendeeProgress } from "./attendee-fields";
 import BookLayout from "./BookLayout";
 import { BookSummary } from "./BookSummary";
 import { Step1SelectTickets } from "./Step1SelectTickets";
@@ -83,6 +84,13 @@ export default function BookContent({ event, profile, paymentConfigured }: Props
     const shippingFee = shipToHome ? Number(event.shippingFee ?? 0) : 0;
     const orderTotal = ticketTotalInSatang / 100 + extraSouvenirTotal + shippingFee;
     const ticketCount = ticketAttendees.length;
+    const attendeeProgress = currentStep === 2 ? ticketAttendees.map<AttendeeProgress>((entry) => ({
+        key: entry.key,
+        name: [entry.attendee.firstName?.trim(), entry.attendee.lastName?.trim()].filter(Boolean).join(" "),
+        status: getAttendeeStatus(entry),
+    })) : undefined;
+    const completedAttendeeCount = attendeeProgress?.filter(({ status }) => status === "complete").length ?? 0;
+    const hasIncompleteAttendees = attendeeProgress !== undefined && completedAttendeeCount < ticketCount;
     const hasEnoughTickets = ticketCount >= Math.max(1, event.minTicketQTY);
     const canConfirmOrder = paymentConfigured || orderTotal === 0;
     const bookingIsLocked = isSubmitting || mustRetrySameOrder;
@@ -110,7 +118,7 @@ export default function BookContent({ event, profile, paymentConfigured }: Props
 
     async function submitCurrentStep(formEvent: FormEvent<HTMLFormElement>) {
         formEvent.preventDefault();
-        if (submittingOrder.current || !hasEnoughTickets) return;
+        if (submittingOrder.current || !hasEnoughTickets || hasIncompleteAttendees) return;
 
         if (currentStep < 4) {
             goToStep(currentStep + 1);
@@ -203,6 +211,8 @@ export default function BookContent({ event, profile, paymentConfigured }: Props
                 </div>
                 <BookSummary
                     currentStep={currentStep}
+                    attendeeProgress={attendeeProgress}
+                    completedAttendeeCount={completedAttendeeCount}
                     selectedTicketTypes={selectedTicketTypes}
                     quantityByTicketId={quantityByTicketId}
                     ticketCount={ticketCount}

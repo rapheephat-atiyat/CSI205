@@ -5,6 +5,7 @@ import type { EventSummary, OrderDetail } from "@/lib/api-types";
 import { requirePageUser } from "@/server/auth/page-user";
 import { getPublicEvents } from "@/server/cache/public-content";
 import { getMyOrders } from "@/server/services/order.service";
+import { connection } from "next/server";
 import { Suspense } from "react";
 
 
@@ -28,6 +29,7 @@ export default function page(props: Props) {
 async function OrdersContent({ searchParams }: Props) {
     const { status } = await searchParams;
     const filter = filters.find((item) => item.value === status)?.value ?? "";
+    await connection();
     const user = await requirePageUser(filter ? `/account/orders?status=${filter}` : "/account/orders");
     let orders: OrderDetail[] = [];
     let events: EventSummary[] = [];
