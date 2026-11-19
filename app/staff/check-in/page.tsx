@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Coins, LogIn, LogOut, Ticket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
@@ -8,6 +8,8 @@ import { AttendeeStatusBadge } from "@/components/staff/status-badge";
 import { ScanResultCard } from "@/components/staff/scan-result";
 import { cn } from "@/lib/utils";
 import { attendees as seed, formatTokens, type Attendee } from "@/lib/staff-mock";
+import { api } from "@/lib/api-client";
+import { saveScanRecord } from "@/lib/staff-storage";
 
 type Feedback = { kind: "checked-in" | "checked-out" | "duplicate"; name: string; ticketId: string };
 
@@ -20,16 +22,54 @@ export default function CheckInPage() {
   const [selectedId, setSelectedId] = useState(seed[1].id);
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
+  useEffect(() => {
+    async function loadAttendees() {
+      try {
+        const res = await api.staff.attendees();
+        if (res.success && res.data && res.data.length > 0) {
+          const mapped: Attendee[] = res.data.map((item) => ({
+            id: item.id,
+            name: item.name,
+            ticketId: item.ticketId,
+            ticketType: (item.ticketType as Attendee["ticketType"]) || "General",
+            status: item.status,
+            tokens: item.tokens,
+            lastActionAt: item.lastActionAt,
+          }));
+          setList(mapped);
+          setSelectedId(mapped[0]?.id ?? seed[0].id);
+        }
+      } catch {
+        // use default seed
+      }
+    }
+    loadAttendees();
+  }, []);
+
   const selected = list.find((a) => a.id === selectedId) ?? list[0];
 
-  function apply(action: "in" | "out") {
+  async function apply(action: "in" | "out") {
     const already =
       (action === "in" && selected.status === "checked-in") ||
       (action === "out" && selected.status !== "checked-in");
     if (already) {
       setFeedback({ kind: "duplicate", name: selected.name, ticketId: selected.ticketId });
+      saveScanRecord({
+        time: nowTime(),
+        attendeeName: selected.name,
+        ticketId: selected.ticketId,
+        action,
+        outcome: "duplicate",
+      });
       return;
     }
+
+    try {
+      await api.tickets.scan({ qrToken: selected.ticketId, action });
+    } catch {
+      // offline / mock mode fallback
+    }
+
     setList((prev) =>
       prev.map((a) =>
         a.id === selected.id
@@ -37,10 +77,20 @@ export default function CheckInPage() {
           : a
       )
     );
+
+    const kind = action === "in" ? "checked-in" : "checked-out";
     setFeedback({
-      kind: action === "in" ? "checked-in" : "checked-out",
+      kind,
       name: selected.name,
       ticketId: selected.ticketId,
+    });
+
+    saveScanRecord({
+      time: nowTime(),
+      attendeeName: selected.name,
+      ticketId: selected.ticketId,
+      action,
+      outcome: kind,
     });
   }
 
@@ -81,55 +131,68 @@ export default function CheckInPage() {
           </ul>
         </section>
 
-        <section className="flex flex-col gap-4">
-          <div className="rounded-xl border bg-background p-4 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold">{selected.name}</h2>
-                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <Ticket className="size-3.5" aria-hidden />
-                    <span className="font-mono">{selected.ticketId}</span>
-                  </span>
-                  <span>บัตร {selected.ticketType}</span>
-                  <span className="inline-flex items-center gap-1">
-                    <Coins className="size-3.5" aria-hidden />
-                    {formatTokens(selected.tokens)} Token
-                  </span>
-                </p>
-              </div>
-              <AttendeeStatusBadge status={selected.status} />
+        <section className="rounded-xl border bg-background p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
+            <div>
+              <p className="text-xs text-muted-foreground">ข้อมูลผู้เข้าร่วม</p>
+              <h2 className="mt-0.5 text-xl font-semibold">{selected.name}</h2>
+              <p className="font-mono text-xs text-muted-foreground">{selected.ticketId}</p>
             </div>
-            {selected.lastActionAt && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                บันทึกล่าสุดเวลา {selected.lastActionAt} น.
-              </p>
-            )}
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              <Button
-                size="lg"
-                className="h-11 bg-brand text-base text-on-brand hover:bg-brand-hover"
-                onClick={() => apply("in")}
-              >
-                <LogIn data-icon="inline-start" aria-hidden />
-                เช็กอิน
-              </Button>
-              <Button variant="outline" size="lg" className="h-11 text-base" onClick={() => apply("out")}>
-                <LogOut data-icon="inline-start" aria-hidden />
-                เช็กเอาท์
-              </Button>
-            </div>
+            <AttendeeStatusBadge status={selected.status} />
           </div>
 
-          <div aria-live="polite">
-            {feedback ? (
-              <ScanResultCard outcome={feedback.kind} name={feedback.name} ticketId={feedback.ticketId} />
-            ) : (
-              <div className="rounded-xl border border-dashed bg-background p-6 text-center text-sm text-muted-foreground">
-                ผลการเช็กอิน/เช็กเอาท์จะแสดงที่นี่
-              </div>
-            )}
+          <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-muted/60 p-3">
+              <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Ticket className="size-3.5" aria-hidden />
+                ประเภทบัตร
+              </dt>
+              <dd className="mt-1 font-medium">{selected.ticketType}</dd>
+            </div>
+            <div className="rounded-lg bg-muted/60 p-3">
+              <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Coins className="size-3.5" aria-hidden />
+                Token คงเหลือ
+              </dt>
+              <dd className="mt-1 font-medium tabular-nums">{formatTokens(selected.tokens)}</dd>
+            </div>
+            <div className="col-span-2 rounded-lg bg-muted/60 p-3 sm:col-span-1">
+              <dt className="text-xs text-muted-foreground">เวลาล่าสุด</dt>
+              <dd className="mt-1 font-medium">{selected.lastActionAt ?? "—"}</dd>
+            </div>
+          </dl>
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              className="flex-1 bg-brand text-on-brand hover:bg-brand-hover"
+              disabled={selected.status === "checked-in"}
+              onClick={() => apply("in")}
+            >
+              <LogIn data-icon="inline-start" aria-hidden />
+              บันทึกเข้างาน (Check-in)
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="flex-1"
+              disabled={selected.status !== "checked-in"}
+              onClick={() => apply("out")}
+            >
+              <LogOut data-icon="inline-start" aria-hidden />
+              บันทึกออกงาน (Check-out)
+            </Button>
           </div>
+
+          {feedback && (
+            <div className="mt-4" aria-live="polite">
+              <ScanResultCard
+                outcome={feedback.kind}
+                name={feedback.name}
+                ticketId={feedback.ticketId}
+              />
+            </div>
+          )}
         </section>
       </div>
     </>

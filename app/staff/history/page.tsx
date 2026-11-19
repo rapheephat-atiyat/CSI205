@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { History, LogIn, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { OutcomeBadge } from "@/components/staff/status-badge";
 import { cn } from "@/lib/utils";
-import { scanHistory } from "@/lib/staff-mock";
+import type { ScanRecord } from "@/lib/staff-mock";
+import { getStoredScans } from "@/lib/staff-storage";
+import { api } from "@/lib/api-client";
 
 type Filter = "all" | "in" | "out" | "error";
 
@@ -20,9 +22,37 @@ const filters: { value: Filter; label: string }[] = [
 const isError = (o: string) => o === "expired" || o === "duplicate" || o === "invalid";
 
 export default function ScanHistoryPage() {
+  const [historyList, setHistoryList] = useState<ScanRecord[]>(() => getStoredScans());
   const [filter, setFilter] = useState<Filter>("all");
 
-  const rows = scanHistory.filter((r) =>
+  useEffect(() => {
+    const stored = getStoredScans();
+
+    // Also fetch server scans if available
+    async function fetchServerScans() {
+      try {
+        const res = await api.staff.overview();
+        if (res.success && res.data?.recentScans?.length) {
+          const serverScans: ScanRecord[] = res.data.recentScans.map((s) => ({
+            id: s.id,
+            time: s.time,
+            attendeeName: s.attendeeName,
+            ticketId: s.ticketId,
+            action: s.action,
+            outcome: s.outcome,
+          }));
+          const existingIds = new Set(stored.map((item) => item.id));
+          const combined = [...stored, ...serverScans.filter((s) => !existingIds.has(s.id))];
+          setHistoryList(combined);
+        }
+      } catch {
+        // use stored
+      }
+    }
+    fetchServerScans();
+  }, []);
+
+  const rows = historyList.filter((r) =>
     filter === "all"
       ? true
       : filter === "error"

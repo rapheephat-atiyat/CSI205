@@ -1,25 +1,79 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { ArrowRight, Coins, LogIn, ScanLine, Search, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { OutcomeBadge } from "@/components/staff/status-badge";
 import {
-  attendees,
-  eventInfo,
+  attendees as seedAttendees,
+  eventInfo as defaultEventInfo,
   formatTokens,
-  scanHistory,
-  staffProfile,
+  staffProfile as defaultStaffProfile,
+  type ScanRecord,
 } from "@/lib/staff-mock";
+import { api } from "@/lib/api-client";
+import { getStoredScans, getStoredTopUpQuota } from "@/lib/staff-storage";
 
 export default function StaffDashboardPage() {
-  const total = attendees.length;
-  const checkedIn = attendees.filter((a) => a.status === "checked-in").length;
-  const checkedOut = attendees.filter((a) => a.status === "checked-out").length;
-  const waiting = total - checkedIn - checkedOut;
-  const quotaLeft = staffProfile.topUpQuotaTotal - staffProfile.topUpQuotaUsed;
+  const [total, setTotal] = useState(seedAttendees.length);
+  const [checkedIn, setCheckedIn] = useState(
+    seedAttendees.filter((a) => a.status === "checked-in").length
+  );
+  const [checkedOut, setCheckedOut] = useState(
+    seedAttendees.filter((a) => a.status === "checked-out").length
+  );
+  const [waiting, setWaiting] = useState(total - checkedIn - checkedOut);
+  const [eventData, setEventData] = useState(defaultEventInfo);
+  const [quotaData] = useState(() => getStoredTopUpQuota());
+  const [recentScans, setRecentScans] = useState<ScanRecord[]>(() => getStoredScans().slice(0, 5));
+
+  useEffect(() => {
+    const localScans = getStoredScans();
+
+    // Fetch server data
+    async function loadOverview() {
+      try {
+        const res = await api.staff.overview();
+        if (res.success && res.data) {
+          const d = res.data;
+          setTotal(d.total > 0 ? d.total : seedAttendees.length);
+          setCheckedIn(d.checkedIn);
+          setCheckedOut(d.checkedOut);
+          setWaiting(d.waiting);
+          if (d.eventInfo) {
+            setEventData({
+              name: d.eventInfo.name,
+              date: d.eventInfo.date,
+              capacity: d.eventInfo.capacity,
+            });
+          }
+          if (d.recentScans?.length) {
+            const serverScans: ScanRecord[] = d.recentScans.map((s) => ({
+              id: s.id,
+              time: s.time,
+              attendeeName: s.attendeeName,
+              ticketId: s.ticketId,
+              action: s.action,
+              outcome: s.outcome,
+            }));
+            const existingIds = new Set(localScans.map((l) => l.id));
+            const merged = [...localScans, ...serverScans.filter((s) => !existingIds.has(s.id))];
+            setRecentScans(merged.slice(0, 5));
+          }
+        }
+      } catch {
+        // use local
+      }
+    }
+    loadOverview();
+  }, []);
+
+  const quotaLeft = defaultStaffProfile.topUpQuotaTotal - quotaData.used;
 
   const stats = [
-    { label: "ผู้เข้าร่วมทั้งหมด", value: total, note: `ความจุงาน ${formatTokens(eventInfo.capacity)} คน` },
+    { label: "ผู้เข้าร่วมทั้งหมด", value: total, note: `ความจุงาน ${formatTokens(eventData.capacity)} คน` },
     { label: "อยู่ในงานตอนนี้", value: checkedIn, note: "เช็กอินแล้ว" },
     { label: "ออกจากงานแล้ว", value: checkedOut, note: "เช็กเอาท์แล้ว" },
     { label: "ยังไม่เข้างาน", value: waiting, note: "รอเช็กอิน" },
@@ -30,7 +84,7 @@ export default function StaffDashboardPage() {
       <PageHeader
         eyebrow="Staff Dashboard"
         title="ภาพรวมผู้เข้าร่วมและยอดเช็กอิน"
-        description={`${eventInfo.name} · ${eventInfo.date}`}
+        description={`${eventData.name} · ${eventData.date}`}
         action={
           <Button asChild size="lg" className="bg-brand text-on-brand hover:bg-brand-hover">
             <Link href="/staff/scanner">
@@ -51,7 +105,6 @@ export default function StaffDashboardPage() {
         ))}
       </section>
 
-
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <section className="rounded-xl border bg-background lg:col-span-2">
           <div className="flex items-center justify-between border-b px-4 py-3 sm:px-5">
@@ -64,17 +117,23 @@ export default function StaffDashboardPage() {
             </Link>
           </div>
           <ul className="divide-y">
-            {scanHistory.slice(0, 5).map((r) => (
-              <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{r.attendeeName}</p>
-                  <p className="text-xs text-muted-foreground">
-                    <span className="font-mono">{r.ticketId}</span> · {r.time} น.
-                  </p>
-                </div>
-                <OutcomeBadge outcome={r.outcome} />
+            {recentScans.length === 0 ? (
+              <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                ยังไม่มีรายการสแกนล่าสุด
               </li>
-            ))}
+            ) : (
+              recentScans.map((r) => (
+                <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3 sm:px-5">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium">{r.attendeeName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-mono">{r.ticketId}</span> · {r.time} น.
+                    </p>
+                  </div>
+                  <OutcomeBadge outcome={r.outcome} />
+                </li>
+              ))
+            )}
           </ul>
         </section>
 
@@ -102,9 +161,9 @@ export default function StaffDashboardPage() {
               โควตาเติม Token ของคุณ
             </div>
             <p className="mt-2 text-2xl font-semibold tabular-nums">
-              {formatTokens(quotaLeft)}
+              {formatTokens(Math.max(quotaLeft, 0))}
               <span className="ml-1 text-sm font-normal text-muted-foreground">
-                / {formatTokens(staffProfile.topUpQuotaTotal)} Token
+                / {formatTokens(defaultStaffProfile.topUpQuotaTotal)} Token
               </span>
             </p>
             <p className="mt-1 text-xs text-muted-foreground">คงเหลือสำหรับวันนี้</p>

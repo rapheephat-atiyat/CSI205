@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Coins, Search, SearchX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { AttendeeStatusBadge } from "@/components/staff/status-badge";
 import { cn } from "@/lib/utils";
-import { attendees, formatTokens, type AttendeeStatus } from "@/lib/staff-mock";
+import { attendees as seed, formatTokens, type AttendeeStatus, type Attendee } from "@/lib/staff-mock";
+import { api } from "@/lib/api-client";
 
 type Filter = "all" | AttendeeStatus;
 
@@ -19,17 +20,41 @@ const filters: { value: Filter; label: string }[] = [
 ];
 
 export default function AttendeeSearchPage() {
+  const [list, setList] = useState<Attendee[]>(seed);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
 
+  useEffect(() => {
+    async function loadData() {
+      try {
+        const res = await api.staff.attendees();
+        if (res.success && res.data && res.data.length > 0) {
+          const mapped: Attendee[] = res.data.map((item) => ({
+            id: item.id,
+            name: item.name,
+            ticketId: item.ticketId,
+            ticketType: (item.ticketType as Attendee["ticketType"]) || "General",
+            status: item.status,
+            tokens: item.tokens,
+            lastActionAt: item.lastActionAt,
+          }));
+          setList(mapped);
+        }
+      } catch {
+        // fallback to seed
+      }
+    }
+    loadData();
+  }, []);
+
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return attendees.filter(
+    return list.filter(
       (a) =>
         (filter === "all" || a.status === filter) &&
         (!q || a.name.toLowerCase().includes(q) || a.ticketId.toLowerCase().includes(q))
     );
-  }, [query, filter]);
+  }, [list, query, filter]);
 
   return (
     <>
@@ -115,7 +140,7 @@ export default function AttendeeSearchPage() {
                 </span>
                 <div className="flex gap-2">
                   <Button asChild variant="outline" size="sm">
-                    <Link href="/staff/top-up">เติม Token</Link>
+                    <Link href={`/staff/top-up?attendeeId=${encodeURIComponent(a.id)}`}>เติม Token</Link>
                   </Button>
                   <Button asChild size="sm" className="bg-brand text-on-brand hover:bg-brand-hover">
                     <Link href="/staff/check-in">เช็กอิน/เอาท์</Link>

@@ -1,26 +1,62 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { CircleCheck, Coins, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { PageHeader } from "@/components/staff/page-header";
 import { cn } from "@/lib/utils";
-import { attendees, formatTokens, staffProfile } from "@/lib/staff-mock";
+import { attendees as seed, formatTokens, staffProfile } from "@/lib/staff-mock";
+import { api } from "@/lib/api-client";
+import { addTopUpUsed, getStoredTopUpQuota } from "@/lib/staff-storage";
 
 const presets = [50, 100, 200, 500];
 
-export default function TokenTopUpPage() {
-  const [attendeeId, setAttendeeId] = useState(attendees[0].id);
+function TokenTopUpContent() {
+  const searchParams = useSearchParams();
+  const initialAttendeeId = searchParams.get("attendeeId");
+
+  const [attendeesList, setAttendeesList] = useState(seed);
+  const [attendeeId, setAttendeeId] = useState(initialAttendeeId ?? seed[0].id);
   const [amount, setAmount] = useState<number>(100);
   const [custom, setCustom] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [done, setDone] = useState<{ name: string; amount: number; balance: number } | null>(null);
-  const [used, setUsed] = useState(staffProfile.topUpQuotaUsed);
+  const [used, setUsed] = useState(() => getStoredTopUpQuota().used);
   const [balances, setBalances] = useState<Record<string, number>>(
-    Object.fromEntries(attendees.map((a) => [a.id, a.tokens]))
+    Object.fromEntries(seed.map((a) => [a.id, a.tokens]))
   );
 
-  const attendee = attendees.find((a) => a.id === attendeeId) ?? attendees[0];
+  useEffect(() => {
+    async function loadAttendees() {
+      try {
+        const res = await api.staff.attendees();
+        if (res.success && res.data && res.data.length > 0) {
+          const mapped = res.data.map((item) => ({
+            id: item.id,
+            name: item.name,
+            ticketId: item.ticketId,
+            ticketType: (item.ticketType as (typeof seed)[0]["ticketType"]) || "General",
+            status: item.status,
+            tokens: item.tokens,
+            lastActionAt: item.lastActionAt,
+          }));
+          setAttendeesList(mapped);
+          setBalances(Object.fromEntries(mapped.map((a) => [a.id, a.tokens])));
+          if (initialAttendeeId && mapped.some((m) => m.id === initialAttendeeId)) {
+            setAttendeeId(initialAttendeeId);
+          } else {
+            setAttendeeId(mapped[0].id);
+          }
+        }
+      } catch {
+        // use fallback seed
+      }
+    }
+    loadAttendees();
+  }, [initialAttendeeId]);
+
+  const attendee = attendeesList.find((a) => a.id === attendeeId) ?? attendeesList[0] ?? seed[0];
   const quotaLeft = staffProfile.topUpQuotaTotal - used;
   const overQuota = amount > quotaLeft;
   const invalid = !Number.isInteger(amount) || amount <= 0;
@@ -38,11 +74,22 @@ export default function TokenTopUpPage() {
     setConfirming(false);
   }
 
-  function confirm() {
-    const next = balances[attendee.id] + amount;
-    setBalances((b) => ({ ...b, [attendee.id]: next }));
-    setUsed((u) => u + amount);
-    setDone({ name: attendee.name, amount, balance: next });
+  async function confirm() {
+    let nextBalance = (balances[attendee.id] ?? 0) + amount;
+    try {
+      const res = await api.staff.topUp({ attendeeId: attendee.id, amount });
+      if (res.success && res.data) {
+        nextBalance = res.data.balance;
+      }
+    } catch {
+      // offline / mock fallback
+    }
+
+    setBalances((b) => ({ ...b, [attendee.id]: nextBalance }));
+    const newUsed = used + amount;
+    setUsed(newUsed);
+    addTopUpUsed(amount);
+    setDone({ name: attendee.name, amount, balance: nextBalance });
     setConfirming(false);
   }
 
@@ -68,7 +115,7 @@ export default function TokenTopUpPage() {
               }}
               className="mt-1.5 h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             >
-              {attendees.map((a) => (
+              {attendeesList.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.name} ({a.ticketId})
                 </option>
@@ -78,7 +125,7 @@ export default function TokenTopUpPage() {
               <Coins className="size-4" aria-hidden />
               ยอดคงเหลือปัจจุบัน
               <span className="font-semibold text-foreground tabular-nums">
-                {formatTokens(balances[attendee.id])}
+                {formatTokens(balances[attendee.id] ?? attendee.tokens ?? 0)}
               </span>
               Token
             </p>
@@ -183,5 +230,13 @@ export default function TokenTopUpPage() {
         </aside>
       </div>
     </>
+  );
+}
+
+export default function TokenTopUpPage() {
+  return (
+    <Suspense fallback={null}>
+      <TokenTopUpContent />
+    </Suspense>
   );
 }
