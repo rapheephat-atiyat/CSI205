@@ -42,8 +42,12 @@ export default function StaffDashboardPage() {
         {stats.map((s) => (
           <div key={s.label} className="rounded-xl border bg-background p-4">
             <p className="text-sm text-muted-foreground">{s.label}</p>
-            <p className="mt-1 text-3xl font-semibold tabular-nums">{s.value}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{s.note}</p>
+            <p className="mt-1 text-3xl font-semibold tabular-nums" suppressHydrationWarning>
+              {s.value}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground" suppressHydrationWarning>
+              {s.note}
+            </p>
           </div>
         ))}
       </section>
@@ -59,7 +63,7 @@ export default function StaffDashboardPage() {
               ดูทั้งหมด <ArrowRight className="size-3.5" aria-hidden />
             </Link>
           </div>
-          <ul className="divide-y">
+          <ul className="divide-y" suppressHydrationWarning>
             {recentScans.length === 0 ? (
               <li className="px-4 py-6 text-center text-sm text-muted-foreground">
                 ยังไม่มีรายการสแกนล่าสุด

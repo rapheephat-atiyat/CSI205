@@ -5,13 +5,15 @@ import React, {
   useCallback,
   useContext,
   useMemo,
-  useState,
+  useSyncExternalStore,
 } from "react";
-import type {
-  Attendee,
-  AttendeeStatus,
-  ScanOutcome,
-  ScanRecord,
+import {
+  attendees as seedAttendees,
+  scanHistory as seedScanHistory,
+  type Attendee,
+  type AttendeeStatus,
+  type ScanOutcome,
+  type ScanRecord,
 } from "@/lib/staff-mock";
 import {
   getStoredAttendees,
@@ -35,7 +37,7 @@ export interface StaffContextType {
   checkInOrOut: (attendeeId: string, action: "in" | "out") => CheckInResult;
   addScan: (record: Omit<ScanRecord, "id"> & { id?: string }) => ScanRecord;
   updateAttendeeTokens: (attendeeId: string, tokens: number) => void;
-  setAttendees: React.Dispatch<React.SetStateAction<Attendee[]>>;
+  setAttendees: (attendees: Attendee[] | ((prev: Attendee[]) => Attendee[])) => void;
 }
 
 const StaffContext = createContext<StaffContextType | undefined>(undefined);
@@ -44,9 +46,61 @@ function nowTime(): string {
   return new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 }
 
+let attendeesStore: Attendee[] = seedAttendees.map((a) => ({ ...a }));
+let scansStore: ScanRecord[] = seedScanHistory.map((s) => ({ ...s }));
+let isInitialized = false;
+
+const listeners = new Set<() => void>();
+
+function subscribe(callback: () => void) {
+  listeners.add(callback);
+  return () => {
+    listeners.delete(callback);
+  };
+}
+
+function notify() {
+  listeners.forEach((listener) => listener());
+}
+
+function initStoreIfNeeded() {
+  if (typeof window !== "undefined" && !isInitialized) {
+    isInitialized = true;
+    attendeesStore = getStoredAttendees();
+    scansStore = getStoredScans();
+  }
+}
+
+function getAttendeesSnapshot(): Attendee[] {
+  initStoreIfNeeded();
+  return attendeesStore;
+}
+
+function getAttendeesServerSnapshot(): Attendee[] {
+  return seedAttendees;
+}
+
+function getScansSnapshot(): ScanRecord[] {
+  initStoreIfNeeded();
+  return scansStore;
+}
+
+function getScansServerSnapshot(): ScanRecord[] {
+  return seedScanHistory;
+}
+
 export function StaffProvider({ children }: { children: React.ReactNode }) {
-  const [attendees, setAttendees] = useState<Attendee[]>(() => getStoredAttendees());
-  const [scanHistory, setScanHistory] = useState<ScanRecord[]>(() => getStoredScans());
+  const attendees = useSyncExternalStore(
+    subscribe,
+    getAttendeesSnapshot,
+    getAttendeesServerSnapshot
+  );
+
+  const scanHistory = useSyncExternalStore(
+    subscribe,
+    getScansSnapshot,
+    getScansServerSnapshot
+  );
 
   const total = attendees.length;
   const checkedIn = useMemo(
@@ -62,10 +116,21 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
     [attendees]
   );
 
+  const setAttendees = useCallback(
+    (action: Attendee[] | ((prev: Attendee[]) => Attendee[])) => {
+      const next = typeof action === "function" ? action(attendeesStore) : action;
+      attendeesStore = next;
+      saveStoredAttendees(next);
+      notify();
+    },
+    []
+  );
+
   const checkInOrOut = useCallback(
     (attendeeId: string, action: "in" | "out"): CheckInResult => {
+      initStoreIfNeeded();
       const cleanId = attendeeId.trim().toLowerCase();
-      const target = attendees.find(
+      const target = attendeesStore.find(
         (a) => a.id === attendeeId || a.ticketId.toLowerCase() === cleanId
       );
 
@@ -88,10 +153,8 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
           outcome: "duplicate",
         });
 
-        setScanHistory((prev) => [
-          duplicateRecord,
-          ...prev.filter((r) => r.id !== duplicateRecord.id),
-        ]);
+        scansStore = [duplicateRecord, ...scansStore.filter((r) => r.id !== duplicateRecord.id)];
+        notify();
 
         return { outcome: "duplicate", attendee: target };
       }
@@ -105,11 +168,11 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
         lastActionAt: time,
       };
 
-      const updatedList = attendees.map((a) =>
+      const updatedList = attendeesStore.map((a) =>
         a.id === target.id ? updatedAttendee : a
       );
 
-      setAttendees(updatedList);
+      attendeesStore = updatedList;
       saveStoredAttendees(updatedList);
 
       const record = saveScanRecord({
@@ -120,29 +183,32 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
         outcome,
       });
 
-      setScanHistory((prev) => [record, ...prev.filter((r) => r.id !== record.id)]);
+      scansStore = [record, ...scansStore.filter((r) => r.id !== record.id)];
+      notify();
 
       return { outcome, attendee: updatedAttendee };
     },
-    [attendees]
+    []
   );
 
   const addScan = useCallback((record: Omit<ScanRecord, "id"> & { id?: string }) => {
+    initStoreIfNeeded();
     const saved = saveScanRecord(record);
-    setScanHistory((prev) => [saved, ...prev.filter((r) => r.id !== saved.id)]);
+    scansStore = [saved, ...scansStore.filter((r) => r.id !== saved.id)];
+    notify();
     return saved;
   }, []);
 
   const updateAttendeeTokens = useCallback((attendeeId: string, tokens: number) => {
-    setAttendees((prev) => {
-      const updated = prev.map((a) =>
-        a.id === attendeeId || a.ticketId.toLowerCase() === attendeeId.toLowerCase()
-          ? { ...a, tokens }
-          : a
-      );
-      saveStoredAttendees(updated);
-      return updated;
-    });
+    initStoreIfNeeded();
+    const updated = attendeesStore.map((a) =>
+      a.id === attendeeId || a.ticketId.toLowerCase() === attendeeId.toLowerCase()
+        ? { ...a, tokens }
+        : a
+    );
+    attendeesStore = updated;
+    saveStoredAttendees(updated);
+    notify();
   }, []);
 
   const value = useMemo(
@@ -168,6 +234,7 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
       checkInOrOut,
       addScan,
       updateAttendeeTokens,
+      setAttendees,
     ]
   );
 
