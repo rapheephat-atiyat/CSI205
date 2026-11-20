@@ -55,6 +55,9 @@ function TicketQuantityPicker({ ticketType, quantity, maximum, onQuantityChange 
                 <h3 className="font-medium wrap-anywhere">{ticketType.name}</h3>
                 {ticketType.description && <p className="text-sm text-muted-foreground wrap-anywhere">{ticketType.description}</p>}
                 <p className="text-xs text-muted-foreground">{maximum < minimum && quantity === 0 ? "ยังเลือกบัตรประเภทนี้ไม่ได้" : `เลือกได้ ${minimum} ถึง ${maximum} ใบ`}</p>
+                {ticketType.tokenReward > 0 && (
+                    <p className="text-xs text-muted-foreground">รับ {ticketType.tokenReward.toLocaleString("th-TH")} Token ต่อใบเมื่อยืนยันการจอง</p>
+                )}
             </div>
             <div className="flex flex-wrap items-center gap-3">
                 <span className="text-sm font-semibold tabular-nums">{money(ticketType.price)} <span className="font-normal text-muted-foreground">/ ใบ</span></span>

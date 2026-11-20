@@ -82,6 +82,7 @@ export function Step5Payment({ order, event, paymentQr }: {
     if (order.status !== "PENDING" || hasSentSlip) {
         const isPaid = order.status === "PAID";
         const isCancelled = order.status === "CANCELLED";
+        const tokenReward = order.tickets.reduce((sum, ticket) => sum + ticket.tokenReward, 0);
         const Icon = isPaid ? CheckCircle2 : isCancelled ? XCircle : Clock3;
         return (
             <BookLayout step={5} event={event}>
@@ -92,6 +93,12 @@ export function Step5Payment({ order, event, paymentQr }: {
                         <div className="space-y-1"><dt className="text-muted-foreground">เลขคำสั่งซื้อ</dt><dd className="font-medium wrap-anywhere">{order.orderNo}</dd></div>
                         <div className="flex justify-between gap-3"><dt className="text-muted-foreground">วันที่สั่งซื้อ</dt><dd>{orderDate(order.createdAt)}</dd></div>
                         <div className="flex justify-between gap-3"><dt className="text-muted-foreground">ยอดรวม</dt><dd className="font-semibold">{money(order.total)}</dd></div>
+                        {!isCancelled && tokenReward > 0 && (
+                            <div className="flex justify-between gap-3">
+                                <dt className="text-muted-foreground">{isPaid ? "Token เข้ากระเป๋าแล้ว" : "Token หลังยืนยันการชำระ"}</dt>
+                                <dd className="font-semibold">{tokenReward.toLocaleString("th-TH")} Token</dd>
+                            </div>
+                        )}
                     </dl>
                     <div className="flex flex-wrap gap-2">
                         <Button asChild variant="brand" className="h-11"><Link href={isPaid ? `/account/tickets?order=${order.id}` : "/account/orders"}>{isPaid ? "ดู QR บัตร" : "ดูประวัติคำสั่งซื้อ"}</Link></Button>

@@ -21,6 +21,7 @@ import {
 @Check("chk_ticket_types_stock", `"sold" >= 0 AND "quota" >= "sold"`)
 @Check("chk_ticket_types_order_limits", `"minTicketQTY" >= 1 AND "maxTicketQTY" >= "minTicketQTY"`)
 @Check("chk_ticket_types_price", `"price" >= 0`)
+@Check("chk_ticket_types_token_reward", `"token_reward" BETWEEN 0 AND 99999999`)
 export class EventTicket {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
@@ -40,6 +41,9 @@ export class EventTicket {
 
     @Column({ type: "decimal", precision: 10, scale: 2 })
     price!: string;
+
+    @Column({ name: "token_reward", type: "int", default: 0 })
+    tokenReward!: number;
 
     @Column({ type: "int" })
     quota!: number;

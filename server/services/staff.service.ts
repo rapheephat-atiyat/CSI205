@@ -6,7 +6,10 @@ import { PERMISSIONS } from "@/lib/permissions";
 import { hasPermission } from "@/server/auth/permission";
 import { ApiError } from "@/server/http/errors";
 import { adjustUserWallet } from "./wallet.service";
-import type { StaffAttendeeItem, StaffOverviewData } from "@/lib/api-types";
+import type { StaffAttendeeItem, StaffOverviewData, StaffTopUpInput } from "@/lib/api-types";
+import type { FindOptionsWhere } from "typeorm";
+
+const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 
 export async function getStaffEvent(staff: User): Promise<Events | null> {
     const db = await getDatabase();
@@ -176,43 +179,47 @@ export async function getStaffAttendees(
 
 export async function topUpStaffAttendee(
     staff: User,
-    input: { attendeeId: string; amount: number; note?: string }
-): Promise<{ name: string; amount: number; balance: number }> {
+    input: StaffTopUpInput
+): Promise<{ name: string; ticketCode: string | null; amount: number; balance: number }> {
     if (!hasPermission(staff, PERMISSIONS.TOKEN_TOPUP)) {
         throw new ApiError("FORBIDDEN", "คุณไม่มีสิทธิ์เติม Token", 403);
     }
     if (!Number.isInteger(input.amount) || input.amount <= 0) {
         throw new ApiError("VALIDATION_ERROR", "จำนวน Token ต้องเป็นจำนวนเต็มบวก", 422);
     }
+    if (typeof input.attendeeId !== "string" || !input.attendeeId.trim()) {
+        throw new ApiError("VALIDATION_ERROR", "กรุณาระบุรหัสบัตรหรือผู้เข้าร่วม", 422);
+    }
 
     const db = await getDatabase();
-    // Look up attendee by ticket id or user id
-    let userId = input.attendeeId;
-    let attendeeName = "ผู้เข้าร่วม";
+    const code = input.attendeeId.trim();
+    const isUuid = uuidPattern.test(code);
+    const where: FindOptionsWhere<Ticket>[] = [
+        { ticketCode: code },
+        { ticketCode: code.toUpperCase() },
+        { qrToken: code },
+    ];
+    if (isUuid) where.push({ id: code }, { qrToken: code.toLowerCase() });
 
     const ticket = await db.getRepository(Ticket).findOne({
-        where: [{ id: input.attendeeId }, { ticketCode: input.attendeeId }],
+        where,
         relations: { user: true },
     });
-    if (ticket) {
-        userId = ticket.userId;
-        attendeeName = `${ticket.firstName ?? ""} ${ticket.lastName ?? ""}`.trim() || ticket.user?.name || attendeeName;
-    } else {
-        const user = await db.getRepository(User).findOneBy({ id: input.attendeeId });
-        if (user) {
-            userId = user.id;
-            attendeeName = user.name || attendeeName;
-        }
+    const user = ticket?.user ?? (isUuid ? await db.getRepository(User).findOneBy({ id: code }) : null);
+    if (!user) {
+        throw new ApiError("ATTENDEE_NOT_FOUND", "ไม่พบผู้เข้าร่วมหรือรหัสบัตร", 404);
     }
 
     const wallet = await adjustUserWallet(staff.id, "TOPUP", {
-        userId,
+        userId: user.id,
         amount: String(input.amount),
+        expectedBahtPerToken: input.expectedBahtPerToken,
         note: input.note ?? "เติม Token หน้างานโดยเจ้าหน้าที่",
     });
 
     return {
-        name: attendeeName,
+        name: `${ticket?.firstName ?? ""} ${ticket?.lastName ?? ""}`.trim() || user.name || "ผู้เข้าร่วม",
+        ticketCode: ticket?.ticketCode ?? null,
         amount: input.amount,
         balance: Number(wallet.total),
     };

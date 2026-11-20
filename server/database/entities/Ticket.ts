@@ -21,6 +21,7 @@ import {
 @Index("uq_tickets_ticket_code", ["ticketCode"], { unique: true })
 @Index("uq_tickets_qr_token", ["qrToken"], { unique: true })
 @Check("chk_tickets_unit_price", `"unitPrice" >= 0`)
+@Check("chk_tickets_token_reward", `"token_reward" BETWEEN 0 AND 99999999`)
 export class Ticket {
     @PrimaryGeneratedColumn("uuid")
     id!: string;
@@ -62,6 +63,9 @@ export class Ticket {
 
     @Column({ type: "decimal", precision: 10, scale: 2 })
     unitPrice!: string;
+
+    @Column({ name: "token_reward", type: "int", default: 0 })
+    tokenReward!: number;
 
     @Column({ type: "varchar", length: 50 })
     ticketCode!: string;

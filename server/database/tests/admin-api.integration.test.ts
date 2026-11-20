@@ -12,7 +12,7 @@ import { AdminActivity, Events, Order, Store, Ticket, User, UserRole, UserRolePe
 import { Role } from "../enums/role.enum";
 import { EVENT_ADMIN_PERMISSIONS, PERMISSIONS } from "@/lib/permissions";
 import { makeAdminCsv } from "@/lib/admin-export";
-import type { AdminActivityItem, AdminExportReport, AdminOrderDetail, AdminOrderSummary, AdminStore, AdminUser, ApiResponse, EventDetail, EventOverviewReport, EventSouvenirItem, EventTicketItem, OrderDetail, Paginated, StoreDetail } from "@/lib/api-types";
+import type { AdminActivityItem, AdminExportReport, AdminOrderDetail, AdminOrderSummary, AdminStore, AdminUser, ApiResponse, EventDetail, EventOverviewReport, EventSouvenirItem, EventTicketItem, OrderDetail, Paginated, StoreDetail, TokenRate, WalletDetail } from "@/lib/api-types";
 
 // Never loads .env. Only a fresh, unused localhost database created here may be dropped.
 if (!process.env.TEST_DATABASE) throw new Error("Set TEST_DATABASE to a new disposable local admin test database.");
@@ -63,6 +63,8 @@ before(async () => {
     // Exercise an actual schema rollback/reapply and repair an older empty event ADMIN assignment.
     const legacy = await source.manager.save(User, { email: "legacy@example.test", name: "Legacy", firstName: "Legacy", lastName: "Test" });
     const role = await source.manager.save(UserRole, { userId: legacy.id, role: Role.ADMIN, eventId: firstEvent.id });
+    await source.undoLastMigration();
+    assert.equal((await source.query("SELECT to_regclass('public.token_pricing') AS name"))[0].name, null);
     await source.undoLastMigration();
     assert.equal((await source.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'review_decision'")).length, 0);
     await source.runMigrations();
@@ -227,6 +229,114 @@ test("admin workflows through real HTTP sessions and a migrated disposable datab
         const updated = ok(await request<EventDetail>(`/api/admin/events/${created.id}`, "PATCH", { title: "Saved title", sessions: [{ ...created.sessions[0], title: "Saved schedule" }] }, owner));
         assert.equal(updated.sessions[0].title, "Saved schedule");
         ok(await request(`/api/admin/events/${created.id}`, "DELETE", undefined, owner));
+    });
+    await t.test("a souvenir photo saved by the event admin is visible in public event details", async () => {
+        const souvenirPath = path() + `/souvenirs/${souvenir.id}`;
+        const image = "/images/demo-souvenirs/pin.webp";
+        denied(await request(souvenirPath, "PATCH", { image }, otherAdmin), 403);
+        denied(await request(souvenirPath, "PATCH", { image: "javascript:alert(1)" }, scoped), 422);
+        const updated = ok(await request<EventSouvenirItem>(souvenirPath, "PATCH", { image: ` ${image} ` }, scoped));
+        assert.equal(updated.image, image);
+
+        const event = ok(await request<EventDetail>(`/api/events/${firstEvent.slug}`));
+        assert.equal(event.souvenirs.find((item) => item.id === souvenir.id)?.image, image);
+        const cleared = ok(await request<EventSouvenirItem>(souvenirPath, "PATCH", { image: null }, scoped));
+        assert.equal(cleared.image, null);
+    });
+    await t.test("ticket rewards use the booked amount and concurrent approval credits only once", async () => {
+        const ticketPath = path() + `/tickets/${ticketType.id}`;
+        assert.equal(ticketType.tokenReward, 0);
+        for (const tokenReward of [-1, 1.5, 100_000_000, null]) {
+            denied(await request(ticketPath, "PATCH", { tokenReward }, scoped), 422);
+        }
+        denied(await request(ticketPath, "PATCH", { tokenReward: 12 }, otherAdmin), 403);
+        assert.equal(ok(await request<EventTicketItem>(ticketPath, "PATCH", { tokenReward: 12 }, scoped)).tokenReward, 12);
+        const order = await submit(await createOrder(2));
+        assert.deepEqual(order.tickets.map((ticket) => ticket.tokenReward), [12, 12]);
+        const walletPath = "/api/me/wallet";
+        const pending = ok(await request<WalletDetail>(walletPath, "GET", undefined, customer));
+        assert.ok(!pending.histories.some((entry) => entry.ref === order.id));
+
+        ok(await request(ticketPath, "PATCH", { tokenReward: 4 }, scoped));
+        const reviewPath = path() + `/orders/${order.id}/review`;
+        const approvals = await Promise.all([scoped, owner].map((admin) =>
+            request<AdminOrderDetail>(reviewPath, "POST", { decision: "APPROVE" }, admin)));
+        for (const approval of approvals) assert.equal(ok(approval).status, "PAID");
+        const approved = ok(await request<WalletDetail>(walletPath, "GET", undefined, customer));
+        const rewards = approved.histories.filter((entry) => entry.ref === order.id);
+        assert.equal(rewards.length, 1);
+        assert.equal(rewards[0].type, "TICKET_REWARD");
+        assert.equal(rewards[0].amount, "24.00");
+        assert.equal(Number(approved.total) - Number(pending.total), 24);
+
+        const rejected = await submit(await createOrder());
+        assert.equal(rejected.tickets[0].tokenReward, 4);
+        ok(await request(path() + `/orders/${rejected.id}/review`, "POST", { decision: "REJECT", reason: "Invalid slip" }, scoped));
+        const afterRejection = ok(await request<WalletDetail>(walletPath, "GET", undefined, customer));
+        assert.equal(afterRejection.total, approved.total);
+        assert.ok(!afterRejection.histories.some((entry) => entry.ref === rejected.id));
+    });
+    await t.test("a free ticket grants its configured reward once and zero disables it", async () => {
+        const freeType = ok(await request<EventTicketItem>(path() + "/tickets", "POST", {
+            name: "Reward ticket", price: "0.00", quota: 10, tokenReward: 7,
+        }, scoped), 201);
+        const input = {
+            requestId: randomUUID(),
+            eventId: firstEvent.id,
+            items: [{ eventTicketId: freeType.id, quantity: 1, attendees: [{ firstName: "Test", lastName: "Attendee" }] }],
+            deliveryMethod: "NONE",
+        };
+        const reservations = await Promise.all([1, 2].map(() =>
+            request<OrderDetail>("/api/orders", "POST", input, otherUser)));
+        for (const reservation of reservations) assert.equal(ok(reservation, 201).status, "PAID");
+        const wallet = ok(await request<WalletDetail>("/api/me/wallet", "GET", undefined, otherUser));
+        const rewards = wallet.histories.filter((entry) => entry.ref === input.requestId);
+        assert.deepEqual(rewards.map((entry) => [entry.type, entry.amount]), [["TICKET_REWARD", "7.00"]]);
+
+        ok(await request(path() + `/tickets/${freeType.id}`, "PATCH", { tokenReward: 0 }, scoped));
+        const zeroReward = ok(await request<OrderDetail>("/api/orders", "POST", { ...input, requestId: randomUUID() }, otherUser), 201);
+        assert.equal(zeroReward.tickets[0].tokenReward, 0);
+        const afterZero = ok(await request<WalletDetail>("/api/me/wallet", "GET", undefined, otherUser));
+        assert.equal(afterZero.total, wallet.total);
+    });
+    await t.test("global admins set the top-up rate and stale staff quotes leave balances intact", async () => {
+        const ratePath = "/api/admin/wallet/rate";
+        const staffRatePath = "/api/staff/token-rate";
+        const staff = await signup("token-clerk");
+        const role = await source.manager.save(UserRole, { userId: staff.id, role: Role.STAFF, eventId: null, storeId: null });
+        await source.manager.insert(UserRolePermission, { userRoleId: role.id, permission: PERMISSIONS.TOKEN_TOPUP });
+        assert.equal(ok(await request<TokenRate>(staffRatePath, "GET", undefined, staff)).bahtPerToken, "1.00");
+        denied(await request(staffRatePath, "GET", undefined, customer), 403);
+        denied(await request(ratePath, "PATCH", { bahtPerToken: "2.50" }, scoped), 403);
+        denied(await request(ratePath, "PATCH", { bahtPerToken: "2.50" }, staff), 403);
+        for (const bahtPerToken of ["0", "-1", "2.505"]) {
+            denied(await request(ratePath, "PATCH", { bahtPerToken }, owner), 422);
+        }
+        assert.equal(ok(await request<TokenRate>(ratePath, "PATCH", { bahtPerToken: "2.35" }, owner)).bahtPerToken, "2.35");
+        assert.equal(ok(await request<TokenRate>(staffRatePath, "GET", undefined, staff)).bahtPerToken, "2.35");
+
+        const paidOrder = ok(await request<OrderDetail>(`/api/orders/${approved.id}`, "GET", undefined, customer));
+        const ticket = paidOrder.tickets[0];
+        assert.ok(ticket.qrToken);
+        const walletPath = "/api/me/wallet";
+        const startingWallet = ok(await request<WalletDetail>(walletPath, "GET", undefined, customer));
+        const input = { attendeeId: ticket.qrToken, amount: 3, expectedBahtPerToken: "1.00" };
+        const stale = await request("/api/staff/top-up", "POST", input, staff);
+        denied(stale, 409);
+        if (!stale.body.success) assert.equal(stale.body.error.code, "TOKEN_RATE_CHANGED");
+        const currentWallet = ok(await request<WalletDetail>(walletPath, "GET", undefined, customer));
+        assert.equal(currentWallet.total, startingWallet.total);
+        assert.equal(currentWallet.histories.length, startingWallet.histories.length);
+
+        const topUp = ok(await request<{ ticketCode: string; balance: number }>("/api/staff/top-up", "POST", {
+            ...input, expectedBahtPerToken: "2.35",
+        }, staff));
+        assert.equal(topUp.ticketCode, ticket.ticketCode);
+        assert.equal(topUp.balance, Number(startingWallet.total) + 3);
+        ok(await request(ratePath, "PATCH", { bahtPerToken: "4.00" }, owner));
+        const afterTopUp = ok(await request<WalletDetail>(walletPath, "GET", undefined, customer));
+        const entry = afterTopUp.histories.find((history) => history.type === "TOPUP" && history.ref === staff.id);
+        assert.deepEqual([entry?.amount, entry?.bahtPerToken, entry?.bahtAmount], ["3.00", "2.35", "7.05"]);
     });
 });
 

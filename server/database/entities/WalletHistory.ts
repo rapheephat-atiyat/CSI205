@@ -33,6 +33,12 @@ export class WalletHistory {
     @Column({ type: "decimal", precision: 10, scale: 2 })
     amount!: string;
 
+    @Column({ name: "baht_per_token", type: "decimal", precision: 10, scale: 2, nullable: true })
+    bahtPerToken!: string | null;
+
+    @Column({ name: "baht_amount", type: "decimal", precision: 18, scale: 2, nullable: true })
+    bahtAmount!: string | null;
+
     @Column({ type: "decimal", precision: 10, scale: 2 })
     before!: string;
 

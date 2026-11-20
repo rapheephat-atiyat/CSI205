@@ -42,7 +42,7 @@ async function FaqContent() {
 
   return (
     <>
-      <SuperAdminTopbar showFaqLink />
+      <SuperAdminTopbar showGlobalLinks />
       <FaqManager />
     </>
   );

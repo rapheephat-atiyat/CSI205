@@ -22,11 +22,13 @@ import type {
     ScanTicketInput,
     StaffAttendeeItem,
     StaffOverviewData,
+    StaffTopUpInput,
     StoreDetail,
     StoreInput,
     StoreSaleResult,
     StoreSellInput,
     TicketItem,
+    TokenRate,
     User as Profile,
     UserInput,
     UpdateFaqCategoryInput,
@@ -327,8 +329,9 @@ export const api = {
         /**
          * เติม Token หน้างานโดยเจ้าหน้าที่
          */
-        topUp: (input: { attendeeId: string; amount: number; note?: string }) =>
-            request<{ name: string; amount: number; balance: number }>("/api/staff/top-up", "POST", input),
+        topUp: (input: StaffTopUpInput) =>
+            request<{ name: string; ticketCode: string | null; amount: number; balance: number }>("/api/staff/top-up", "POST", input),
+        tokenRate: () => request<TokenRate>("/api/staff/token-rate"),
     },
 
     store: {
@@ -369,6 +372,7 @@ export const api = {
     },
 
     admin: {
+        updateTokenRate: (input: TokenRate) => request<TokenRate>("/api/admin/wallet/rate", "PATCH", input),
         eventOverview: (eventId: string) => request<EventOverviewReport>(`${eventPath(eventId)}/overview`),
         activities: (eventId: string) => request<AdminActivityItem[]>(`${eventPath(eventId)}/activities`),
         exportReport: (eventId: string) => request<AdminExportReport>(`${eventPath(eventId)}/reports`),

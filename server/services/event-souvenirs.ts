@@ -1,5 +1,6 @@
 import "server-only";
 import type { EventSouvenirInput, EventSouvenirItem } from "@/lib/api-types";
+import { isSouvenirImageUrl } from "@/lib/souvenirs";
 import { getDatabase } from "@/server/database/database.souce";
 import { Events, EventSouvenir, EventTicket, SouvenirTicketType } from "@/server/database/entities";
 import { ApiError } from "@/server/http/errors";
@@ -45,6 +46,10 @@ export async function updateSouvenir(eventId: string, souvenirId: string, input:
 
 async function saveSouvenir(eventId: string, input: Partial<EventSouvenirInput>, souvenirId?: string, actorId?: string): Promise<EventSouvenirItem> {
     if ((input.allowDecline !== undefined && typeof input.allowDecline !== "boolean") || (input.allTicketTypes !== undefined && typeof input.allTicketTypes !== "boolean") || (input.image != null && typeof input.image !== "string")) throw new ApiError("VALIDATION_ERROR", "การตั้งค่าของที่ระลึกไม่ถูกต้อง", 422);
+    const image = input.image?.trim() || null;
+    if (image && !isSouvenirImageUrl(image)) {
+        throw new ApiError("VALIDATION_ERROR", "กรุณาใส่ลิงก์รูป HTTPS หรือพาธในเว็บไซต์", 422);
+    }
     const db = await getDatabase();
     return db.transaction(async (manager) => {
         const souvenir = souvenirId
@@ -59,7 +64,7 @@ async function saveSouvenir(eventId: string, input: Partial<EventSouvenirInput>,
         if (!souvenir.name || souvenir.name.length > 255) {
             throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่อของที่ระลึกไม่เกิน 255 ตัวอักษร", 422);
         }
-        if (input.image !== undefined) souvenir.image = input.image;
+        if (input.image !== undefined) souvenir.image = image;
         if (input.sizes !== undefined) {
             if (!Array.isArray(input.sizes) || input.sizes.some((size) => typeof size !== "string" || !size.trim())) {
                 throw new ApiError("VALIDATION_ERROR", "ไซซ์ต้องเป็นรายการข้อความ เช่น S, M, L", 422);

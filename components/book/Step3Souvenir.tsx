@@ -3,9 +3,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { EventDetail, OrderShippingInput, TicketAttendeeInput } from "@/lib/api-types";
 import { souvenirVariantKey, ticketCanReceiveSouvenir } from "@/lib/souvenirs";
-import { Gift, Minus, Plus } from "lucide-react";
-import Image from "next/image";
+import { Minus, Plus } from "lucide-react";
 import { BookCard, money } from "./BookUI";
+import { SouvenirPhoto } from "./SouvenirPhoto";
 import type { BookingAttendee } from "./booking-types";
 
 const shippingFields = [
@@ -62,9 +62,14 @@ export function Step3Souvenir({
                 const sizesForSale = souvenir.sizes.length ? souvenir.sizes : [null];
                 return (
                     <BookCard key={souvenir.id} title={souvenir.name}>
-                        <div className="relative flex aspect-video max-w-xs items-center justify-center overflow-hidden rounded-lg bg-muted text-muted-foreground">
-                            {souvenir.image ? <Image src={souvenir.image} alt="" fill sizes="320px" unoptimized className="object-cover" /> : <Gift aria-hidden="true" />}
-                        </div>
+                        <figure className="w-full max-w-xs space-y-1.5">
+                            <SouvenirPhoto image={souvenir.image} sizes="(max-width: 383px) 90vw, 320px" className="aspect-[4/3]" />
+                            {souvenir.image?.startsWith("/images/demo-souvenirs/") && (
+                                <figcaption className="text-xs text-muted-foreground">
+                                    <a href="/images/demo-souvenirs/credits.md" className="underline underline-offset-2">ภาพอ้างอิงและเครดิตรูป</a>
+                                </figcaption>
+                            )}
+                        </figure>
                         {eligibleAttendees.map(({ key, ticketType, attendee }) => {
                             const selections = attendee.souvenirs ?? [];
                             const selection = selections.find((item) => item.souvenirId === souvenir.id);
