@@ -11,12 +11,7 @@ import { useVendorStore } from "@/components/vendor/vendor-store-context";
 import { api } from "@/lib/api-client";
 import type { StoreSalesSummary } from "@/lib/api-types";
 import Image from "next/image";
-import {
-  ChartNoAxesCombined,
-  Coffee,
-  Coins,
-  Receipt,
-} from "lucide-react";
+import { Coffee, Coins, Receipt } from "lucide-react";
 import {
   Bar,
   BarChart,
@@ -94,10 +89,6 @@ export function VendorDashboardClient() {
 
   const storeName = selectedStore?.name ?? "ร้านค้า";
   const storeCode = selectedStore?.code;
-  const avgOrder =
-    salesSummary && salesSummary.todayTransactions > 0
-      ? salesSummary.todaySales / salesSummary.todayTransactions
-      : 0;
 
   return (
     <div className="w-full flex flex-col gap-10 pb-8">
@@ -127,8 +118,8 @@ export function VendorDashboardClient() {
         </div>
       )}
 
-      {/* การ์ดสรุป 3 ใบ */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 px-4 md:px-10">
+      {/* การ์ดสรุป 2 ใบ */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5 px-4 md:px-10">
         <div className="border border-black/10 rounded-xl relative p-6 flex flex-col gap-5">
           <h6>ยอดขายวันนี้</h6>
           <div className="text-5xl text-brand font-bold">
@@ -147,14 +138,6 @@ export function VendorDashboardClient() {
           <div>จำนวนรายการที่ชำระสำเร็จวันนี้</div>
         </div>
 
-        <div className="border border-black/10 rounded-xl relative p-6 flex flex-col gap-5">
-          <h6>ยอดเฉลี่ยต่อรายการ</h6>
-          <div className="text-5xl text-brand font-bold">
-            {salesLoading ? "กำลังโหลด..." : salesSummary ? `${formatToken(avgOrder)} T` : "—"}
-          </div>
-          <ChartNoAxesCombined className="text-brand size-10 absolute top-6 right-5" />
-          <div>ยอดเฉลี่ยจากรายการวันนี้</div>
-        </div>
       </div>
 
       {/* กราฟ + กล่องยอดขายสินค้า */}
