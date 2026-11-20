@@ -27,7 +27,6 @@ export function VisualProfileCard({
   memberCode,
   displayName,
   username,
-  role,
   isVendor,
   walletBalance,
   storeName,
@@ -161,7 +160,7 @@ export function VisualProfileCard({
               <div className="text-right">
                 <div className="text-[10px] uppercase text-zinc-400">ยอดเงิน</div>
                 <div className="text-sm font-mono font-semibold text-zinc-100">
-                  ฿{formattedBalance}
+                  {formattedBalance} Token
                 </div>
               </div>
             </div>

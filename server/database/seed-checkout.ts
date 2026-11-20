@@ -18,7 +18,7 @@ export async function seedCheckoutSalesExamples(manager: EntityManager, campusEv
     const [freeTicket] = await manager.save(EventTicket, [
         {
             eventId: campusEvent.id, name: "บัตรเข้าชมฟรี", description: "ทดสอบจองบัตรยอด 0 บาท",
-            price: "0.00", quota: 20, sortOrder: 3,
+            price: "0.00", tokenReward: 5, quota: 20, sortOrder: 3,
             requiredFields: [ATTENDEE_FIELDS.FIRST_NAME, ATTENDEE_FIELDS.LAST_NAME],
         },
         {
@@ -119,6 +119,7 @@ export async function seedCheckoutOrders(manager: EntityManager, fixtures: Check
         },
     ];
 
+    const paidOrders = [];
     for (const demo of cases) {
         const { ticketType, includedItems = [], extraItems = [], createdAt = seededAt, shippingStatus } = demo;
         const shippingFee = shippingStatus ? Number(reunionShippingFee) : 0;
@@ -143,6 +144,7 @@ export async function seedCheckoutOrders(manager: EntityManager, fixtures: Check
             eventId: order.eventId,
             eventTicketId: ticketType.id,
             unitPrice: ticketType.price,
+            tokenReward: ticketType.tokenReward,
             status: demo.ticketStatus,
             ticketCode: `TKT-DEMO-${demo.code}`,
             qrToken: crypto.randomUUID(),
@@ -154,6 +156,9 @@ export async function seedCheckoutOrders(manager: EntityManager, fixtures: Check
             souvenirItems: includedItems,
             createdAt,
         });
+        if (order.status === ORDER_STATUSES.PAID) {
+            paidOrders.push({ id: order.id, tokenReward: ticketType.tokenReward });
+        }
         if (demo.ticketStatus !== TICKET_STATUSES.CANCELLED) {
             await manager.increment(EventTicket, { id: ticketType.id }, "sold", 1);
         }
@@ -176,4 +181,5 @@ export async function seedCheckoutOrders(manager: EntityManager, fixtures: Check
             });
         }
     }
+    return paidOrders;
 }

@@ -35,7 +35,7 @@ export async function requirePermission(
     return user;
 }
 
-/** FAQ เป็นข้อมูลกลางของระบบ จึงให้เฉพาะ ADMIN ที่ไม่มีขอบเขตงานหรือร้านค้าจัดการ */
+/** ข้อมูลกลางของระบบจัดการได้โดย ADMIN ที่ไม่มีขอบเขตงานหรือร้านค้า */
 export async function requireAdmin(request: Request): Promise<User> {
     const user = await requireUser(request);
     const isAdmin = user.userRoles.some((role) =>

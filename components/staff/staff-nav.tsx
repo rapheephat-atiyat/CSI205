@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import {
-  Coins,
   History,
   LayoutDashboard,
   LogIn,
@@ -39,7 +38,6 @@ export const staffNav: NavItem[] = [
   { href: "/staff/check-in", label: "เช็กอิน / เอาท์", sub: "Check-in / Check-out", icon: LogIn },
   { href: "/staff/attendees", label: "ค้นหาผู้เข้าร่วม", sub: "Attendee Search", icon: Search },
   { href: "/staff/history", label: "ประวัติการสแกน", sub: "Scan History", icon: History },
-  { href: "/staff/top-up", label: "เติม Token", sub: "Staff Token Top-up", icon: Coins },
 ];
 
 function isItemActive(pathname: string, href: string) {

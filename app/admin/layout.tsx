@@ -42,7 +42,7 @@ async function AdminGate({ children }: { children: React.ReactNode }) {
         <main className="bg-[#F5F5F5] w-full">
           <OnlyOnPath path="/admin">
             <SuperAdminTopbar
-              showFaqLink={user.userRoles.some(
+              showGlobalLinks={user.userRoles.some(
                 (role) =>
                   role.role === "ADMIN" &&
                   role.eventId === null &&

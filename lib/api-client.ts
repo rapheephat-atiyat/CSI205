@@ -20,11 +20,15 @@ import type {
     OverviewReport,
     ProductInput,
     ScanTicketInput,
+    StaffAttendeeItem,
+    StaffOverviewData,
+    StaffTopUpInput,
     StoreDetail,
     StoreInput,
     StoreSaleResult,
     StoreSellInput,
     TicketItem,
+    TokenRate,
     User as Profile,
     UserInput,
     UpdateFaqCategoryInput,
@@ -298,11 +302,36 @@ export const api = {
 
     tickets: {
         /**
-         * เช็กอินจาก QR ของบัตร ต้องมีสิทธิ์สแกนในงานนั้น
-         * @param input ส่ง { qrToken } ที่อ่านจากบัตร
+         * เช็กอินจาก QR หรือรหัสของบัตร ต้องมีสิทธิ์สแกนในงานนั้น
+         * @param input ส่ง { qrToken, action } ที่อ่านจากบัตร
          * @returns บัตรพร้อมสถานะ USED และเวลาเช็กอิน
          */
         scan: (input: ScanTicketInput) => request<TicketItem>("/api/tickets/scan", "POST", input),
+    },
+
+    staff: {
+        /**
+         * ข้อมูลภาพรวมงานและสถิติสำหรับเจ้าหน้าที่
+         */
+        overview: () => request<StaffOverviewData>("/api/staff/overview"),
+
+        /**
+         * รายชื่อผู้เข้าร่วมสำหรับเจ้าหน้าที่ พร้อมค้นหาและกรอง
+         */
+        attendees: (params?: { q?: string; status?: string }) => {
+            const query = new URLSearchParams();
+            if (params?.q) query.set("q", params.q);
+            if (params?.status) query.set("status", params.status);
+            const qs = query.toString();
+            return request<StaffAttendeeItem[]>(`/api/staff/attendees${qs ? `?${qs}` : ""}`);
+        },
+
+        /**
+         * เติม Token หน้างานโดยเจ้าหน้าที่
+         */
+        topUp: (input: StaffTopUpInput) =>
+            request<{ name: string; ticketCode: string | null; amount: number; balance: number }>("/api/staff/top-up", "POST", input),
+        tokenRate: () => request<TokenRate>("/api/staff/token-rate"),
     },
 
     store: {
@@ -343,6 +372,7 @@ export const api = {
     },
 
     admin: {
+        updateTokenRate: (input: TokenRate) => request<TokenRate>("/api/admin/wallet/rate", "PATCH", input),
         eventOverview: (eventId: string) => request<EventOverviewReport>(`${eventPath(eventId)}/overview`),
         activities: (eventId: string) => request<AdminActivityItem[]>(`${eventPath(eventId)}/activities`),
         exportReport: (eventId: string) => request<AdminExportReport>(`${eventPath(eventId)}/reports`),

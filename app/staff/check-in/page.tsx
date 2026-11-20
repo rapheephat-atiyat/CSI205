@@ -7,38 +7,32 @@ import { PageHeader } from "@/components/staff/page-header";
 import { AttendeeStatusBadge } from "@/components/staff/status-badge";
 import { ScanResultCard } from "@/components/staff/scan-result";
 import { cn } from "@/lib/utils";
-import { attendees as seed, formatTokens, type Attendee } from "@/lib/staff-mock";
+import { formatTokens } from "@/lib/staff-mock";
+import { api } from "@/lib/api-client";
+import { useStaff } from "@/components/staff/staff-context";
 
 type Feedback = { kind: "checked-in" | "checked-out" | "duplicate"; name: string; ticketId: string };
 
-function nowTime() {
-  return new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
-}
-
 export default function CheckInPage() {
-  const [list, setList] = useState<Attendee[]>(seed);
-  const [selectedId, setSelectedId] = useState(seed[1].id);
+  const { attendees, checkInOrOut } = useStaff();
+  const [selectedId, setSelectedId] = useState(() => attendees[1]?.id ?? attendees[0]?.id ?? "");
   const [feedback, setFeedback] = useState<Feedback | null>(null);
 
-  const selected = list.find((a) => a.id === selectedId) ?? list[0];
+  const selected = attendees.find((a) => a.id === selectedId) ?? attendees[0];
 
-  function apply(action: "in" | "out") {
-    const already =
-      (action === "in" && selected.status === "checked-in") ||
-      (action === "out" && selected.status !== "checked-in");
-    if (already) {
-      setFeedback({ kind: "duplicate", name: selected.name, ticketId: selected.ticketId });
-      return;
+  async function apply(action: "in" | "out") {
+    if (!selected) return;
+
+    try {
+      await api.tickets.scan({ qrToken: selected.ticketId, action });
+    } catch {
+      // offline / mock mode fallback
     }
-    setList((prev) =>
-      prev.map((a) =>
-        a.id === selected.id
-          ? { ...a, status: action === "in" ? "checked-in" : "checked-out", lastActionAt: nowTime() }
-          : a
-      )
-    );
+
+    const res = checkInOrOut(selected.id, action);
+
     setFeedback({
-      kind: action === "in" ? "checked-in" : "checked-out",
+      kind: res.outcome,
       name: selected.name,
       ticketId: selected.ticketId,
     });
@@ -56,7 +50,7 @@ export default function CheckInPage() {
         <section className="rounded-xl border bg-background">
           <h2 className="border-b px-4 py-3 text-sm font-medium">ผู้เข้าร่วม</h2>
           <ul className="max-h-[26rem] divide-y overflow-y-auto">
-            {list.map((a) => (
+            {attendees.map((a) => (
               <li key={a.id}>
                 <button
                   type="button"
@@ -81,55 +75,68 @@ export default function CheckInPage() {
           </ul>
         </section>
 
-        <section className="flex flex-col gap-4">
-          <div className="rounded-xl border bg-background p-4 sm:p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold">{selected.name}</h2>
-                <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-                  <span className="inline-flex items-center gap-1">
-                    <Ticket className="size-3.5" aria-hidden />
-                    <span className="font-mono">{selected.ticketId}</span>
-                  </span>
-                  <span>บัตร {selected.ticketType}</span>
-                  <span className="inline-flex items-center gap-1">
-                    <Coins className="size-3.5" aria-hidden />
-                    {formatTokens(selected.tokens)} Token
-                  </span>
-                </p>
-              </div>
-              <AttendeeStatusBadge status={selected.status} />
+        <section className="rounded-xl border bg-background p-4 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-4">
+            <div>
+              <p className="text-xs text-muted-foreground">ข้อมูลผู้เข้าร่วม</p>
+              <h2 className="mt-0.5 text-xl font-semibold">{selected.name}</h2>
+              <p className="font-mono text-xs text-muted-foreground">{selected.ticketId}</p>
             </div>
-            {selected.lastActionAt && (
-              <p className="mt-3 text-xs text-muted-foreground">
-                บันทึกล่าสุดเวลา {selected.lastActionAt} น.
-              </p>
-            )}
-            <div className="mt-5 grid gap-2 sm:grid-cols-2">
-              <Button
-                size="lg"
-                className="h-11 bg-brand text-base text-on-brand hover:bg-brand-hover"
-                onClick={() => apply("in")}
-              >
-                <LogIn data-icon="inline-start" aria-hidden />
-                เช็กอิน
-              </Button>
-              <Button variant="outline" size="lg" className="h-11 text-base" onClick={() => apply("out")}>
-                <LogOut data-icon="inline-start" aria-hidden />
-                เช็กเอาท์
-              </Button>
-            </div>
+            <AttendeeStatusBadge status={selected.status} />
           </div>
 
-          <div aria-live="polite">
-            {feedback ? (
-              <ScanResultCard outcome={feedback.kind} name={feedback.name} ticketId={feedback.ticketId} />
-            ) : (
-              <div className="rounded-xl border border-dashed bg-background p-6 text-center text-sm text-muted-foreground">
-                ผลการเช็กอิน/เช็กเอาท์จะแสดงที่นี่
-              </div>
-            )}
+          <dl className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-muted/60 p-3">
+              <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Ticket className="size-3.5" aria-hidden />
+                ประเภทบัตร
+              </dt>
+              <dd className="mt-1 font-medium">{selected.ticketType.startsWith("บัตร") ? selected.ticketType : `บัตร${selected.ticketType}`}</dd>
+            </div>
+            <div className="rounded-lg bg-muted/60 p-3">
+              <dt className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Coins className="size-3.5" aria-hidden />
+                Token คงเหลือ
+              </dt>
+              <dd className="mt-1 font-medium tabular-nums">{formatTokens(selected.tokens)}</dd>
+            </div>
+            <div className="col-span-2 rounded-lg bg-muted/60 p-3 sm:col-span-1">
+              <dt className="text-xs text-muted-foreground">เวลาล่าสุด</dt>
+              <dd className="mt-1 font-medium">{selected.lastActionAt ?? "—"}</dd>
+            </div>
+          </dl>
+
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Button
+              size="lg"
+              className="flex-1 bg-brand text-on-brand hover:bg-brand-hover"
+              disabled={selected.status === "checked-in"}
+              onClick={() => apply("in")}
+            >
+              <LogIn data-icon="inline-start" aria-hidden />
+              บันทึกเข้างาน (Check-in)
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="flex-1"
+              disabled={selected.status !== "checked-in"}
+              onClick={() => apply("out")}
+            >
+              <LogOut data-icon="inline-start" aria-hidden />
+              บันทึกออกงาน (Check-out)
+            </Button>
           </div>
+
+          {feedback && (
+            <div className="mt-4" aria-live="polite">
+              <ScanResultCard
+                outcome={feedback.kind}
+                name={feedback.name}
+                ticketId={feedback.ticketId}
+              />
+            </div>
+          )}
         </section>
       </div>
     </>

@@ -163,6 +163,7 @@ export type EventTicketItem = {
     name: string;
     description: string | null;
     price: string;
+    tokenReward: number;
     quota: number;
     sold: number;
     minTicketQTY: number;
@@ -179,6 +180,7 @@ export type EventTicketInput = {
     description?: string | null;
     /** ราคาเป็นบาท เช่น "500.00" หรือ "0.00" สำหรับบัตรฟรี */
     price: string;
+    tokenReward?: number;
     quota: number;
     minTicketQTY?: number;
     maxTicketQTY?: number;
@@ -239,6 +241,7 @@ export type TicketItem = {
     userId: string;
     unitPrice: string;
     ticketCode: string;
+    tokenReward: number;
     qrToken: string;
     status: TicketStatus;
     firstName: string | null;
@@ -298,6 +301,47 @@ export type CreateOrderInput = {
 
 export type ScanTicketInput = {
     qrToken: string;
+    action?: "in" | "out";
+};
+
+export type StaffAttendeeItem = {
+    id: string;
+    name: string;
+    ticketId: string;
+    ticketType: string;
+    status: "not-arrived" | "checked-in" | "checked-out";
+    tokens: number;
+    userId: string;
+    lastActionAt?: string;
+    phone?: string;
+    email?: string;
+};
+
+export type StaffOverviewData = {
+    total: number;
+    checkedIn: number;
+    checkedOut: number;
+    waiting: number;
+    eventInfo: {
+        id?: string;
+        name: string;
+        date: string;
+        capacity: number;
+    };
+    recentScans: {
+        id: string;
+        time: string;
+        attendeeName: string;
+        ticketId: string;
+        action: "in" | "out";
+        outcome: "checked-in" | "checked-out" | "expired" | "duplicate" | "invalid";
+    }[];
+    staffProfile?: {
+        name: string;
+        role: string;
+        topUpQuotaTotal: number;
+        topUpQuotaUsed: number;
+    };
 };
 
 export type ProductItem = {
@@ -353,6 +397,8 @@ export type WalletHistoryItem = {
     type: TransactionType;
     status: TransactionStatus;
     amount: string;
+    bahtPerToken: string | null;
+    bahtAmount: string | null;
     before: string;
     after: string;
     ref: string | null;
@@ -373,9 +419,19 @@ export type WalletDetail = {
 export type WalletTransactionInput = {
     /** id ของบัญชีเจ้าของกระเป๋า */
     userId: string;
-    /** ยอดที่เติมหรือคืน เช่น "500.00" */
+    /** จำนวน Token ที่เติมหรือคืน เช่น "500.00" */
     amount: string;
     note?: string | null;
+    expectedBahtPerToken?: string;
+};
+
+export type TokenRate = { bahtPerToken: string };
+
+export type StaffTopUpInput = {
+    attendeeId: string;
+    amount: number;
+    note?: string;
+    expectedBahtPerToken?: string;
 };
 
 export type StoreSaleResult = {

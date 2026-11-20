@@ -81,6 +81,11 @@ async function TicketsContent({ searchParams }: Props) {
                                     <p className="font-medium">{[ticket.firstName, ticket.lastName].filter(Boolean).join(" ") || "ผู้เข้าร่วมงาน"}</p>
                                     {ticket.ticketTypeName && <p className="text-muted-foreground">{ticket.ticketTypeName}</p>}
                                     <p className="text-xs text-muted-foreground">{ticket.ticketCode}</p>
+                                    {ticket.tokenReward > 0 && ticket.status !== "CANCELLED" && (
+                                        <p className="text-muted-foreground">
+                                            {ticket.status === "PENDING" ? "รอรับ" : "ได้รับ"} {ticket.tokenReward.toLocaleString("th-TH")} Token
+                                        </p>
+                                    )}
                                     {ticket.souvenirItems.map(({ souvenirId, name, size }) => (
                                         <p key={souvenirId} className="text-muted-foreground">รับ {name}{size ? ` · ขนาด ${size}` : ""}</p>
                                     ))}

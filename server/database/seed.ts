@@ -3,6 +3,7 @@ import { hashPassword } from "better-auth/crypto";
 import { In, type EntityManager } from "typeorm";
 import type { EventSummary, OrderSouvenirItem, TicketSouvenir } from "@/lib/api-types";
 import { FALLBACK_EVENTS } from "@/lib/events-mock";
+import { calculateTopUpBaht } from "@/lib/token-pricing";
 import migrationDataSource from "./data-source.cli";
 import {
     Account,
@@ -35,9 +36,16 @@ import { Role } from "./enums/role.enum";
 import { PERMISSIONS, type Permission } from "@/lib/permissions";
 import { seedCheckoutOrders, seedCheckoutSalesExamples } from "./seed-checkout";
 import { seedFaq } from "./seed-faq";
+import { catalogSouvenirs, galaBottle, refreshSeedSouvenirImages, reunionSouvenirs } from "./seed-souvenirs";
+import { TOKEN_PRICING_ID, TokenPricing } from "./entities/TokenPricing";
 
 const dayMs = 86_400_000;
 const demoSlip = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jMfkAAAAASUVORK5CYII=";
+const demoBahtPerToken = "2.50";
+
+function demoTopUpPricing(tokens: number) {
+    return { bahtPerToken: demoBahtPerToken, bahtAmount: calculateTopUpBaht(tokens, Number(demoBahtPerToken)) };
+}
 
 // ตัวอย่าง HTML ที่ใส่ในช่อง description ได้เลย
 const reunionDescription = `
@@ -373,8 +381,8 @@ async function seedMoreEvents(manager: EntityManager, seededAt: Date) {
         const upcoming = index >= 18;
         const closed = index === 16 || index === 17;
         const soldOut = index === 4 || index === 11;
-        const hasSouvenirs = index % 4 !== 0;
-        const allowShipping = hasSouvenirs && index % 2 === 1;
+        const souvenirFixtures = catalogSouvenirs(index);
+        const allowShipping = souvenirFixtures.length > 0 && index % 2 === 1;
         const event = await manager.save(Events, {
             slug: sample.slug,
             title: sample.title,
@@ -424,20 +432,9 @@ async function seedMoreEvents(manager: EntityManager, seededAt: Date) {
         ]);
 
         const [, premium, group] = ticketTypes;
-        const savedSouvenirs = hasSouvenirs ? await manager.save(manager.create(EventSouvenir, [
-            {
-                eventId: event.id, name: index % 2 === 0 ? "เข็มกลัดประจำงาน" : "โปสการ์ดประจำงาน",
-                allTicketTypes: true, allowDecline: index % 3 !== 0,
-            },
-            {
-                eventId: event.id, name: "เสื้อที่ระลึกประจำงาน",
-                sizes: ["S", "M", "L", "XL"], extraPrice: "179.50",
-            },
-            {
-                eventId: event.id, name: index % 2 === 0 ? "กระเป๋าผ้าพิมพ์ลาย" : "สมุดโน้ตประจำงาน",
-                extraPrice: "69.00",
-            },
-        ])) : [];
+        const savedSouvenirs = await manager.save(manager.create(
+            EventSouvenir, souvenirFixtures.map((item) => ({ ...item, eventId: event.id })),
+        ));
 
         const shirt = savedSouvenirs[1];
         if (shirt) await seedSouvenirTicketTypes(manager, shirt, [premium, group]);
@@ -595,6 +592,7 @@ async function seedMoreWalletActivity(
         let balance = 500 + index % 8 * 100;
         await manager.insert(WalletHistory, {
             walletId: wallet.id, type: TRANSACTION_TYPES.TOPUP, amount: balance.toFixed(2),
+            ...demoTopUpPricing(balance),
             before: "0.00", after: balance.toFixed(2), ref: topUpStaff.id, note: "เติมโทเคนที่เคาน์เตอร์หน้างาน",
             createdAt: new Date(startTime),
         });
@@ -636,14 +634,42 @@ async function seedMoreWalletActivity(
     }
 }
 
+async function seedTicketRewards(
+    manager: EntityManager,
+    wallet: Wallet,
+    orders: readonly { id: string; tokenReward: number }[],
+) {
+    for (const order of orders) {
+        if (order.tokenReward === 0) continue;
+        const before = wallet.total;
+        wallet.total = (Number(before) + order.tokenReward).toFixed(2);
+        await manager.insert(WalletHistory, {
+            walletId: wallet.id,
+            type: TRANSACTION_TYPES.TICKET_REWARD,
+            amount: order.tokenReward.toFixed(2),
+            before,
+            after: wallet.total,
+            ref: order.id,
+            note: "Token จากการจองบัตร",
+        });
+    }
+    await manager.update(Wallet, { id: wallet.id }, { total: wallet.total });
+}
+
 async function runSeed() {
     const isReset = process.argv.includes("--reset");
     const descriptionsOnly = process.argv.includes("--event-descriptions-only");
+    const souvenirImagesOnly = process.argv.includes("--souvenir-images-only");
 
     console.log("⏳ กำลังเชื่อมต่อฐานข้อมูล Supabase...");
     await migrationDataSource.initialize();
 
     try {
+        if (souvenirImagesOnly) {
+            const updated = await migrationDataSource.transaction(refreshSeedSouvenirImages);
+            console.log(`อัปเดตรูปของที่ระลึกตัวอย่าง ${updated} รายการ`);
+            return;
+        }
         if (descriptionsOnly) {
             const { foundCount, updatedCount } = await migrationDataSource.transaction(refreshSeedEventDescriptions);
             console.log(`พบงานตัวอย่าง ${foundCount} งาน อัปเดตรายละเอียด ${updatedCount} งาน`);
@@ -685,6 +711,7 @@ async function runSeed() {
         ];
 
         await migrationDataSource.transaction(async (manager) => {
+            await manager.update(TokenPricing, { id: TOKEN_PRICING_ID }, { bahtPerToken: demoBahtPerToken });
             // ==========================================
             // 1. สร้าง Users & Accounts (รหัสผ่านทุกคนคือ: password123)
             // ==========================================
@@ -888,6 +915,7 @@ async function runSeed() {
                     name: "บัตรศิษย์เก่าสัมพันธ์ (Early Bird)",
                     description: "บัตรเข้างานราคาพิเศษสำหรับผู้จองล่วงหน้า (ไม่รวมเสื้อที่ระลึก)",
                     price: "350.00",
+                    tokenReward: 10,
                     quota: 100,
                     sold: 45,
                     minTicketQTY: 1,
@@ -901,6 +929,7 @@ async function runSeed() {
                     name: "บัตรศิษย์เก่าทั่วไป (Regular + เสื้อที่ระลึก)",
                     description: "บัตรเข้างานพร้อมรับเสื้อยืดที่ระลึก TUATUA Reunion 1 ตัว",
                     price: "500.00",
+                    tokenReward: 25,
                     quota: 300,
                     sold: 120,
                     minTicketQTY: 1,
@@ -919,6 +948,7 @@ async function runSeed() {
                     name: "บัตรศิษย์เก่าสนับสนุน (VIP Front Table)",
                     description: "ที่นั่งโซนพิเศษหน้าเวที พร้อมเสื้อที่ระลึกและเครื่องดื่มต้อนรับ",
                     price: "1000.00",
+                    tokenReward: 50,
                     quota: 50,
                     sold: 18,
                     minTicketQTY: 1,
@@ -980,8 +1010,7 @@ async function runSeed() {
             // ของที่ระลึกแยกจากงานและกำหนดสิทธิ์ได้ทีละรายการ
             const reunionShirt = await manager.save(manager.create(EventSouvenir, {
                 eventId: event1.id,
-                name: "เสื้อยืดที่ระลึก TUATUA Reunion 2026 (Oversize)",
-                image: "https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?auto=format&fit=crop&w=600&q=80",
+                ...reunionSouvenirs[0],
                 sizes: ["S", "M", "L", "XL", "2XL"],
                 extraPrice: "300.00",
             }));
@@ -989,20 +1018,19 @@ async function runSeed() {
             const [reunionPin, , reunionKeychain] = await manager.save([
                 manager.create(EventSouvenir, {
                     eventId: event1.id,
-                    name: "เข็มกลัด TUATUA Reunion 2026",
+                    ...reunionSouvenirs[1],
                     allTicketTypes: true,
                 }),
                 manager.create(EventSouvenir, {
                     eventId: event3.id,
-                    name: "กระบอกน้ำเก็บอุณหภูมิ Tech Alumni Edition",
-                    image: "https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=600&q=80",
+                    ...galaBottle,
                     sizes: ["One Size"],
                     allTicketTypes: true,
                     allowDecline: false,
                 }),
                 manager.create(EventSouvenir, {
                     eventId: event1.id,
-                    name: "พวงกุญแจ TUATUA Reunion 2026",
+                    ...reunionSouvenirs[2],
                     extraPrice: "79.50",
                 }),
             ]);
@@ -1148,6 +1176,7 @@ async function runSeed() {
                     eventTicketId: t1Regular.id,
                     userId: user1.id,
                     unitPrice: "500.00",
+                    tokenReward: t1Regular.tokenReward,
                     ticketCode: "TKT-REU26-0001",
                     qrToken: "QR-DEMO-ACTIVE-001",
                     status: TICKET_STATUSES.ACTIVE,
@@ -1164,6 +1193,7 @@ async function runSeed() {
                     eventTicketId: t1Regular.id,
                     userId: user1.id,
                     unitPrice: "500.00",
+                    tokenReward: t1Regular.tokenReward,
                     ticketCode: "TKT-REU26-0002",
                     qrToken: "QR-DEMO-USED-002",
                     status: TICKET_STATUSES.USED,
@@ -1200,6 +1230,7 @@ async function runSeed() {
                     eventTicketId: t1Vip.id,
                     userId: user2.id,
                     unitPrice: "1000.00",
+                    tokenReward: t1Vip.tokenReward,
                     ticketCode: "TKT-VIP26-0001",
                     qrToken: "QR-DEMO-VIP-001",
                     status: TICKET_STATUSES.ACTIVE,
@@ -1212,7 +1243,7 @@ async function runSeed() {
                 })
             );
 
-            await seedCheckoutOrders(manager, {
+            const paidCheckoutOrders = await seedCheckoutOrders(manager, {
                 buyer: user1,
                 earlyTicket: t1Early,
                 regularTicket: t1Regular,
@@ -1237,6 +1268,7 @@ async function runSeed() {
                     type: TRANSACTION_TYPES.TOPUP,
                     status: TRANSACTION_STATUSES.COMPLETED,
                     amount: "2000.00",
+                    ...demoTopUpPricing(2000),
                     before: "0.00",
                     after: "2000.00",
                     ref: staffUser.id,
@@ -1287,6 +1319,7 @@ async function runSeed() {
                     type: TRANSACTION_TYPES.TOPUP,
                     status: TRANSACTION_STATUSES.COMPLETED,
                     amount: "3500.00",
+                    ...demoTopUpPricing(3500),
                     before: "0.00",
                     after: "3500.00",
                     ref: staffUser.id,
@@ -1303,6 +1336,11 @@ async function runSeed() {
                     note: "แลกคืนเงินสดหลังจบงาน",
                 }),
             ]);
+            await seedTicketRewards(manager, u1Wallet, [
+                { id: order1.id, tokenReward: 2 * t1Regular.tokenReward },
+                ...paidCheckoutOrders,
+            ]);
+            await seedTicketRewards(manager, u2Wallet, [{ id: order2.id, tokenReward: t1Vip.tokenReward }]);
 
             // 8. งานและรายการเพิ่ม สำหรับลองตัวกรอง รายการยาว และบทบาทหลายขอบเขต
             const demoGuests = guests.map((guest) => savedUsers[guest.email]);

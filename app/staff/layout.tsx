@@ -17,7 +17,8 @@ import {
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
 import { StaffSidebarNav } from "@/components/staff/staff-nav";
-import { eventInfo, staffProfile } from "@/lib/staff-mock";
+import { StaffProvider } from "@/components/staff/staff-context";
+import { eventInfo } from "@/lib/staff-mock";
 
 export const metadata: Metadata = {
   title: "Staff & Check-in | TuaTua",
@@ -39,34 +40,31 @@ export default function StaffLayout({
     >
       <TooltipProvider>
         <SidebarProvider defaultOpen={false}>
-          <StaffSidebarNav />
-          <SidebarInset className="bg-[#F5F5F5] min-h-screen">
-            <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
-              <div className="flex items-center gap-2">
-                <SidebarTrigger className="-ml-1" />
-                <Separator orientation="vertical" className="mr-2 h-4" />
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    <BreadcrumbItem className="hidden sm:inline-flex">
-                      <BreadcrumbLink href="/staff">Staff</BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator className="hidden sm:inline-flex" />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage>{eventInfo.name}</BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </BreadcrumbList>
-                </Breadcrumb>
+          <StaffProvider>
+            <StaffSidebarNav />
+            <SidebarInset className="bg-[#F5F5F5] min-h-screen">
+              <header className="flex h-12 shrink-0 items-center justify-between gap-2 border-b bg-background px-4">
+                <div className="flex items-center gap-2">
+                  <SidebarTrigger className="-ml-1" />
+                  <Separator orientation="vertical" className="mr-2 h-4" />
+                  <Breadcrumb>
+                    <BreadcrumbList>
+                      <BreadcrumbItem className="hidden sm:inline-flex">
+                        <BreadcrumbLink href="/staff">Staff</BreadcrumbLink>
+                      </BreadcrumbItem>
+                      <BreadcrumbSeparator className="hidden sm:inline-flex" />
+                      <BreadcrumbItem>
+                        <BreadcrumbPage>{eventInfo.name}</BreadcrumbPage>
+                      </BreadcrumbItem>
+                    </BreadcrumbList>
+                  </Breadcrumb>
+                </div>
+              </header>
+              <div className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8">
+                {children}
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="font-medium text-foreground">{staffProfile.name}</span>
-                <span className="hidden sm:inline">·</span>
-                <span className="hidden sm:inline">{staffProfile.role}</span>
-              </div>
-            </header>
-            <div className="flex flex-1 flex-col gap-4 p-4 md:p-6 lg:p-8">
-              {children}
-            </div>
-          </SidebarInset>
+            </SidebarInset>
+          </StaffProvider>
         </SidebarProvider>
       </TooltipProvider>
     </Suspense>
