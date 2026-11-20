@@ -3,10 +3,34 @@
 import { useEffect, useRef, useState } from "react";
 import type { Html5Qrcode } from "html5-qrcode";
 import { useVendorStore } from "@/components/vendor/vendor-store-context";
+import { api } from "@/lib/api-client";
 import { Camera, CheckCircle2, Keyboard, X, XCircle } from "lucide-react";
 
 // ตรวจสอบรูปแบบ UUID (8-4-4-4-12 ตัวอักษร 0-9 และ a-f)
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function getPaymentUserId(rawCode: string): string | null {
+  const trimmed = rawCode.trim();
+  if (UUID_REGEX.test(trimmed)) return trimmed;
+
+  try {
+    const payload: unknown = JSON.parse(trimmed);
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)) return null;
+    const paymentQr = payload as Record<string, unknown>;
+    if (
+      paymentQr.protocol === "tuatua" &&
+      paymentQr.type === "USER_PAYMENT" &&
+      typeof paymentQr.userId === "string" &&
+      UUID_REGEX.test(paymentQr.userId)
+    ) {
+      return paymentQr.userId;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 export function ScannerBox() {
   const { selectedStore } = useVendorStore();
@@ -14,6 +38,8 @@ export function ScannerBox() {
   const [manualCode, setManualCode] = useState("");
   const [scannedResult, setScannedResult] = useState<string | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isPaying, setIsPaying] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState<{
     code: string;
     amount: number;
@@ -21,6 +47,7 @@ export function ScannerBox() {
 
   const scannerRef = useRef<Html5Qrcode | null>(null);
   const cameraRequestRef = useRef(0);
+  const paymentInProgressRef = useRef(false);
 
   const storeName = selectedStore?.name ?? "ร้านค้า";
   const productTitle = selectedStore?.product?.title ?? "สินค้าของร้าน";
@@ -52,16 +79,17 @@ export function ScannerBox() {
 
   // ตรวจสอบความถูกต้องของรหัสก่อนเปิด Modal ยืนยัน
   const processScannedCode = (rawCode: string) => {
-    const trimmed = rawCode.trim();
-    if (!UUID_REGEX.test(trimmed)) {
+    const userId = getPaymentUserId(rawCode);
+    if (!userId) {
       setCameraError(
-        `รูปแบบรหัส QR ไม่ถูกต้อง ("${trimmed}") — ต้องเป็นรหัส UUID เช่น 550e8400-e29b-41d4-a716-446655440000`
+        "QR ไม่ถูกต้อง กรุณาสแกน QR ชำระเงินจากบัตรสมาชิก หรือกรอกรหัสผู้ใช้ UUID"
       );
       return;
     }
     setCameraError(null);
+    setPaymentError(null);
     setPaymentSuccess(null);
-    setScannedResult(trimmed);
+    setScannedResult(userId);
   };
 
   const handleOpenCamera = async () => {
@@ -188,18 +216,45 @@ export function ScannerBox() {
 
   const handleCancelModal = () => {
     setScannedResult(null);
+    setPaymentError(null);
   };
 
-  const handleConfirmPayment = () => {
-    if (!scannedResult) return;
+  const handleConfirmPayment = async () => {
+    if (
+      !scannedResult ||
+      !selectedStore?.product ||
+      productPrice <= 0 ||
+      paymentInProgressRef.current
+    ) return;
 
-    // TODO: เรียก API / Server Action ตัดยอด Token ของ scannedResult (UUID) เข้า selectedStore ตรงนี้
-    setPaymentSuccess({
-      code: scannedResult,
-      amount: productPrice,
-    });
-    setScannedResult(null);
-    setManualCode("");
+    paymentInProgressRef.current = true;
+    setIsPaying(true);
+    setPaymentError(null);
+    try {
+      const result = await api.store.sell(
+        {
+          customerUserId: scannedResult,
+          amount: selectedStore.product.price,
+          note: productTitle,
+        },
+        selectedStore.id,
+      );
+      if (!result.success) {
+        setPaymentError(result.error.message);
+        return;
+      }
+
+      setPaymentSuccess({ code: scannedResult, amount: productPrice });
+      setScannedResult(null);
+      setManualCode("");
+    } catch (error) {
+      setPaymentError(
+        error instanceof Error ? error.message : "รับชำระไม่สำเร็จ กรุณาลองอีกครั้ง",
+      );
+    } finally {
+      paymentInProgressRef.current = false;
+      setIsPaying(false);
+    }
   };
 
   return (
@@ -292,7 +347,7 @@ export function ScannerBox() {
             <h3 className="text-sm font-bold text-gray-900">กรอกรหัส QR เอง</h3>
           </div>
           <p className="text-xs text-gray-400 mb-3">
-            ใช้ในกรณีที่เปิดกล้องไม่ได้หรือกล้องสแกนไม่ติด (รหัส UUID 36 หลัก)
+            ใช้ในกรณีที่เปิดกล้องไม่ได้ โดยกรอกรหัสผู้ใช้ UUID 36 หลัก
           </p>
 
           <form onSubmit={handleManualSubmit} className="flex gap-2">
@@ -355,6 +410,17 @@ export function ScannerBox() {
               </div>
             </div>
 
+            {(!selectedStore?.product || productPrice <= 0) && (
+              <p role="alert" className="mt-3 text-sm text-destructive">
+                ร้านนี้ยังไม่มีสินค้าหรือราคาที่รับชำระได้
+              </p>
+            )}
+            {paymentError && (
+              <p role="alert" className="mt-3 text-sm text-destructive">
+                {paymentError}
+              </p>
+            )}
+
             <div className="mt-5 flex items-center gap-3">
               <button
                 type="button"
@@ -366,9 +432,10 @@ export function ScannerBox() {
               <button
                 type="button"
                 onClick={handleConfirmPayment}
-                className="flex-1 bg-[#E53935] hover:bg-red-700 text-white py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
+                disabled={isPaying || !selectedStore?.product || productPrice <= 0}
+                className="flex-1 bg-[#E53935] hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 text-white py-2.5 rounded-xl text-sm font-bold transition-colors shadow-sm cursor-pointer"
               >
-                ยืนยัน
+                {isPaying ? "กำลังบันทึก..." : "ยืนยัน"}
               </button>
             </div>
           </div>

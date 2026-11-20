@@ -24,6 +24,7 @@ import type {
     StaffOverviewData,
     StaffTopUpInput,
     StoreDetail,
+    StoreSalesSummary,
     StoreInput,
     StoreSaleResult,
     StoreSellInput,
@@ -369,6 +370,8 @@ export const api = {
          */
         sell: (input: StoreSellInput, storeId?: string) =>
             request<StoreSaleResult>(withStoreId("/api/store/sell", storeId), "POST", input),
+        sales: (storeId: string) =>
+            request<StoreSalesSummary>(withStoreId("/api/store/sales", storeId)),
     },
 
     admin: {

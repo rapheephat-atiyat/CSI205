@@ -443,6 +443,19 @@ export type StoreSaleResult = {
     customerBalance: string;
 };
 
+export type StoreSalesSummary = {
+    todaySales: number;
+    todayTransactions: number;
+    weeklySales: number;
+    dailySales: { date: string; label: string; sales: number }[];
+    recentTransactions: {
+        id: string;
+        customerName: string | null;
+        amount: number;
+        createdAt: string;
+    }[];
+};
+
 export type OverviewReport = {
     totalTicketsSold: number;
     totalCheckedIn: number;
