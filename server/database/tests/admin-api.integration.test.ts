@@ -180,8 +180,12 @@ test("admin workflows through real HTTP sessions and a migrated disposable datab
         denied(await request(path() + `/orders/${approved.id}/shipping`, "PATCH", { status: "PENDING" }, owner), 409);
     });
     await t.test("store CRUD uses admin scope and refuses to erase financial history", async () => {
-        store = ok(await request<StoreDetail>(path() + "/stores", "POST", { eventId: secondEvent.id, name: "Admin store" }, scoped), 201);
+        store = ok(await request<StoreDetail>(path() + "/stores", "POST", { eventId: secondEvent.id, name: "Admin store", product: { title: "Test food", price: "42.50", images: [proof] } }, scoped), 201);
         assert.equal(store.eventId, firstEvent.id);
+        assert.deepEqual(
+            { title: store.product?.title, price: store.product?.price, images: store.product?.images },
+            { title: "Test food", price: "42.50", images: [proof] },
+        );
         const updated = ok(await request<AdminStore>(path() + `/stores/${store.id}`, "PATCH", { name: "Updated store", description: "Actual data" }, scoped));
         assert.equal(updated.name, "Updated store");
         denied(await request(path(secondEvent) + `/stores/${store.id}`, "PATCH", { name: "Cross event" }, owner), 404);

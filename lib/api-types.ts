@@ -383,6 +383,10 @@ export type StoreInput = {
     thumbnail?: string | null;
 };
 
+export type AdminStoreCreateInput = Omit<StoreInput, "eventId"> & {
+    product?: Pick<ProductInput, "title" | "price" | "images">;
+};
+
 export type StoreSellInput = {
     /** id ของบัญชีผู้ซื้อที่อ่านได้จากข้อมูลผู้ใช้ */
     customerUserId: string;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { useAdminAccess } from "@/components/admin/AdminAccess";
 import { toast } from "sonner";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -55,6 +56,18 @@ type SortKey = "name" | "balance-desc" | "balance-asc";
 
 const selectClass =
   "h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50";
+
+function readImageAsDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("อ่านไฟล์รูปภาพไม่สำเร็จ"));
+    reader.onload = () =>
+      typeof reader.result === "string"
+        ? resolve(reader.result)
+        : reject(new Error("อ่านไฟล์รูปภาพไม่สำเร็จ"));
+    reader.readAsDataURL(file);
+  });
+}
 
 const formatToken = (v?: string | number | null) => {
   if (v == null) return "-";
@@ -214,6 +227,9 @@ export default function Page() {
   const [createOpen, setCreateOpen] = useState(false);
   const [newName, setNewName] = useState("");
   const [newDescription, setNewDescription] = useState("");
+  const [newProductName, setNewProductName] = useState("");
+  const [newProductPrice, setNewProductPrice] = useState("");
+  const [newProductImage, setNewProductImage] = useState("");
   const [creating, setCreating] = useState(false);
   const [editingStore, setEditingStore] = useState<AdminStore | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -223,9 +239,42 @@ export default function Page() {
     setEditingStore(store);
     setNewName(store?.name ?? "");
     setNewDescription(store?.description ?? "");
+    setNewProductName("");
+    setNewProductPrice("");
+    setNewProductImage("");
     setCreateError(null);
     setConfirmDelete(false);
     setCreateOpen(true);
+  }
+
+  async function handleProductImageChange(
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) {
+    const input = event.currentTarget;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    if (
+      !["image/png", "image/jpeg"].includes(file.type) ||
+      file.size === 0 ||
+      file.size > 2 * 1024 * 1024
+    ) {
+      const message = "กรุณาเลือกรูปอาหาร PNG หรือ JPEG ขนาดไม่เกิน 2 MB";
+      setNewProductImage("");
+      setCreateError(message);
+      toast.error(message);
+      return;
+    }
+
+    try {
+      setNewProductImage(await readImageAsDataUrl(file));
+      setCreateError(null);
+    } catch {
+      const message = "อ่านรูปอาหารไม่สำเร็จ กรุณาลองอีกครั้ง";
+      setNewProductImage("");
+      setCreateError(message);
+      toast.error(message);
+    }
   }
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
@@ -236,12 +285,32 @@ export default function Page() {
       toast.error("กรุณากรอกชื่อร้าน");
       return;
     }
+    const productName = newProductName.trim();
+    const productPrice = newProductPrice.trim();
+    const hasProductInput = Boolean(productName || productPrice || newProductImage);
+    if (!editingStore && hasProductInput && (!productName || !productPrice)) {
+      const message = "กรุณาระบุชื่ออาหารและราคา Token ต่อชิ้นให้ครบ";
+      setCreateError(message);
+      toast.error(message);
+      return;
+    }
     setCreating(true);
     setCreateError(null);
     const input = { name, description: newDescription.trim() || null };
     const result = editingStore
       ? await api.admin.stores.update(eventId, editingStore.id, input)
-      : await api.admin.stores.create(eventId, input);
+      : await api.admin.stores.create(eventId, {
+          ...input,
+          ...(productName
+            ? {
+                product: {
+                  title: productName,
+                  price: productPrice,
+                  ...(newProductImage ? { images: [newProductImage] } : {}),
+                },
+              }
+            : {}),
+        });
     setCreating(false);
     if (!result.success) {
       setCreateError(result.error.message);
@@ -664,6 +733,71 @@ export default function Page() {
                   />
                 </Field>
               </FieldGroup>
+
+              {!editingStore && (
+                <div className="mt-4 border-t pt-4">
+                  <p className="mb-3 text-sm font-medium">อาหารเริ่มต้น (ไม่บังคับ)</p>
+                  <FieldGroup>
+                    <Field>
+                      <FieldLabel htmlFor="store-product-name">ชื่ออาหาร</FieldLabel>
+                      <Input
+                        id="store-product-name"
+                        placeholder="ข้าวไก่ย่าง"
+                        value={newProductName}
+                        onChange={(e) => setNewProductName(e.target.value)}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="store-product-price">ราคา Token ต่อชิ้น</FieldLabel>
+                      <Input
+                        id="store-product-price"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        inputMode="decimal"
+                        placeholder="50"
+                        value={newProductPrice}
+                        onChange={(e) => setNewProductPrice(e.target.value)}
+                      />
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="store-product-image">รูปอาหาร</FieldLabel>
+                      <Input
+                        id="store-product-image"
+                        type="file"
+                        accept="image/png,image/jpeg"
+                        aria-describedby="store-product-image-help"
+                        onChange={(e) => void handleProductImageChange(e)}
+                      />
+                      <p
+                        id="store-product-image-help"
+                        className="text-xs text-muted-foreground"
+                      >
+                        PNG หรือ JPEG ขนาดไม่เกิน 2 MB
+                      </p>
+                      {newProductImage && (
+                        <div className="flex items-center gap-3">
+                          <Image
+                            src={newProductImage}
+                            alt="ตัวอย่างรูปอาหาร"
+                            width={64}
+                            height={64}
+                            unoptimized
+                            className="size-16 rounded-md border object-cover"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setNewProductImage("")}
+                          >
+                            เอารูปออก
+                          </Button>
+                        </div>
+                      )}
+                    </Field>
+                  </FieldGroup>
+                </div>
+              )}
 
               {createError && (
                 <p role="alert" className="mt-3 text-sm text-destructive">
