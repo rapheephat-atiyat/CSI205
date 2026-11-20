@@ -12,7 +12,8 @@ import { AdminActivity, Events, Order, Store, Ticket, User, UserRole, UserRolePe
 import { Role } from "../enums/role.enum";
 import { EVENT_ADMIN_PERMISSIONS, PERMISSIONS } from "@/lib/permissions";
 import { makeAdminCsv } from "@/lib/admin-export";
-import type { AdminActivityItem, AdminEventSummary, AdminExportReport, AdminOrderDetail, AdminOrderSummary, AdminStore, AdminUser, ApiResponse, EventArchiveResult, EventDetail, EventOverviewReport, EventSouvenirItem, EventSummary, EventTicketItem, OrderDetail, Paginated, StoreDetail, StoreSalesSummary, TokenRate, WalletDetail } from "@/lib/api-types";
+import { getBookingDays } from "@/lib/booking-days";
+import type { AdminActivityItem, AdminEventSummary, AdminExportReport, AdminOrderDetail, AdminOrderSummary, AdminStore, AdminUser, ApiResponse, EventArchiveResult, EventDetail, EventOverviewReport, EventSouvenirItem, EventSummary, EventTicketItem, OrderDetail, Paginated, StoreDetail, StoreSalesSummary, TicketItem, TokenRate, WalletDetail } from "@/lib/api-types";
 
 // Never loads .env. Only a fresh, unused localhost database created here may be dropped.
 if (!process.env.TEST_DATABASE) throw new Error("Set TEST_DATABASE to a new disposable local admin test database.");
@@ -43,7 +44,7 @@ function ok<T>(reply: Reply<T>, status = 200): T {
     return reply.body.data;
 }
 function denied(reply: Reply<unknown>, status: number) { assert.equal(reply.status, status, JSON.stringify(reply.body)); assert.equal(reply.body.success, false); }
-const path = (event = firstEvent) => `/api/admin/events/${event.id}`;
+const path = (event: Pick<Events, "id"> = firstEvent) => `/api/admin/events/${event.id}`;
 
 async function signup(name: string): Promise<Session> {
     const reply = await fetch(baseUrl + "/api/auth/sign-up/email", { method: "POST", headers: { "Content-Type": "application/json", Origin: baseUrl }, body: JSON.stringify({ name, firstName: name, lastName: "Test", email: `${name}@example.test`, password: randomBytes(24).toString("hex") }) });
@@ -63,6 +64,8 @@ before(async () => {
     // Exercise an actual schema rollback/reapply and repair an older empty event ADMIN assignment.
     const legacy = await source.manager.save(User, { email: "legacy@example.test", name: "Legacy", firstName: "Legacy", lastName: "Test" });
     const role = await source.manager.save(UserRole, { userId: legacy.id, role: Role.ADMIN, eventId: firstEvent.id });
+    await source.undoLastMigration();
+    assert.equal((await source.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'orders' AND column_name = 'attendance_date'")).length, 0);
     await source.undoLastMigration();
     assert.equal((await source.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'events' AND column_name = 'archived_at'")).length, 0);
     await source.undoLastMigration();
@@ -427,6 +430,52 @@ test("admin workflows through real HTTP sessions and a migrated disposable datab
         assert.ok((await listPublic()).some((event) => event.id === firstEvent.id));
         assert.equal(ok(await request<EventDetail>(publicPath)).id, firstEvent.id);
         assert.equal(ok(await request<OrderDetail>("/api/orders", "POST", newOrder, customer), 201).status, "PENDING");
+    });
+    await t.test("booking uses one Bangkok date per order and preserves it after schedule changes", async () => {
+        const event = ok(await request<EventDetail>("/api/admin/events", "POST", {
+            slug: "booking-dates", title: "Event with two days", subTitle: "", venue: "Test", description: "",
+            banner: "", thumbnail: "", buyAt: "2020-01-01T00:00:00Z", buyEndAt: "2030-01-01T00:00:00Z",
+            minTicketQTY: 1, maxTicketQTY: 4,
+            sessions: [
+                { title: "Late night", startsAt: "2026-12-04T17:30:00Z", endsAt: "2026-12-04T18:30:00Z" },
+                { title: "Afternoon", startsAt: "2026-12-05T13:00:00+07:00", endsAt: "2026-12-05T14:00:00+07:00" },
+                { title: "Second day", startsAt: "2026-12-06T09:00:00+07:00", endsAt: "2026-12-06T10:00:00+07:00" },
+                { title: "Time unannounced" },
+            ],
+        }, owner), 201);
+        assert.deepEqual(getBookingDays(event.sessions).map(({ date, sessions }) => [date, sessions.length]), [["2026-12-05", 2], ["2026-12-06", 1]]);
+        const free = ok(await request<EventTicketItem>(path(event) + "/tickets", "POST", { name: "Free", price: "0.00", quota: 10 }, owner), 201);
+        const input = {
+            requestId: randomUUID(), eventId: event.id,
+            items: [{ eventTicketId: free.id, quantity: 1, attendees: [{ firstName: "Test", lastName: "Buyer" }] }],
+            deliveryMethod: "NONE",
+        };
+        const missing = await request("/api/orders", "POST", input, customer);
+        denied(missing, 422);
+        if (!missing.body.success) assert.equal(missing.body.error.code, "EVENT_DATE_REQUIRED");
+
+        const invalid = await request("/api/orders", "POST", { ...input, attendanceDate: "2026-12-04" }, customer);
+        denied(invalid, 409);
+        if (!invalid.body.success) assert.equal(invalid.body.error.code, "EVENT_DATE_UNAVAILABLE");
+        const booking = { ...input, attendanceDate: "2026-12-05" };
+        const order = ok(await request<OrderDetail>("/api/orders", "POST", booking, customer), 201);
+        assert.equal(order.attendanceDate, "2026-12-05");
+        assert.equal((await source.manager.findOneByOrFail(Order, { id: order.id })).attendanceDate, "2026-12-05");
+        const tickets = ok(await request<TicketItem[]>("/api/me/tickets", "GET", undefined, customer));
+        assert.equal(tickets.find(({ orderId }) => orderId === order.id)?.attendanceDate, "2026-12-05");
+
+        const secondDay = event.sessions.find(({ title }) => title === "Second day");
+        assert.ok(secondDay);
+        ok(await request(path(event), "PATCH", { sessions: [secondDay] }, owner));
+        const retry = ok(await request<OrderDetail>("/api/orders", "POST", booking, customer), 201);
+        assert.equal(retry.attendanceDate, order.attendanceDate);
+        const oneDay = ok(await request<OrderDetail>("/api/orders", "POST", { ...input, requestId: randomUUID() }, customer), 201);
+        assert.equal(oneDay.attendanceDate, "2026-12-06");
+        await source.manager.update(Order, { id: oneDay.id }, { attendanceDate: null });
+        const withLegacy = ok(await request<TicketItem[]>("/api/me/tickets", "GET", undefined, customer));
+        assert.equal(withLegacy.find(({ orderId }) => orderId === oneDay.id)?.attendanceDate, "2026-12-06");
+        assert.equal(withLegacy.find(({ orderId }) => orderId === approved.id)?.attendanceDate, null);
+        assert.equal(approved.attendanceDate, null);
     });
 });
 

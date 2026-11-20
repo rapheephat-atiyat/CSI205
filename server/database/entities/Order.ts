@@ -41,6 +41,9 @@ export class Order {
     @Column({ name: "event_id", type: "uuid" })
     eventId!: string;
 
+    @Column({ name: "attendance_date", type: "date", nullable: true })
+    attendanceDate!: string | null;
+
     @ManyToOne(() => Events, (e) => e.orders, { onDelete: "RESTRICT", nullable: false })
     @JoinColumn({ name: "event_id", referencedColumnName: "id" })
     event!: Relation<Events>;

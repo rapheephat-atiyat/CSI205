@@ -2,6 +2,7 @@
 import { BookCard, money, orderDate } from "@/components/book/BookUI";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { bookingDateLabel } from "@/lib/booking-days";
 import type { EventSummary, OrderDetail } from "@/lib/api-types";
 import { souvenirVariantKey } from "@/lib/souvenirs";
 import { cn } from "cn";
@@ -81,6 +82,12 @@ export default function Content({ filter, orders, events }: {
                             <Badge variant="secondary" className={order.status === "PAID" ? "bg-brand-soft text-brand" : undefined}>{orderStatus(order)}</Badge>
                         </div>
                         <dl className="grid grid-cols-2 gap-3 border-t pt-4 text-sm sm:grid-cols-3">
+                            {order.attendanceDate && (
+                                <div>
+                                    <dt className="text-muted-foreground">วันที่เข้าร่วม</dt>
+                                    <dd><time dateTime={order.attendanceDate}>{bookingDateLabel(order.attendanceDate)}</time></dd>
+                                </div>
+                            )}
                             <div>
                                 <dt className="text-muted-foreground">สั่งซื้อเมื่อ</dt>
                                 <dd>{orderDate(order.createdAt)}</dd>

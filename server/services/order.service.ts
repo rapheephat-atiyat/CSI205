@@ -1,7 +1,8 @@
 import "server-only";
 import type { CreateOrderInput, OrderDetail, TicketItem } from "@/lib/api-types";
+import { getBookingDays } from "@/lib/booking-days";
 import { getDatabase } from "@/server/database/database.souce";
-import { Events, EventTicket, Order, OrderShipping, Ticket, User } from "@/server/database/entities";
+import { Events, EventSession, EventTicket, Order, OrderShipping, Ticket, User } from "@/server/database/entities";
 import { DELIVERY_METHODS, ORDER_STATUSES, TICKET_STATUSES } from "@/server/database/enums/domain.enum";
 import { ApiError } from "@/server/http/errors";
 import { In, IsNull, LessThanOrEqual, type EntityManager } from "typeorm";
@@ -59,6 +60,18 @@ export async function createOrder(userId: string, input: CreateOrderInput): Prom
         if (now < event.buyAt.getTime() || now >= event.buyEndAt.getTime()) {
             throw new ApiError("SALES_CLOSED", "ขณะนี้อยู่นอกช่วงจำหน่ายบัตร", 409);
         }
+        const sessions = await manager.find(EventSession, {
+            where: { eventId: event.id },
+            select: { startsAt: true },
+        });
+        const days = getBookingDays(sessions);
+        if (input.attendanceDate != null && !days.some(({ date }) => date === input.attendanceDate)) {
+            throw new ApiError("EVENT_DATE_UNAVAILABLE", "วันที่เลือกไม่อยู่ในกำหนดการ กรุณาเลือกวันเข้าร่วมใหม่", 409);
+        }
+        if (input.attendanceDate == null && days.length > 1) {
+            throw new ApiError("EVENT_DATE_REQUIRED", "กรุณาเลือกวันเข้าร่วมก่อนสั่งซื้อบัตร", 422);
+        }
+        const attendanceDate = input.attendanceDate ?? days[0]?.date ?? null;
         const totalTickets = ticketChoices.reduce((total, choice) => total + choice.quantity, 0);
         if (totalTickets < event.minTicketQTY || totalTickets > event.maxTicketQTY) {
             invalidOrder(`กรุณาเลือกบัตรระหว่าง ${event.minTicketQTY} ถึง ${event.maxTicketQTY} ใบ`);
@@ -126,6 +139,7 @@ export async function createOrder(userId: string, input: CreateOrderInput): Prom
             orderNo: `ORD-${crypto.randomUUID().toUpperCase()}`,
             userId,
             eventId: event.id,
+            attendanceDate,
             total: (totalSatang / 100).toFixed(2),
             status: isFree ? ORDER_STATUSES.PAID : ORDER_STATUSES.PENDING,
             paymentSlip: null,
@@ -245,12 +259,29 @@ export async function getMyOrders(userId: string): Promise<OrderDetail[]> {
 export async function getMyTickets(userId: string): Promise<TicketItem[]> {
     await releaseExpiredOrderHolds({ userId });
     const db = await getDatabase();
-    const tickets = await db.getRepository(Ticket).find({
-        where: { userId },
-        relations: { eventTicket: true },
-        order: { createdAt: "DESC" },
-    });
-    return tickets.map(toTicketItem);
+    const tickets = await db.getRepository(Ticket).createQueryBuilder("ticket")
+        .leftJoinAndSelect("ticket.eventTicket", "ticketType")
+        .leftJoin("ticket.order", "booking")
+        .addSelect(["booking.id", "booking.attendanceDate"])
+        .where("ticket.userId = :userId", { userId })
+        .orderBy("ticket.createdAt", "DESC")
+        .getMany();
+    const legacyEventIds = [...new Set(tickets.filter((ticket) => !ticket.order?.attendanceDate).map(({ eventId }) => eventId))];
+    const singleDatesByEvent = new Map<string, string>();
+    if (legacyEventIds.length) {
+        const sessions = await db.getRepository(EventSession).find({
+            where: { eventId: In(legacyEventIds) },
+            select: { eventId: true, startsAt: true },
+        });
+        for (const [eventId, eventSessions] of Map.groupBy(sessions, ({ eventId }) => eventId)) {
+            const days = getBookingDays(eventSessions);
+            if (days.length === 1) singleDatesByEvent.set(eventId, days[0].date);
+        }
+    }
+    return tickets.map((ticket) => ({
+        ...toTicketItem(ticket),
+        attendanceDate: ticket.order?.attendanceDate ?? singleDatesByEvent.get(ticket.eventId) ?? null,
+    }));
 }
 
 export function toOrderDetail(order: Order): OrderDetail {
@@ -261,6 +292,7 @@ export function toOrderDetail(order: Order): OrderDetail {
         orderNo: order.orderNo,
         userId: order.userId,
         eventId: order.eventId,
+        attendanceDate: order.attendanceDate,
         total: order.total,
         status: order.status,
         paymentSlip: order.paymentSlip?.startsWith("data:") ? null : order.paymentSlip,
