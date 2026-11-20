@@ -49,8 +49,12 @@ export async function createOrder(userId: string, input: CreateOrderInput): Prom
         const existingOrder = await manager.findOneBy(Order, { id: requestId, userId });
         if (existingOrder) return existingOrder.id;
 
-        const event = await manager.findOneBy(Events, { id: input.eventId });
+        const event = await manager.findOne(Events, {
+            where: { id: input.eventId },
+            lock: { mode: "pessimistic_read" },
+        });
         if (!event) throw new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
+        if (event.archivedAt) throw new ApiError("EVENT_ARCHIVED", "งานนี้จัดเก็บแล้วและไม่รับจองเพิ่ม", 409);
         const now = Date.now();
         if (now < event.buyAt.getTime() || now >= event.buyEndAt.getTime()) {
             throw new ApiError("SALES_CLOSED", "ขณะนี้อยู่นอกช่วงจำหน่ายบัตร", 409);
@@ -86,7 +90,7 @@ export async function createOrder(userId: string, input: CreateOrderInput): Prom
             return { ticketType, attendees };
         });
 
-        const souvenirItems = priceSouvenirs(input.souvenirItems, eventSouvenirs);
+        const souvenirItems = priceSouvenirs(input.souvenirItems, eventSouvenirs, ticketTypeIds);
         const orderHasSouvenirs = souvenirItems.length > 0
             || bookedTicketTypes.some(({ attendees }) => attendees.some((attendee) => attendee.souvenirItems.length > 0));
         const wantsShipping = input.deliveryMethod === DELIVERY_METHODS.SHIPPING;

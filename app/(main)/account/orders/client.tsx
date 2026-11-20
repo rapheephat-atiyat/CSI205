@@ -2,7 +2,7 @@
 import { BookCard, money, orderDate } from "@/components/book/BookUI";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { EventSummary, OrderDetail } from "@/lib/api-types";
+import type { EventSummary, OrderDetail } from "@/lib/api-types";
 import { souvenirVariantKey } from "@/lib/souvenirs";
 import { cn } from "cn";
 import { CloudOff, ReceiptText } from "lucide-react";
@@ -22,7 +22,11 @@ const orderStatus = (order: OrderDetail) => {
     return order.hasPaymentSlip || order.paymentSlip ? "รอตรวจสอบ" : "รอชำระเงิน";
 };
 
-export default function Content({ filter, orders, events }: { filter: string, orders: OrderDetail[], events: EventSummary[] }) {
+export default function Content({ filter, orders, events }: {
+    filter: string;
+    orders: OrderDetail[];
+    events: Pick<EventSummary, "id" | "slug" | "title">[];
+}) {
 
     const visibleOrders = filter ? orders.filter((or) => or.status == filter) : orders;
     const eventsById = new Map(events.map((event) => [event.id, event]));

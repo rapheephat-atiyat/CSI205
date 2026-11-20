@@ -23,6 +23,9 @@ export type EventSummary = {
     buyEndAt: string;
 };
 
+export type AdminEventSummary = EventSummary & { archivedAt: string | null };
+export type EventArchiveResult = Pick<AdminEventSummary, "id" | "archivedAt">;
+
 export type EventSouvenirItem = {
     id: string;
     name: string;
@@ -67,7 +70,7 @@ export type EventSessionInput = {
     endsAt?: string | null;
 };
 
-export type EventDetail = EventSummary & {
+export type EventDetail = AdminEventSummary & {
     souvenirs: EventSouvenirItem[];
     banner: string;
     description: string;

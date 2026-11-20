@@ -1,11 +1,11 @@
 import "server-only";
-import type { EventDetail, EventInput, EventSessionInput, EventSouvenirItem, EventSummary } from "@/lib/api-types";
+import type { AdminEventSummary, EventArchiveResult, EventDetail, EventInput, EventSessionInput, EventSouvenirItem, EventSummary } from "@/lib/api-types";
 import { getDatabase } from "@/server/database/database.souce";
-import { Events, EventSession, Order, Store, User } from "@/server/database/entities";
+import { Events, EventSession, User } from "@/server/database/entities";
 import { ApiError } from "@/server/http/errors";
 import { hasPermission } from "@/server/auth/permission";
 import { PERMISSIONS } from "@/lib/permissions";
-import { In, type EntityManager } from "typeorm";
+import { In, IsNull, type EntityManager, type FindOptionsWhere } from "typeorm";
 import { getEventSouvenirs } from "./event-souvenirs";
 import { readMoney } from "./money";
 import { toEventTicketItem } from "./ticket.service";
@@ -13,11 +13,16 @@ import { recordAdminActivity } from "./admin-activity";
 import { readUuid } from "@/server/http/validation";
 
 const eventNotFound = () => new ApiError("EVENT_NOT_FOUND", "ไม่พบงานที่ต้องการ", 404);
+const eventSummaryFields = {
+    id: true, slug: true, title: true, subTitle: true, thumbnail: true,
+    venue: true, tags: true, buyAt: true, buyEndAt: true,
+} as const;
 
 export async function getEvents(): Promise<EventSummary[]> {
     const db = await getDatabase();
     const events = await db.getRepository(Events).find({
-        select: { id: true, slug: true, title: true, subTitle: true, thumbnail: true, venue: true, tags: true, buyAt: true, buyEndAt: true },
+        where: { archivedAt: IsNull() },
+        select: eventSummaryFields,
         order: { createdAt: "ASC", buyAt: "ASC" },
     });
     return events.map(toEventSummary);
@@ -25,22 +30,34 @@ export async function getEvents(): Promise<EventSummary[]> {
 
 export async function getEventBySlug(slug: string): Promise<EventDetail> {
     const db = await getDatabase();
-    return findEventDetail(db.manager, { slug });
+    return findEventDetail(db.manager, { slug, archivedAt: IsNull() });
 }
 
-export async function listManageableEvents(user: User): Promise<EventSummary[]> {
-    if (hasPermission(user, PERMISSIONS.EVENT_UPDATE)) return getEvents();
-
-    const eventIds: string[] = [];
-    for (const role of user.userRoles) {
-        const canEditEvent = role.permissions.some((grant) => grant.permission === PERMISSIONS.EVENT_UPDATE);
-        if (role.eventId && !role.storeId && canEditEvent) eventIds.push(role.eventId);
-    }
-
-    if (eventIds.length === 0) return [];
+export async function getEventsByIds(ids: readonly string[]): Promise<Pick<EventSummary, "id" | "slug" | "title">[]> {
+    if (!ids.length) return [];
     const db = await getDatabase();
-    const events = await db.getRepository(Events).find({ where: { id: In(eventIds) }, order: { buyAt: "ASC" } });
-    return events.map(toEventSummary);
+    const events = await db.getRepository(Events).find({
+        where: { id: In([...new Set(ids)]) },
+        select: { id: true, slug: true, title: true },
+    });
+    return events.map(({ id, slug, title }) => ({ id, slug, title }));
+}
+
+export async function listManageableEvents(user: User): Promise<AdminEventSummary[]> {
+    const canManageAll = hasPermission(user, PERMISSIONS.EVENT_UPDATE);
+    const eventIds = user.userRoles.flatMap((role) => {
+        const canEditEvent = role.permissions.some((grant) => grant.permission === PERMISSIONS.EVENT_UPDATE);
+        return role.eventId && !role.storeId && canEditEvent ? [role.eventId] : [];
+    });
+
+    if (!canManageAll && !eventIds.length) return [];
+    const db = await getDatabase();
+    const events = await db.getRepository(Events).find({
+        where: canManageAll ? {} : { id: In(eventIds) },
+        select: { ...eventSummaryFields, archivedAt: true },
+        order: canManageAll ? { createdAt: "ASC", buyAt: "ASC" } : { buyAt: "ASC" },
+    });
+    return events.map(toAdminEventSummary);
 }
 
 export async function getEventById(id: string): Promise<EventDetail> {
@@ -49,7 +66,7 @@ export async function getEventById(id: string): Promise<EventDetail> {
     return findEventDetail(db.manager, { id });
 }
 
-async function findEventDetail(manager: EntityManager, where: { id: string } | { slug: string }): Promise<EventDetail> {
+async function findEventDetail(manager: EntityManager, where: FindOptionsWhere<Events>): Promise<EventDetail> {
     const event = await manager.findOne(Events, {
         where,
         relations: { sessions: true, stores: true, tickets: true },
@@ -181,22 +198,19 @@ async function saveEventSchedule(manager: EntityManager, eventId: string, input?
     if (sessions.length > 0) await manager.save(sessions);
 }
 
-export async function deleteEvent(id: string, actorId?: string): Promise<{ id: string }> {
+export async function setEventArchived(id: string, archived: boolean, actorId: string): Promise<EventArchiveResult> {
     readUuid(id, "รหัสงาน");
     const db = await getDatabase();
-    if (await db.getRepository(Order).existsBy({ eventId: id })) {
-        throw new ApiError("EVENT_HAS_ORDERS", "งานนี้มีออเดอร์แล้ว ลบไม่ได้", 409);
-    }
-    if (await db.getRepository(Store).existsBy({ eventId: id })) {
-        throw new ApiError("EVENT_HAS_STORES", "งานนี้มีร้านค้าที่ผูกอยู่ ลบไม่ได้", 409);
-    }
-    await db.transaction(async (manager) => {
-        const event = await manager.findOne(Events, { where: { id }, lock: { mode: "pessimistic_write" } });
+    return db.transaction(async (manager) => {
+        const event = await manager.findOne(Events, { where: { id }, lock: { mode: "for_no_key_update" } });
         if (!event) throw eventNotFound();
-        await recordAdminActivity(manager, actorId, id, "event.delete", id, event.title);
-        await manager.delete(Events, { id });
+        if (Boolean(event.archivedAt) !== archived) {
+            event.archivedAt = archived ? new Date() : null;
+            await manager.update(Events, { id }, { archivedAt: event.archivedAt });
+            await recordAdminActivity(manager, actorId, id, archived ? "event.archive" : "event.restore", id, event.title);
+        }
+        return { id, archivedAt: event.archivedAt?.toISOString() ?? null };
     });
-    return { id };
 }
 
 export function isEventSelling(event: Pick<EventDetail, "buyAt" | "buyEndAt">) {
@@ -230,6 +244,10 @@ function toEventSummary(event: Events): EventSummary {
     };
 }
 
+function toAdminEventSummary(event: Events): AdminEventSummary {
+    return { ...toEventSummary(event), archivedAt: event.archivedAt?.toISOString() ?? null };
+}
+
 function toEventDetail(event: Events, souvenirs: EventSouvenirItem[]): EventDetail {
     const ticketTypes = (event.tickets ?? []).toSorted((first, second) =>
         first.sortOrder - second.sortOrder || first.id.localeCompare(second.id)
@@ -240,7 +258,7 @@ function toEventDetail(event: Events, souvenirs: EventSouvenirItem[]): EventDeta
         return firstStart - secondStart || first.id.localeCompare(second.id);
     });
     return {
-        ...toEventSummary(event),
+        ...toAdminEventSummary(event),
         souvenirs,
         banner: event.banner,
         description: event.description,

@@ -9,8 +9,7 @@ import { RichTextEditor } from "./RichTextEditor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { cn } from "@/lib/utils";
+import { Field, FieldLabel } from "@/components/ui/field";
 
 // แปลงวันเวลาเป็นรูปแบบสำหรับ input type="datetime-local" (YYYY-MM-DDTHH:mm)
 function toInputDate(value?: string | null) {
@@ -32,10 +31,10 @@ function makeSlug(text: string) {
 
 export default function EventForm({
   initial,
-  canDelete = false,
+  canArchive = false,
 }: {
   initial?: EventDetail;
-  canDelete?: boolean;
+  canArchive?: boolean;
 }) {
   const router = useRouter();
 
@@ -72,8 +71,9 @@ export default function EventForm({
   const [shippingFee, setShippingFee] = useState(initial?.shippingFee ?? "0.00");
 
   const [loading, setLoading] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteConfirmed, setDeleteConfirmed] = useState(false);
+  const [archivedAt, setArchivedAt] = useState(initial?.archivedAt ?? null);
+  const [changingArchive, setChangingArchive] = useState(false);
+  const [archiveConfirmed, setArchiveConfirmed] = useState(false);
 
   // เมื่อผู้ใช้พิมพ์ชื่องาน ถ้ายังไม่ได้แก้ slug เอง จะ auto-generate slug ให้
   function handleTitleChange(val: string) {
@@ -201,24 +201,23 @@ export default function EventForm({
     }
   }
 
-  // ลบงาน
-  async function handleDelete() {
-    if (!initial || !deleteConfirmed) return;
-    setDeleting(true);
+  async function handleArchiveChange() {
+    if (!initial || changingArchive || (!archivedAt && !archiveConfirmed)) return;
+    setChangingArchive(true);
 
     try {
-      const res = await api.events.drop(initial.id);
+      const res = await (archivedAt ? api.events.restore(initial.id) : api.events.archive(initial.id));
       if (res.success) {
-        toast.success("ลบงานเรียบร้อยแล้ว");
-        router.replace("/admin");
-        router.refresh();
+        setArchivedAt(res.data.archivedAt);
+        setArchiveConfirmed(false);
+        toast.success(res.data.archivedAt ? "จัดเก็บงานแล้ว" : "กู้คืนงานแล้ว");
       } else {
         toast.error(res.error.message);
       }
     } catch {
-      toast.error("เกิดข้อผิดพลาดในการลบงาน");
+      toast.error("เปลี่ยนสถานะการจัดเก็บไม่สำเร็จ");
     } finally {
-      setDeleting(false);
+      setChangingArchive(false);
     }
   }
 
@@ -231,7 +230,7 @@ export default function EventForm({
       </header>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <fieldset disabled={loading || deleting} className="space-y-6">
+        <fieldset disabled={loading || changingArchive} className="space-y-6">
           {/* ข้อมูลงาน */}
           <section className="space-y-5 rounded-xl border bg-card p-6 shadow-xs">
             <h2 className="text-lg font-semibold">ข้อมูลงาน</h2>
@@ -561,36 +560,32 @@ export default function EventForm({
         </fieldset>
       </form>
 
-      {/* ลบงาน */}
-      {initial && canDelete && (
-        <section className="space-y-3 rounded-xl border border-destructive/20 bg-card p-6 shadow-xs">
-          <h2 className="text-lg font-semibold text-destructive">ลบงาน</h2>
+      {initial && canArchive && (
+        <section className="space-y-3 rounded-xl border bg-card p-6 shadow-xs">
+          <h2 className="text-lg font-semibold">{archivedAt ? "งานนี้จัดเก็บแล้ว" : "จัดเก็บงาน"}</h2>
           <p className="text-sm text-muted-foreground">
-            ลบได้เฉพาะงานที่ยังไม่มีคำสั่งซื้อหรือร้านค้า
-            การลบไม่สามารถย้อนกลับได้
+            {archivedAt
+              ? "กู้คืนเพื่อแสดงงานบนเว็บไซต์และเปิดรับจองตามช่วงจำหน่ายเดิม"
+              : "งานจะถูกซ่อนจากเว็บไซต์และหยุดรับจองใหม่ ข้อมูลคำสั่งซื้อ บัตร และร้านค้ายังเปิดดูได้"}
           </p>
-          <label className="flex items-center gap-2 cursor-pointer text-sm">
-            <Checkbox
-              checked={deleteConfirmed}
-              onCheckedChange={(checked) =>
-                setDeleteConfirmed(checked === true)
-              }
-            />
-            <span>ยืนยันว่าต้องการลบงานนี้</span>
-          </label>
+          {!archivedAt && (
+            <label className="flex min-h-10 items-center gap-2 text-sm">
+              <Checkbox
+                checked={archiveConfirmed}
+                onCheckedChange={(checked) => setArchiveConfirmed(checked === true)}
+              />
+              <span>ยืนยันการจัดเก็บงานนี้</span>
+            </label>
+          )}
           <div>
             <Button
               type="button"
-              variant="destructive"
-              disabled={!deleteConfirmed || loading || deleting}
-              onClick={handleDelete}
-              className={cn(
-                "min-h-10 cursor-pointer",
-                !deleteConfirmed &&
-                  "bg-destructive/10 text-destructive/60 hover:bg-destructive/10 cursor-not-allowed border-none shadow-none"
-              )}
+              variant="outline"
+              disabled={(!archivedAt && !archiveConfirmed) || loading || changingArchive}
+              onClick={handleArchiveChange}
+              className="min-h-11"
             >
-              {deleting ? "กำลังลบ..." : "ลบงาน"}
+              {changingArchive ? "กำลังบันทึก…" : archivedAt ? "กู้คืนงาน" : "จัดเก็บงาน"}
             </Button>
           </div>
         </section>

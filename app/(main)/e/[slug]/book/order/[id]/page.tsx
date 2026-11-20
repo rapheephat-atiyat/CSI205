@@ -2,7 +2,7 @@ import { Step5Payment } from "@/components/book/Step5Payment";
 import { requirePageUser } from "@/server/auth/page-user";
 import { ApiError } from "@/server/http/errors";
 import { checkoutPaymentQr } from "@/server/services/checkout-payment";
-import { getEventBySlug } from "@/server/services/event.service";
+import { getEventById } from "@/server/services/event.service";
 import { getMyOrder } from "@/server/services/order.service";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
@@ -15,11 +15,13 @@ export default async function BookingOrderPage({ params }: Props) {
     await connection();
     const user = await requirePageUser(path);
 
-    const [event, order] = await Promise.all([getEventBySlug(slug), getMyOrder(user.id, id)]).catch((error: unknown) => {
-        if (error instanceof ApiError && error.status === 404) notFound();
-        throw error;
-    });
-    if (order.eventId !== event.id) notFound();
+    const { order, event } = await getMyOrder(user.id, id)
+        .then(async (order) => ({ order, event: await getEventById(order.eventId) }))
+        .catch((error: unknown) => {
+            if (error instanceof ApiError && error.status === 404) notFound();
+            throw error;
+        });
+    if (event.slug !== slug) notFound();
     const canPay = order.status === "PENDING" && !order.hasPaymentSlip;
     const paymentQr = canPay ? checkoutPaymentQr(order.total) : null;
     return <Step5Payment order={order} event={event} paymentQr={paymentQr} />;
