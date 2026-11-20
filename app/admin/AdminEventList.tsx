@@ -2,6 +2,7 @@
 
 // import ui
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Eye, Plus } from "lucide-react";
 import { ButtonGroup } from "@/components/ui/button-group";
 import { Field, FieldLabel } from "@/components/ui/field";
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { EventSummary } from "@/lib/api-types";
+import type { AdminEventSummary } from "@/lib/api-types";
 import { api } from "@/lib/api-client";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -37,10 +38,11 @@ const headEv: HeadEv = {
 };
 
 export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
-  const [events, setEvents] = useState<EventSummary[]>([]);
+  const [events, setEvents] = useState<AdminEventSummary[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState<string>("");
+  const [showArchived, setShowArchived] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -71,11 +73,12 @@ export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
       </div>
     );
 
-  const filteredEvents = events.filter((event) => {
-    const searchLower = search.toLowerCase();
+  const visibleEvents = events.filter((event) => Boolean(event.archivedAt) === showArchived);
+  const searchLower = search.trim().toLowerCase();
+  const filteredEvents = visibleEvents.filter((event) => {
     return (
-      event.title.toLowerCase().startsWith(searchLower.trim()) ||
-      event.venue.toLowerCase().startsWith(searchLower.trim())
+      event.title.toLowerCase().startsWith(searchLower) ||
+      event.venue.toLowerCase().startsWith(searchLower)
     );
   });
 
@@ -111,7 +114,7 @@ export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
             <div className="w-full">
               <div className="w-full">
                 <Field>
-                  <FieldLabel htmlFor="input-event-group">ชื่องาน</FieldLabel>
+                  <FieldLabel htmlFor="input-event-name">ชื่องาน</FieldLabel>
                   <ButtonGroup className="flex flex-row items-start justify-center">
                     <Input
                       id="input-event-name"
@@ -130,9 +133,17 @@ export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
         {/* all events */}
         <div className="w-full flex flex-col">
           {/* หัวเรื่อง */}
-          <div className="flex flex-col items-start justify-center">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="text-[18px] font-semibold text-black">
               งานที่จัดการได้
+            </div>
+            <div role="group" aria-label="สถานะงาน" className="flex flex-wrap gap-2">
+              <Button type="button" variant={showArchived ? "outline" : "secondary"} aria-pressed={!showArchived} onClick={() => setShowArchived(false)}>
+                งานที่แสดง
+              </Button>
+              <Button type="button" variant={showArchived ? "secondary" : "outline"} aria-pressed={showArchived} onClick={() => setShowArchived(true)}>
+                จัดเก็บแล้ว
+              </Button>
             </div>
           </div>
           <div className="w-full mt-4">
@@ -176,8 +187,8 @@ export default function AdminEventList({ canCreate }: { canCreate: boolean }) {
                         colSpan={3}
                         className="py-6 text-center text-muted-foreground"
                       >
-                        {events.length === 0
-                          ? "บัญชีนี้ยังไม่มีงานที่จัดการได้"
+                        {visibleEvents.length === 0
+                          ? showArchived ? "ยังไม่มีงานที่จัดเก็บ" : "ยังไม่มีงานที่แสดง"
                           : "ไม่พบรายการงานที่ค้นหา"}
                       </TableCell>
                     </TableRow>

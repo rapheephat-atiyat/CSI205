@@ -14,6 +14,15 @@ export function ticketCanReceiveSouvenir(souvenir: EventSouvenirItem, ticketType
     return souvenir.allTicketTypes || souvenir.eligibleTicketTypeIds.includes(ticketTypeId);
 }
 
+export function canBuySouvenirExtra(
+    souvenir: EventSouvenirItem,
+    ticketTypeIds: readonly string[],
+): souvenir is EventSouvenirItem & { extraPrice: string } {
+    return ticketTypeIds.length > 0 && souvenir.extraPrice !== null && Number(souvenir.extraPrice) > 0
+        && (souvenir.eligibleTicketTypeIds.length === 0
+            || ticketTypeIds.some((id) => ticketCanReceiveSouvenir(souvenir, id)));
+}
+
 export function souvenirVariantKey(souvenirId: string, size: string | null) {
     return JSON.stringify([souvenirId, size]);
 }

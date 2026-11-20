@@ -2,7 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { EventDetail, OrderShippingInput, TicketAttendeeInput } from "@/lib/api-types";
-import { souvenirVariantKey, ticketCanReceiveSouvenir } from "@/lib/souvenirs";
+import { canBuySouvenirExtra, souvenirVariantKey, ticketCanReceiveSouvenir } from "@/lib/souvenirs";
 import { Minus, Plus } from "lucide-react";
 import { BookCard, money } from "./BookUI";
 import { SouvenirPhoto } from "./SouvenirPhoto";
@@ -45,8 +45,9 @@ export function Step3Souvenir({
     hasSouvenir,
     onExtraQuantityChange,
 }: Props) {
+    const ticketTypeIds = [...new Set(ticketAttendees.map(({ ticketType }) => ticketType.id))];
     const visibleSouvenirs = (event.souvenirs ?? []).filter((souvenir) =>
-        Number(souvenir.extraPrice) > 0 || ticketAttendees.some(({ ticketType }) => ticketCanReceiveSouvenir(souvenir, ticketType.id))
+        canBuySouvenirExtra(souvenir, ticketTypeIds) || ticketTypeIds.some((id) => ticketCanReceiveSouvenir(souvenir, id))
     );
 
     if (visibleSouvenirs.length === 0) {
@@ -111,7 +112,7 @@ export function Step3Souvenir({
                                 </div>
                             );
                         })}
-                        {souvenir.extraPrice && Number(souvenir.extraPrice) > 0 && (
+                        {canBuySouvenirExtra(souvenir, ticketTypeIds) && (
                             <fieldset className="space-y-2 rounded-lg border p-4">
                                 <legend className="px-2 text-sm font-semibold">สั่งเพิ่ม</legend>
                                 <p className="text-sm text-muted-foreground">{money(souvenir.extraPrice)} ต่อชิ้น · สั่งเพิ่มรวมได้ 10 ชิ้นต่อคำสั่งซื้อ</p>

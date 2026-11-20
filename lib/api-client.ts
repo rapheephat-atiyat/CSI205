@@ -1,4 +1,6 @@
 import type {
+    AdminEventSummary,
+    EventArchiveResult,
     AdminActivityItem, AdminExportReport, AdminOrderDetail, AdminOrderFilters, AdminOrderSummary,
     AdminStore, AdminStoreCreateInput, AdminUser, EventOverviewReport, OrderReviewInput, OrderShippingUpdate, Paginated,
     ApiResponse,
@@ -127,7 +129,7 @@ export const api = {
          * ดูเฉพาะงานที่บัญชีนี้มีสิทธิ์แก้ไข
          * @returns รายการข้อมูลย่อของงานที่จัดการได้
          */
-        listManageable: () => request<EventSummary[]>("/api/admin/events"),
+        listManageable: () => request<AdminEventSummary[]>("/api/admin/events"),
 
         /**
          * อ่านรายละเอียดงานด้วย ID ตอนจัดการงาน
@@ -153,11 +155,10 @@ export const api = {
         update: (eventId: string, input: Partial<EventInput>) => request<EventDetail>(eventPath(eventId), "PATCH", input),
 
         /**
-         * ลบงานที่ยังไม่มีออเดอร์หรือร้านค้า ต้องมีสิทธิ์สร้างงาน
-         * @param eventId ค่า id ของงาน
-         * @returns { id } ของงานที่ลบ
+         * จัดเก็บงานและปิดรับจองใหม่ ต้องมีสิทธิ์สร้างงาน
          */
-        drop: (eventId: string) => request<{ id: string }>(eventPath(eventId), "DELETE"),
+        archive: (eventId: string) => request<EventArchiveResult>(eventPath(eventId), "DELETE"),
+        restore: (eventId: string) => request<EventArchiveResult>(`${eventPath(eventId)}/restore`, "POST"),
 
         tickets: {
             /**

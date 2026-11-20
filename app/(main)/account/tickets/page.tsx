@@ -5,7 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import type { TicketItem } from "@/lib/api-types";
 import { cn } from "@/lib/utils";
 import { requirePageUser } from "@/server/auth/page-user";
-import { getEvents } from "@/server/services/event.service";
+import { getEventsByIds } from "@/server/services/event.service";
 import { getMyTickets } from "@/server/services/order.service";
 import { CircleCheck, CircleX, Clock3, QrCode, type LucideIcon } from "lucide-react";
 import Image from "next/image";
@@ -33,9 +33,11 @@ async function TicketsContent({ searchParams }: Props) {
     const { order } = await searchParams;
     await connection();
     const user = await requirePageUser(typeof order === "string" ? `/account/tickets?order=${encodeURIComponent(order)}` : "/account/tickets");
-    const [tickets, events] = await Promise.all([getMyTickets(user.id), getEvents()]);
+    const tickets = await getMyTickets(user.id);
+    const visibleTickets = tickets.filter((ticket) => typeof order !== "string" || ticket.orderId === order);
+    const events = await getEventsByIds(visibleTickets.map((ticket) => ticket.eventId));
     const eventTitles = new Map(events.map((event) => [event.id, event.title]));
-    const cards = await Promise.all(tickets.filter((ticket) => typeof order !== "string" || ticket.orderId === order).map(async (ticket) => ({
+    const cards = await Promise.all(visibleTickets.map(async (ticket) => ({
         ticket,
         qr: ticket.status === "ACTIVE" && ticket.qrToken ? await QRCode.toDataURL(ticket.qrToken, { width: 320, margin: 4 }) : null,
     })));

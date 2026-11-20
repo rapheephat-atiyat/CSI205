@@ -7,18 +7,23 @@ const BOOKING_STEP_LABELS = ["เลือกบัตร", "ข้อมูล�
 
 interface Props {
     step: number;
-    event?: { title: string; slug: string },
+    event?: { title: string; slug: string; archivedAt?: string | null };
     onStep?: (step: number) => void;
     children: ReactNode;
 }
 
 export default function BookLayout({ step, event, onStep, children }: Props) {
+    const backLink = event?.archivedAt
+        ? { href: "/account/orders", label: "ประวัติคำสั่งซื้อ" }
+        : event ? { href: `/e/${encodeURIComponent(event.slug)}`, label: event.title }
+            : { href: "/events", label: "งานทั้งหมด" };
     return (
         <main className="mx-auto w-full space-y-6 max-w-6xl px-4 pt-6 pb-12 sm:px-6 sm:pt-8 lg:px-10">
             <header className="space-y-2">
-                <Link href={event ? `/e/${encodeURIComponent(event.slug)}` : '/events'} className="inline-flex min-h-10 items-center gap-1 text-sm text-muted-foreground hover:text-brand focus-visible:underline">
-                    <ChevronLeft className="size-4" aria-hidden="true" /> {event ? event.title : "งานทั้งหมด"}
+                <Link href={backLink.href} className="inline-flex min-h-10 items-center gap-1 text-sm text-muted-foreground hover:text-brand focus-visible:underline">
+                    <ChevronLeft className="size-4" aria-hidden="true" /> {backLink.label}
                 </Link>
+                {event?.archivedAt && <p className="text-sm text-muted-foreground">{event.title}</p>}
                 <h1 id="book-step-heading" tabIndex={-1} className="text-3xl font-semibold tracking-tight focus:outline-none">{BOOKING_STEP_LABELS[step - 1]}</h1>
             </header>
             <nav aria-label="ขั้นตอนการสั่งซื้อ" className="rounded-xl border bg-card p-3 sm:p-4">

@@ -1,6 +1,6 @@
 import "server-only";
 import type { EventSouvenirItem, OrderShippingInput, OrderSouvenirInput, OrderSouvenirItem, TicketAttendeeInput, TicketSouvenir } from "@/lib/api-types";
-import { souvenirVariantKey, ticketCanReceiveSouvenir } from "@/lib/souvenirs";
+import { canBuySouvenirExtra, souvenirVariantKey, ticketCanReceiveSouvenir } from "@/lib/souvenirs";
 import type { EventTicket } from "@/server/database/entities";
 import { ApiError } from "@/server/http/errors";
 
@@ -99,7 +99,11 @@ export function validateShipping(shipping: OrderShippingInput | null | undefined
     };
 }
 
-export function priceSouvenirs(input: OrderSouvenirInput[] | undefined, souvenirs: EventSouvenirItem[]): OrderSouvenirItem[] {
+export function priceSouvenirs(
+    input: OrderSouvenirInput[] | undefined,
+    souvenirs: EventSouvenirItem[],
+    ticketTypeIds: readonly string[],
+): OrderSouvenirItem[] {
     if (input === undefined) return [];
     if (!Array.isArray(input) || input.length > 10) invalidOrder("รายการของที่ระลึกไม่ถูกต้อง");
     const orderedVariants = new Set<string>();
@@ -107,7 +111,9 @@ export function priceSouvenirs(input: OrderSouvenirInput[] | undefined, souvenir
     let totalQuantity = 0;
     for (const item of input) {
         const souvenir = item && souvenirs.find((entry) => entry.id === item.souvenirId);
-        if (!souvenir?.extraPrice || Number(souvenir.extraPrice) <= 0) invalidOrder("รายการนี้ไม่ได้เปิดให้สั่งเพิ่ม");
+        if (!souvenir || !canBuySouvenirExtra(souvenir, ticketTypeIds)) {
+            invalidOrder("รายการนี้ไม่เปิดให้สั่งเพิ่มสำหรับบัตรที่เลือก");
+        }
         const size = item.size ?? null;
         const variant = souvenirVariantKey(souvenir.id, size);
         const validQuantity = Number.isSafeInteger(item.quantity) && item.quantity >= 1;

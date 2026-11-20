@@ -12,7 +12,7 @@ import { AdminActivity, Events, Order, Store, Ticket, User, UserRole, UserRolePe
 import { Role } from "../enums/role.enum";
 import { EVENT_ADMIN_PERMISSIONS, PERMISSIONS } from "@/lib/permissions";
 import { makeAdminCsv } from "@/lib/admin-export";
-import type { AdminActivityItem, AdminExportReport, AdminOrderDetail, AdminOrderSummary, AdminStore, AdminUser, ApiResponse, EventDetail, EventOverviewReport, EventSouvenirItem, EventTicketItem, OrderDetail, Paginated, StoreDetail, TokenRate, WalletDetail } from "@/lib/api-types";
+import type { AdminActivityItem, AdminEventSummary, AdminExportReport, AdminOrderDetail, AdminOrderSummary, AdminStore, AdminUser, ApiResponse, EventArchiveResult, EventDetail, EventOverviewReport, EventSouvenirItem, EventSummary, EventTicketItem, OrderDetail, Paginated, StoreDetail, TokenRate, WalletDetail } from "@/lib/api-types";
 
 // Never loads .env. Only a fresh, unused localhost database created here may be dropped.
 if (!process.env.TEST_DATABASE) throw new Error("Set TEST_DATABASE to a new disposable local admin test database.");
@@ -63,6 +63,8 @@ before(async () => {
     // Exercise an actual schema rollback/reapply and repair an older empty event ADMIN assignment.
     const legacy = await source.manager.save(User, { email: "legacy@example.test", name: "Legacy", firstName: "Legacy", lastName: "Test" });
     const role = await source.manager.save(UserRole, { userId: legacy.id, role: Role.ADMIN, eventId: firstEvent.id });
+    await source.undoLastMigration();
+    assert.equal((await source.query("SELECT column_name FROM information_schema.columns WHERE table_name = 'events' AND column_name = 'archived_at'")).length, 0);
     await source.undoLastMigration();
     assert.equal((await source.query("SELECT to_regclass('public.token_pricing') AS name"))[0].name, null);
     await source.undoLastMigration();
@@ -341,6 +343,79 @@ test("admin workflows through real HTTP sessions and a migrated disposable datab
         const afterTopUp = ok(await request<WalletDetail>(walletPath, "GET", undefined, customer));
         const entry = afterTopUp.histories.find((history) => history.type === "TOPUP" && history.ref === staff.id);
         assert.deepEqual([entry?.amount, entry?.bahtPerToken, entry?.bahtAmount], ["3.00", "2.35", "7.05"]);
+    });
+    await t.test("restricted souvenirs require an eligible ticket for inclusion or extra purchase", async () => {
+        const regular = ok(await request<EventTicketItem>(path() + "/tickets", "POST", { name: "Regular", price: "200.00", quota: 10 }, scoped), 201);
+        const vip = ok(await request<EventTicketItem>(path() + "/tickets", "POST", { name: "VIP", price: "300.00", quota: 10 }, scoped), 201);
+        const restricted = ok(await request<EventSouvenirItem>(path() + "/souvenirs", "POST", {
+            name: "Regular only", extraPrice: "19.50", sizes: [], allTicketTypes: false,
+            eligibleTicketTypeIds: [regular.id],
+        }, scoped), 201);
+        const item = (eventTicketId: string, receive: boolean) => ({
+            eventTicketId,
+            quantity: 1,
+            attendees: [{ firstName: "Test", lastName: "Buyer", souvenirs: receive ? [{ souvenirId: restricted.id, size: null }] : [] }],
+        });
+        const buy = (items: ReturnType<typeof item>[], souvenirId = restricted.id) =>
+            request<OrderDetail>("/api/orders", "POST", {
+                requestId: randomUUID(), eventId: firstEvent.id, items,
+                deliveryMethod: "PICKUP", souvenirItems: [{ souvenirId, quantity: 1, size: null }],
+            }, customer);
+
+        denied(await buy([item(vip.id, false)]), 422);
+        denied(await buy([item(regular.id, false), item(vip.id, true)]), 422);
+        const mixed = ok(await buy([item(regular.id, true), item(vip.id, false)]), 201);
+        assert.equal(mixed.total, "519.50");
+        assert.equal(mixed.tickets.find((ticket) => ticket.eventTicketId === regular.id)?.souvenirItems[0]?.souvenirId, restricted.id);
+        assert.equal(mixed.tickets.find((ticket) => ticket.eventTicketId === vip.id)?.souvenirItems.length, 0);
+        const saleOnly = ok(await buy([item(vip.id, false)], souvenir.id), 201);
+        assert.equal(saleOnly.souvenirItems[0]?.souvenirId, souvenir.id);
+    });
+    await t.test("archive hides sales while preserving related records, and restore reopens the same event", async () => {
+        const adminPath = path();
+        const orderPath = `/api/orders/${approved.id}`;
+        const publicPath = `/api/events/${firstEvent.slug}`;
+        const listPublic = async () => ok(await request<EventSummary[]>("/api/events"));
+        const listAdmin = async () => ok(await request<AdminEventSummary[]>("/api/admin/events", "GET", undefined, owner));
+        const newOrder = {
+            requestId: randomUUID(),
+            eventId: firstEvent.id,
+            items: [{ eventTicketId: ticketType.id, quantity: 1, attendees: [{ firstName: "Test", lastName: "Attendee" }] }],
+            deliveryMethod: "NONE",
+        };
+        const checkout = `/e/${firstEvent.slug}/book/order/${approved.id}`;
+
+        assert.ok((await listPublic()).some((event) => event.id === firstEvent.id));
+        denied(await request(adminPath, "DELETE", undefined, scoped), 403);
+        denied(await request(adminPath + "/restore", "POST", undefined, customer), 403);
+        const archives = await Promise.all([1, 2].map(() => request<EventArchiveResult>(adminPath, "DELETE", undefined, owner)));
+        const archived = ok(archives[0]);
+        assert.ok(archived.archivedAt);
+        assert.equal(ok(archives[1]).archivedAt, archived.archivedAt);
+        assert.equal(await source.manager.countBy(AdminActivity, { action: "event.archive", eventId: firstEvent.id }), 1);
+
+        assert.ok(!(await listPublic()).some((event) => event.id === firstEvent.id));
+        denied(await request(publicPath), 404);
+        const blocked = await request("/api/orders", "POST", newOrder, customer);
+        denied(blocked, 409);
+        if (!blocked.body.success) assert.equal(blocked.body.error.code, "EVENT_ARCHIVED");
+        assert.equal((await listAdmin()).find((event) => event.id === firstEvent.id)?.archivedAt, archived.archivedAt);
+        const detail = ok(await request<EventDetail>(adminPath, "GET", undefined, scoped));
+        assert.ok(detail.stores.some((entry) => entry.id === store.id));
+        assert.ok(detail.souvenirs.some((entry) => entry.id === souvenir.id));
+        assert.ok(detail.tickets.some((entry) => entry.id === ticketType.id));
+        assert.equal(ok(await request<OrderDetail>(orderPath, "GET", undefined, customer)).status, "PAID");
+        const oldCheckout = await fetch(baseUrl + checkout, { headers: { Cookie: customer.cookie } });
+        assert.match(await oldCheckout.text(), /ชำระเงินสำเร็จ/);
+        const ordersPage = await fetch(baseUrl + "/account/orders", { headers: { Cookie: customer.cookie } });
+        const ordersHtml = await ordersPage.text();
+        assert.ok(ordersHtml.includes(checkout), `Archived order link missing (status ${ordersPage.status}, page URL ${ordersPage.url}, order present: ${ordersHtml.includes(approved.orderNo)}, load error: ${ordersHtml.includes("โหลดคำสั่งซื้อไม่สำเร็จ")})`);
+
+        const restored = ok(await request<EventArchiveResult>(adminPath + "/restore", "POST", undefined, owner));
+        assert.deepEqual(restored, { id: firstEvent.id, archivedAt: null });
+        assert.ok((await listPublic()).some((event) => event.id === firstEvent.id));
+        assert.equal(ok(await request<EventDetail>(publicPath)).id, firstEvent.id);
+        assert.equal(ok(await request<OrderDetail>("/api/orders", "POST", newOrder, customer), 201).status, "PENDING");
     });
 });
 

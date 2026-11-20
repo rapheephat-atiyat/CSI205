@@ -4,7 +4,7 @@ import { requirePermission } from "@/server/auth/permission";
 import { withHandler } from "@/server/http/handler";
 import { readJson } from "@/server/http/request";
 import { privateSuccess as success } from "@/server/http/response";
-import { deleteEvent, getEventById, updateEvent } from "@/server/services/event.service";
+import { getEventById, setEventArchived, updateEvent } from "@/server/services/event.service";
 import { invalidatePublicEvents } from "@/server/cache/tags";
 
 type Context = { params: Promise<{ id: string }> };
@@ -18,7 +18,7 @@ export const GET = withHandler(async (req, { params }: Context) => {
 export const DELETE = withHandler(async (req, { params }: Context) => {
     const { id } = await params;
     const actor = await requirePermission(req, PERMISSIONS.EVENT_CREATE);
-    const result = await deleteEvent(id, actor.id);
+    const result = await setEventArchived(id, true, actor.id);
     invalidatePublicEvents();
     return success(result);
 });

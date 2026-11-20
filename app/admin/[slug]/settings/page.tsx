@@ -49,5 +49,5 @@ export default function EventSettingsPage() {
     );
   }
 
-  return <EventForm key={event.id} initial={event} canDelete={can(PERMISSIONS.EVENT_CREATE)} />;
+  return <EventForm key={event.id} initial={event} canArchive={can(PERMISSIONS.EVENT_CREATE)} />;
 }

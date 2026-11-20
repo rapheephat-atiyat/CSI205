@@ -2,7 +2,7 @@
 
 import { api } from "@/lib/api-client";
 import type { EventDetail, OrderShippingInput, OrderSouvenirItem, TicketAttendeeInput } from "@/lib/api-types";
-import { souvenirVariantKey, ticketCanReceiveSouvenir } from "@/lib/souvenirs";
+import { canBuySouvenirExtra, souvenirVariantKey, ticketCanReceiveSouvenir } from "@/lib/souvenirs";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { getAttendeeStatus, type AttendeeProgress } from "./attendee-fields";
@@ -65,10 +65,11 @@ export default function BookContent({ event, profile, paymentConfigured }: Props
         }
     }
 
+    const selectedTicketTypeIds = selectedTicketTypes.map(({ id }) => id);
     const souvenirItems: OrderSouvenirItem[] = [];
     for (const souvenir of souvenirs) {
+        if (!canBuySouvenirExtra(souvenir, selectedTicketTypeIds)) continue;
         const unitPrice = souvenir.extraPrice;
-        if (!unitPrice || Number(unitPrice) <= 0) continue;
         const availableSizes = souvenir.sizes.length ? souvenir.sizes : [null];
         for (const size of availableSizes) {
             const quantity = extraQuantityByVariant[souvenirVariantKey(souvenir.id, size)] ?? 0;
