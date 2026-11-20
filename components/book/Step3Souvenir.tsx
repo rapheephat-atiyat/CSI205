@@ -66,7 +66,7 @@ export function Step3Souvenir({
                             <SouvenirPhoto image={souvenir.image} sizes="(max-width: 383px) 90vw, 320px" className="aspect-[4/3]" />
                             {souvenir.image?.startsWith("/images/demo-souvenirs/") && (
                                 <figcaption className="text-xs text-muted-foreground">
-                                    <a href="/images/demo-souvenirs/credits.md" className="underline underline-offset-2">ภาพอ้างอิงและเครดิตรูป</a>
+                                    <a href="/images/demo-souvenirs/credits.md" className="underline underline-offset-2">ภาพอ้างอิง</a>
                                 </figcaption>
                             )}
                         </figure>
