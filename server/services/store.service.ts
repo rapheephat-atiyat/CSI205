@@ -1,7 +1,7 @@
 import "server-only";
-import type { ProductInput, StoreDetail, StoreInput, StoreSaleResult, StoreSellInput } from "@/lib/api-types";
+import type { ProductInput, StoreDetail, StoreInput, StoreSaleResult, StoreSalesSummary, StoreSellInput } from "@/lib/api-types";
 import { getDatabase } from "@/server/database/database.souce";
-import { Events, Product, Store, Wallet, WalletHistory, type User } from "@/server/database/entities";
+import { Events, Product, Store, User, Wallet, WalletHistory } from "@/server/database/entities";
 import { TRANSACTION_STATUSES, TRANSACTION_TYPES } from "@/server/database/enums/domain.enum";
 import { ApiError } from "@/server/http/errors";
 import { readMoney } from "./money";
@@ -201,4 +201,90 @@ export async function sellToCustomer(storeId: string, input: StoreSellInput): Pr
 
         return { storeBalance: storeWallet.total, customerBalance: customerWallet.total };
     });
+}
+
+export async function getStoreSalesSummary(storeId: string): Promise<StoreSalesSummary> {
+    readUuid(storeId, "รหัสร้านค้า");
+
+    const now = new Date();
+    const dateParts = new Intl.DateTimeFormat("en-US", {
+        timeZone: "Asia/Bangkok",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(now);
+    const datePart = (type: string) => Number(dateParts.find((part) => part.type === type)?.value);
+    const year = datePart("year");
+    const month = datePart("month");
+    const day = datePart("day");
+    const today = `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const startAt = new Date(Date.UTC(year, month - 1, day - 6, -7));
+    const endAt = new Date(Date.UTC(year, month - 1, day + 1, -7));
+    const dates = Array.from({ length: 7 }, (_, index) => new Date(Date.UTC(year, month - 1, day - 6 + index)));
+    const dateKey = (date: Date) =>
+        `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+    const labelFormat = new Intl.DateTimeFormat("th-TH", {
+        day: "numeric",
+        month: "short",
+        timeZone: "UTC",
+    });
+
+    const db = await getDatabase();
+    const historyRepository = db.getRepository(WalletHistory);
+    const salesQuery = () =>
+        historyRepository.createQueryBuilder("history")
+            .innerJoin("history.wallet", "wallet")
+            .where("wallet.storeId = :storeId", { storeId })
+            .andWhere("history.type = :type", { type: TRANSACTION_TYPES.PURCHASE })
+            .andWhere("history.status = :status", { status: TRANSACTION_STATUSES.COMPLETED });
+
+    const [dailyRows, recentRows] = await Promise.all([
+        salesQuery()
+            .select(`to_char(history.createdAt AT TIME ZONE 'Asia/Bangkok', 'YYYY-MM-DD')`, "date")
+            .addSelect("COALESCE(SUM(history.amount), 0)", "sales")
+            .addSelect("COUNT(history.id)", "transactions")
+            .andWhere("history.createdAt >= :startAt AND history.createdAt < :endAt", { startAt, endAt })
+            .groupBy("1")
+            .orderBy("1", "ASC")
+            .getRawMany<{ date: string; sales: string; transactions: string }>(),
+        salesQuery()
+            .leftJoin(User, "customer", "customer.id = history.ref")
+            .select("history.id", "id")
+            .addSelect("customer.name", "customerName")
+            .addSelect("history.amount", "amount")
+            .addSelect("history.createdAt", "createdAt")
+            .orderBy("history.createdAt", "DESC")
+            .limit(10)
+            .getRawMany<{
+                id: string;
+                customerName: string | null;
+                amount: string;
+                createdAt: Date | string;
+            }>(),
+    ]);
+
+    const dailyByDate = new Map(dailyRows.map((row) => [row.date, row]));
+    const dailySales = dates.map((date) => {
+        const key = dateKey(date);
+        const row = dailyByDate.get(key);
+        return {
+            date: key,
+            label: labelFormat.format(date),
+            sales: Number(row?.sales ?? 0),
+        };
+    });
+    const todayRow = dailyByDate.get(today);
+
+    return {
+        todaySales: Number(todayRow?.sales ?? 0),
+        todayTransactions: Number(todayRow?.transactions ?? 0),
+        weeklySales: dailySales.reduce((sum, entry) => sum + entry.sales, 0),
+        dailySales,
+        recentTransactions: recentRows.map((row) => ({
+            id: row.id,
+            customerName: row.customerName,
+            amount: Number(row.amount),
+            createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString(),
+        })),
+    };
 }

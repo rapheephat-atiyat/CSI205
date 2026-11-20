@@ -12,7 +12,7 @@ import { AdminActivity, Events, Order, Store, Ticket, User, UserRole, UserRolePe
 import { Role } from "../enums/role.enum";
 import { EVENT_ADMIN_PERMISSIONS, PERMISSIONS } from "@/lib/permissions";
 import { makeAdminCsv } from "@/lib/admin-export";
-import type { AdminActivityItem, AdminEventSummary, AdminExportReport, AdminOrderDetail, AdminOrderSummary, AdminStore, AdminUser, ApiResponse, EventArchiveResult, EventDetail, EventOverviewReport, EventSouvenirItem, EventSummary, EventTicketItem, OrderDetail, Paginated, StoreDetail, TokenRate, WalletDetail } from "@/lib/api-types";
+import type { AdminActivityItem, AdminEventSummary, AdminExportReport, AdminOrderDetail, AdminOrderSummary, AdminStore, AdminUser, ApiResponse, EventArchiveResult, EventDetail, EventOverviewReport, EventSouvenirItem, EventSummary, EventTicketItem, OrderDetail, Paginated, StoreDetail, StoreSalesSummary, TokenRate, WalletDetail } from "@/lib/api-types";
 
 // Never loads .env. Only a fresh, unused localhost database created here may be dropped.
 if (!process.env.TEST_DATABASE) throw new Error("Set TEST_DATABASE to a new disposable local admin test database.");
@@ -194,6 +194,17 @@ test("admin workflows through real HTTP sessions and a migrated disposable datab
         ok(await request(path() + `/users/${vendor.id}/roles`, "POST", { role: "VENDOR", storeId: store.id, permissions: [PERMISSIONS.STORE_SELL, PERMISSIONS.STORE_MANAGE] }, scoped), 201);
         ok(await request("/api/admin/wallet/topup", "POST", { userId: customer.id, amount: "100.00" }, owner));
         ok(await request(`/api/store/sell?storeId=${store.id}`, "POST", { customerUserId: customer.id, amount: "25.00" }, vendor));
+        denied(await request(`/api/store/sales?storeId=${store.id}`), 401);
+        const salesReply = await request<StoreSalesSummary>(`/api/store/sales?storeId=${store.id}`, "GET", undefined, vendor);
+        const sales = ok(salesReply);
+        assert.match(salesReply.headers.get("cache-control") ?? "", /private.*no-store/);
+        assert.equal(sales.todaySales, 25);
+        assert.equal(sales.todayTransactions, 1);
+        assert.equal(sales.weeklySales, 25);
+        assert.equal(sales.dailySales.length, 7);
+        assert.equal(sales.dailySales[6].sales, 25);
+        assert.equal(sales.recentTransactions[0]?.customerName, "customer");
+        assert.equal(sales.recentTransactions[0]?.amount, 25);
         denied(await request(path() + `/stores/${store.id}`, "DELETE", undefined, scoped), 409);
         assert.equal((await source.manager.findOneByOrFail(Store, { id: store.id })).name, "Updated store");
         const removable = ok(await request<StoreDetail>(path() + "/stores", "POST", { name: "Unused store" }, scoped), 201);

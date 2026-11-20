@@ -19,8 +19,6 @@ export interface VendorStore {
   banner?: string | null;
   status: "เปิดให้บริการ" | "ปิดชั่วคราว";
   walletBalance: string;
-  todaySales: number;
-  todayOrders: number;
   product: StoreDetail["product"];
 }
 
@@ -38,8 +36,6 @@ function mapStoreDetailToVendorStore(store: StoreDetail): VendorStore {
     banner: store.banner,
     status: "เปิดให้บริการ",
     walletBalance: store.walletBalance,
-    todaySales: Number(store.walletBalance) || 0,
-    todayOrders: 0,
     product: store.product,
   };
 }
