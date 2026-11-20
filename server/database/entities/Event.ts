@@ -79,6 +79,9 @@ export class Events {
     @Column({ type: "timestamptz" })
     buyEndAt!: Date;
 
+    @Column({ name: "archived_at", type: "timestamptz", nullable: true })
+    archivedAt!: Date | null;
+
     @Column({ type: "int", default: 1 })
     minTicketQTY!: number;
 

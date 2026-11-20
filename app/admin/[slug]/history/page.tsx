@@ -16,6 +16,8 @@ const labels: Record<string, string> = {
   "shipping.update": "อัปเดตจัดส่ง",
   "event.create": "สร้างงาน",
   "event.update": "แก้ไขงาน",
+  "event.archive": "จัดเก็บงาน",
+  "event.restore": "กู้คืนงาน",
   "ticket.create": "เพิ่มประเภทบัตร",
   "ticket.update": "แก้ไขประเภทบัตร",
   "ticket.delete": "ลบประเภทบัตร",
