@@ -62,14 +62,11 @@ export function Step3Souvenir({
                 const sizesForSale = souvenir.sizes.length ? souvenir.sizes : [null];
                 return (
                     <BookCard key={souvenir.id} title={souvenir.name}>
-                        <figure className="w-full max-w-xs space-y-1.5">
-                            <SouvenirPhoto image={souvenir.image} sizes="(max-width: 383px) 90vw, 320px" className="aspect-[4/3]" />
-                            {souvenir.image?.startsWith("/images/demo-souvenirs/") && (
-                                <figcaption className="text-xs text-muted-foreground">
-                                    <a href="/images/demo-souvenirs/credits.md" className="underline underline-offset-2">ภาพอ้างอิง</a>
-                                </figcaption>
-                            )}
-                        </figure>
+                        <SouvenirPhoto
+                            image={souvenir.image}
+                            sizes="(max-width: 383px) 90vw, 320px"
+                            className="aspect-[4/3] w-full max-w-xs"
+                        />
                         {eligibleAttendees.map(({ key, ticketType, attendee }) => {
                             const selections = attendee.souvenirs ?? [];
                             const selection = selections.find((item) => item.souvenirId === souvenir.id);
