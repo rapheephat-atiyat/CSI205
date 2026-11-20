@@ -2,6 +2,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import type { EventTicketItem } from "@/lib/api-types";
+import { bookingDateLabel } from "@/lib/booking-days";
 import { ArrowLeft, ArrowRight, Check, Circle, Clock3, Info, LockKeyhole, Ticket } from "lucide-react";
 import type { AttendeeProgress } from "./attendee-fields";
 import { BookCard, money } from "./BookUI";
@@ -15,6 +16,7 @@ const nextButtonLabels = [
 
 type Props = {
     currentStep: number;
+    attendanceDate: string | null;
     attendeeProgress?: AttendeeProgress[];
     completedAttendeeCount: number;
     selectedTicketTypes: EventTicketItem[];
@@ -31,7 +33,7 @@ type Props = {
     isSubmitting: boolean;
     mustRetrySameOrder: boolean;
     errorMessage: string;
-    onBack: () => void;
+    onBack?: () => void;
 };
 
 const attendeeStatuses = {
@@ -41,7 +43,7 @@ const attendeeStatuses = {
 };
 
 export function BookSummary({
-    currentStep, attendeeProgress, completedAttendeeCount, selectedTicketTypes, quantityByTicketId, ticketCount, extraSouvenirCount,
+    currentStep, attendanceDate, attendeeProgress, completedAttendeeCount, selectedTicketTypes, quantityByTicketId, ticketCount, extraSouvenirCount,
     extraSouvenirTotal, shippingFee, orderTotal, minimumTickets, maximumTickets, hasTicketTypes,
     canConfirmOrder, isSubmitting, mustRetrySameOrder, errorMessage, onBack,
 }: Props) {
@@ -62,6 +64,11 @@ export function BookSummary({
     return (
         <aside className="lg:sticky lg:top-[calc(var(--navbar-height)+1.5rem)]">
             <BookCard title={attendeeProgress ? "ความคืบหน้า" : "สรุปรายการ"}>
+                {attendanceDate && (
+                    <p className="text-sm text-muted-foreground">
+                        วันที่เข้าร่วม <time dateTime={attendanceDate} className="font-medium text-foreground">{bookingDateLabel(attendanceDate)}</time>
+                    </p>
+                )}
                 {attendeeProgress ? (
                     <div className="space-y-3">
                         <div className="space-y-2">
@@ -139,7 +146,7 @@ export function BookSummary({
                     {buttonLabel}
                     {isReviewStep ? <LockKeyhole aria-hidden="true" /> : <ArrowRight aria-hidden="true" />}
                 </Button>
-                {currentStep > 1 && (
+                {onBack && (
                     <Button type="button" variant="outline" className="h-10 w-full" onClick={onBack} disabled={isSubmitting || mustRetrySameOrder}>
                         <ArrowLeft aria-hidden="true" /> ย้อนกลับ
                     </Button>

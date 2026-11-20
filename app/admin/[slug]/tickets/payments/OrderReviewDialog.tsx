@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { api } from "@/lib/api-client";
+import { bookingDateLabel } from "@/lib/booking-days";
 import type { AdminOrderDetail } from "@/lib/api-types";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -230,6 +231,11 @@ function OrderContent({
             )}
           </div>
 
+          {order.attendanceDate && (
+            <p className="text-sm text-muted-foreground">
+              วันที่เข้าร่วม <time dateTime={order.attendanceDate}>{bookingDateLabel(order.attendanceDate)}</time>
+            </p>
+          )}
           <p className="text-3xl font-semibold tabular-nums text-foreground">
             ฿{money(order.total)}
           </p>

@@ -238,6 +238,7 @@ export type TicketSouvenir = SouvenirSelection & { name: string; claimedAt?: str
 export type TicketItem = {
     id: string;
     orderId: string;
+    attendanceDate?: string | null;
     eventId: string;
     eventTicketId: string;
     ticketTypeName?: string;
@@ -264,6 +265,7 @@ export type OrderDetail = {
     orderNo: string;
     userId: string;
     eventId: string;
+    attendanceDate: string | null;
     total: string;
     status: OrderStatus;
     paymentSlip: string | null;
@@ -294,6 +296,8 @@ export type CreateOrderInput = {
     /** สร้างด้วย crypto.randomUUID() แล้วใช้ค่าเดิมถ้าต้องลองส่งออเดอร์เดิมอีกครั้ง */
     requestId: string;
     eventId: string;
+    /** วันที่เข้าร่วมตามเวลาไทย (YYYY-MM-DD) ต้องเลือกเมื่อมีกำหนดการหลายวัน */
+    attendanceDate?: string | null;
     items: OrderSelection[];
     deliveryMethod: DeliveryMethod;
     /** ต้องส่งที่อยู่เมื่อเลือก deliveryMethod เป็น "SHIPPING" */

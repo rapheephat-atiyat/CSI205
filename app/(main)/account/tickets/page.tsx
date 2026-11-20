@@ -3,11 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { TicketItem } from "@/lib/api-types";
+import { bookingDateLabel } from "@/lib/booking-days";
 import { cn } from "@/lib/utils";
 import { requirePageUser } from "@/server/auth/page-user";
 import { getEventsByIds } from "@/server/services/event.service";
 import { getMyTickets } from "@/server/services/order.service";
-import { CircleCheck, CircleX, Clock3, QrCode, type LucideIcon } from "lucide-react";
+import { CalendarDays, CircleCheck, CircleX, Clock3, QrCode, type LucideIcon } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { connection } from "next/server";
@@ -82,6 +83,15 @@ async function TicketsContent({ searchParams }: Props) {
                                 <div className="space-y-1 text-sm">
                                     <p className="font-medium">{[ticket.firstName, ticket.lastName].filter(Boolean).join(" ") || "ผู้เข้าร่วมงาน"}</p>
                                     {ticket.ticketTypeName && <p className="text-muted-foreground">{ticket.ticketTypeName}</p>}
+                                    {ticket.attendanceDate && (
+                                        <div className="flex items-start gap-2.5 rounded-lg bg-muted/60 px-3 py-2">
+                                            <CalendarDays className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">วันเข้าร่วมงาน</p>
+                                                <time dateTime={ticket.attendanceDate} className="font-medium">{bookingDateLabel(ticket.attendanceDate)}</time>
+                                            </div>
+                                        </div>
+                                    )}
                                     <p className="text-xs text-muted-foreground">{ticket.ticketCode}</p>
                                     {ticket.tokenReward > 0 && ticket.status !== "CANCELLED" && (
                                         <p className="text-muted-foreground">

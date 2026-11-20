@@ -6,12 +6,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api-client";
-import type { OrderDetail } from "@/lib/api-types";
+import type { EventDetail, OrderDetail } from "@/lib/api-types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import BookLayout from "./BookLayout";
 import { BookCard, money, orderDate } from "./BookUI";
+import { getBookingDays } from "@/lib/booking-days";
 
 function readSlipAsDataUrl(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -24,7 +25,7 @@ function readSlipAsDataUrl(file: File): Promise<string> {
 
 export function Step5Payment({ order, event, paymentQr }: {
     order: OrderDetail;
-    event: { title: string; slug: string };
+    event: Pick<EventDetail, "title" | "slug" | "archivedAt" | "sessions">;
     paymentQr: string | null;
 }) {
     const router = useRouter();
@@ -79,13 +80,15 @@ export function Step5Payment({ order, event, paymentQr }: {
         requestInProgress.current = false;
     }
 
+    const showDateStep = Boolean(order.attendanceDate) && getBookingDays(event.sessions).length > 1;
+
     if (order.status !== "PENDING" || hasSentSlip) {
         const isPaid = order.status === "PAID";
         const isCancelled = order.status === "CANCELLED";
         const tokenReward = order.tickets.reduce((sum, ticket) => sum + ticket.tokenReward, 0);
         const Icon = isPaid ? CheckCircle2 : isCancelled ? XCircle : Clock3;
         return (
-            <BookLayout step={5} event={event}>
+            <BookLayout step={5} event={event} showDateStep={showDateStep} attendanceDate={order.attendanceDate}>
                 <BookCard title={isPaid ? "ชำระเงินสำเร็จ" : isCancelled ? "คำสั่งซื้อถูกยกเลิก" : "ส่งหลักฐานแล้ว รอตรวจสอบ"} className="mx-auto max-w-2xl text-center">
                     <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-yellow-200 text-yellow-600"><Icon aria-hidden="true" className="size-6" /></span>
                     <p className="text-sm text-muted-foreground">{isPaid ? "เปิด QR บัตรของคุณเพื่อใช้เช็กอินที่หน้างาน" : isCancelled ? "ดูรายละเอียดรายการนี้ได้จากประวัติคำสั่งซื้อ" : "ระบบได้รับสลิปแล้ว คุณติดตามผลได้จากประวัติคำสั่งซื้อ"}</p>
@@ -110,7 +113,7 @@ export function Step5Payment({ order, event, paymentQr }: {
     }
 
     return (
-        <BookLayout step={5} event={event}>
+        <BookLayout step={5} event={event} showDateStep={showDateStep} attendanceDate={order.attendanceDate}>
             <div className="grid items-start gap-5 lg:grid-cols-2">
                 <BookCard title="สแกน QR เพื่อโอนเงิน">
                     <p className="text-sm text-muted-foreground">เลขคำสั่งซื้อ <strong className="font-medium text-foreground wrap-anywhere">{order.orderNo}</strong></p>
