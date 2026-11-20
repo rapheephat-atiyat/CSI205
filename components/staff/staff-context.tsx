@@ -37,14 +37,9 @@ export type StaffQuota = {
   remaining: number;
 };
 
-export type TopUpResult = {
-  success: boolean;
-  error?: "invalid" | "overQuota" | "invalidAmount";
-  attendee?: Attendee;
-  amount?: number;
-  newBalance?: number;
-  remainingQuota?: number;
-};
+export type TopUpResult =
+  | { success: true; name: string; ticketCode: string | null; newBalance: number }
+  | { success: false; error: string; message: string };
 
 export interface StaffContextType {
   attendees: Attendee[];
@@ -58,7 +53,7 @@ export interface StaffContextType {
   addScan: (record: Omit<ScanRecord, "id"> & { id?: string }) => ScanRecord;
   updateAttendeeTokens: (attendeeId: string, tokens: number) => void;
   setAttendees: (attendees: Attendee[] | ((prev: Attendee[]) => Attendee[])) => void;
-  topUpTokens: (attendeeIdOrTicket: string, amount: number) => Promise<TopUpResult>;
+  topUpTokens: (attendeeIdOrTicket: string, amount: number, expectedBahtPerToken: string) => Promise<TopUpResult>;
 }
 
 const StaffContext = createContext<StaffContextType | undefined>(undefined);
@@ -275,48 +270,28 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const topUpTokens = useCallback(
-    async (attendeeIdOrTicket: string, amount: number): Promise<TopUpResult> => {
+    async (attendeeIdOrTicket: string, amount: number, expectedBahtPerToken: string): Promise<TopUpResult> => {
       initStoreIfNeeded();
       if (!Number.isInteger(amount) || amount <= 0) {
-        return { success: false, error: "invalidAmount" };
+        return { success: false, error: "invalidAmount", message: "จำนวน Token ต้องเป็นจำนวนเต็มบวก" };
       }
 
       const currentQuota = getStoredTopUpQuota();
       const remaining = Math.max(currentQuota.total - currentQuota.used, 0);
       if (amount > remaining) {
-        return { success: false, error: "overQuota", remainingQuota: remaining };
+        return { success: false, error: "overQuota", message: "เกินโควตาของเจ้าหน้าที่" };
       }
 
-      const clean = attendeeIdOrTicket.trim().toLowerCase();
-      const target = attendeesStore.find(
-        (a) => a.id.toLowerCase() === clean || a.ticketId.toLowerCase() === clean
-      );
+      const res = await api.staff.topUp({ attendeeId: attendeeIdOrTicket, amount, expectedBahtPerToken });
+      if (!res.success) return { success: false, error: res.error.code, message: res.error.message };
 
-      if (!target) {
-        return { success: false, error: "invalid" };
+      const { name, ticketCode, balance } = res.data;
+      if (ticketCode) {
+        attendeesStore = attendeesStore.map((attendee) =>
+          attendee.ticketId === ticketCode ? { ...attendee, tokens: balance } : attendee
+        );
+        saveStoredAttendees(attendeesStore);
       }
-
-      let newBalance = (target.tokens ?? 0) + amount;
-
-      try {
-        const res = await api.staff.topUp({ attendeeId: target.id, amount });
-        if (res.success && res.data) {
-          newBalance = res.data.balance;
-        }
-      } catch {
-        // mock fallback
-      }
-
-      const updatedAttendee: Attendee = {
-        ...target,
-        tokens: newBalance,
-      };
-
-      const nextAttendees = attendeesStore.map((a) =>
-        a.id === target.id ? updatedAttendee : a
-      );
-      attendeesStore = nextAttendees;
-      saveStoredAttendees(nextAttendees);
 
       addTopUpUsed(amount);
       quotaStore = getStoredTopUpQuota();
@@ -325,10 +300,9 @@ export function StaffProvider({ children }: { children: React.ReactNode }) {
 
       return {
         success: true,
-        attendee: updatedAttendee,
-        amount,
-        newBalance,
-        remainingQuota: Math.max(quotaStore.total - quotaStore.used, 0),
+        name,
+        ticketCode,
+        newBalance: balance,
       };
     },
     []

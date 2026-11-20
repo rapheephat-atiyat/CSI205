@@ -1,3 +1,4 @@
+import type { StaffTopUpInput } from "@/lib/api-types";
 import { requireUser } from "@/server/auth/current-user";
 import { withHandler } from "@/server/http/handler";
 import { readJson } from "@/server/http/request";
@@ -6,6 +7,6 @@ import { topUpStaffAttendee } from "@/server/services/staff.service";
 
 export const POST = withHandler(async (req) => {
     const staff = await requireUser(req);
-    const body = await readJson<{ attendeeId: string; amount: number; note?: string }>(req);
+    const body = await readJson<StaffTopUpInput>(req);
     return success(await topUpStaffAttendee(staff, body));
 });

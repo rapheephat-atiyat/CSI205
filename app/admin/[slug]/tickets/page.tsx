@@ -1,9 +1,12 @@
 "use client";
 
+import { MAX_TICKET_TOKEN_REWARD } from "@/lib/token-pricing";
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAdminAccess } from "@/components/admin/AdminAccess";
 import { AdminFeedback, apiData } from "@/components/admin/AdminFeedback";
+import { SouvenirPhoto } from "@/components/book/SouvenirPhoto";
 
 // import icons
 import { ClipboardCheck, Pencil, Plus, Trash2 } from "lucide-react";
@@ -91,6 +94,7 @@ export default function Page() {
   const [tName, setTName] = useState("");
   const [tPrice, setTPrice] = useState("");
   const [tQuota, setTQuota] = useState("");
+  const [tTokenReward, setTTokenReward] = useState("0");
   const [tActive, setTActive] = useState(true);
 
   function openTicket(ticket?: EventTicketItem) {
@@ -98,6 +102,7 @@ export default function Page() {
     setTName(ticket?.name ?? "");
     setTPrice(ticket ? String(Number(ticket.price)) : "");
     setTQuota(ticket ? String(ticket.quota) : "");
+    setTTokenReward(String(ticket?.tokenReward ?? 0));
     setTActive(ticket?.isActive ?? true);
     setTicketOpen(true);
   }
@@ -108,6 +113,7 @@ export default function Page() {
       name: tName.trim(),
       price: Number(tPrice).toFixed(2),
       quota: Number(tQuota),
+      tokenReward: Number(tTokenReward),
       isActive: tActive,
     };
 
@@ -117,7 +123,7 @@ export default function Page() {
 
     if (!res.success) return toast.error(res.error.message);
     setTicketOpen(false);
-    toast.success("เพิ่มบัตรสำเร็จ", {
+    toast.success(editingTicket ? "บันทึกบัตรสำเร็จ" : "เพิ่มบัตรสำเร็จ", {
       position: "top-center",
       className: "text-green-800!",
     });
@@ -139,6 +145,7 @@ export default function Page() {
   const [editingSouvenir, setEditingSouvenir] =
     useState<EventSouvenirItem | null>(null);
   const [sName, setSName] = useState("");
+  const [sImage, setSImage] = useState("");
   const [sSizes, setSSizes] = useState("");
   const [sExtraPrice, setSExtraPrice] = useState("");
   const [sAllowDecline, setSAllowDecline] = useState(true);
@@ -148,6 +155,7 @@ export default function Page() {
   function openSouvenir(souvenir?: EventSouvenirItem) {
     setEditingSouvenir(souvenir ?? null);
     setSName(souvenir?.name ?? "");
+    setSImage(souvenir?.image ?? "");
     setSSizes((souvenir?.sizes ?? []).join(", "));
     setSExtraPrice(
       souvenir?.extraPrice ? String(Number(souvenir.extraPrice)) : "",
@@ -171,6 +179,9 @@ export default function Page() {
 
     const input: EventSouvenirInput = {
       name: sName.trim(),
+      image: editingSouvenir && sImage === (editingSouvenir.image ?? "")
+        ? undefined
+        : sImage.trim() || null,
       sizes: sSizes
         .split(",")
         .map((s) => s.trim().toUpperCase())
@@ -187,7 +198,7 @@ export default function Page() {
 
     if (!res.success) return toast.error(res.error.message);
     setSouvenirOpen(false);
-    toast.success("เพิ่มของที่ระลึกสำเร็จ", {
+    toast.success(editingSouvenir ? "บันทึกของที่ระลึกสำเร็จ" : "เพิ่มของที่ระลึกสำเร็จ", {
       position: "top-center",
       className: "text-green-800!",
     });
@@ -294,6 +305,7 @@ export default function Page() {
                 <TableRow>
                   <TableHead>ประเภทบัตร</TableHead>
                   <TableHead>ราคาบัตร</TableHead>
+                  <TableHead>Token ต่อใบ</TableHead>
                   <TableHead>ขายแล้ว / จำนวน</TableHead>
                   <TableHead>สถานะ</TableHead>
                   <TableHead></TableHead>
@@ -303,7 +315,7 @@ export default function Page() {
                 {tickets.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={5}
+                      colSpan={6}
                       className="h-24 text-center text-muted-foreground"
                     >
                       ยังไม่มีบัตร
@@ -316,6 +328,7 @@ export default function Page() {
                       <TableCell>
                         {Number(ticket.price).toLocaleString("th-TH")} บาท
                       </TableCell>
+                      <TableCell className="tabular-nums">{ticket.tokenReward.toLocaleString("th-TH")}</TableCell>
                       <TableCell>
                         {ticket.sold} / {ticket.quota}
                       </TableCell>
@@ -395,7 +408,12 @@ export default function Page() {
                 ) : (
                   souvenirs.map((souvenir) => (
                     <TableRow key={souvenir.id}>
-                      <TableCell>{souvenir.name}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <SouvenirPhoto image={souvenir.image} sizes="48px" className="size-12" />
+                          <span>{souvenir.name}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {souvenir.sizes.length
                           ? souvenir.sizes.join(", ")
@@ -448,7 +466,7 @@ export default function Page() {
 
         {/* dialog add / edit ticket */}
         <Dialog open={ticketOpen} onOpenChange={setTicketOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
                 {editingTicket ? "แก้ไขบัตร" : "เพิ่มบัตร"}
@@ -498,6 +516,23 @@ export default function Page() {
                     onChange={(e) => setTQuota(e.target.value)}
                   />
                 </Field>
+                <Field>
+                  <FieldLabel htmlFor="ticket-token-reward">Token ที่ได้รับต่อใบ</FieldLabel>
+                  <Input
+                    id="ticket-token-reward"
+                    type="number"
+                    min={0}
+                    max={MAX_TICKET_TOKEN_REWARD}
+                    step={1}
+                    required
+                    aria-describedby="ticket-token-reward-hint"
+                    value={tTokenReward}
+                    onChange={(e) => setTTokenReward(e.target.value)}
+                  />
+                  <p id="ticket-token-reward-hint" className="text-xs text-muted-foreground">
+                    ใส่ 0 สำหรับบัตรที่ไม่แจก Token อัตรานี้ใช้กับการจองใหม่
+                  </p>
+                </Field>
                 <label className="flex items-center gap-2 text-sm">
                   <input
                     type="checkbox"
@@ -525,7 +560,7 @@ export default function Page() {
 
         {/* dialog add / edit souvenir */}
         <Dialog open={souvenirOpen} onOpenChange={setSouvenirOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
                 {editingSouvenir ? "แก้ไขของที่ระลึก" : "เพิ่มของที่ระลึก"}
@@ -545,6 +580,17 @@ export default function Page() {
                     placeholder="เสื้อที่ระลึก"
                     value={sName}
                     onChange={(e) => setSName(e.target.value)}
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="souvenir-image">ลิงก์รูปของที่ระลึก</FieldLabel>
+                  <Input
+                    id="souvenir-image"
+                    inputMode="url"
+                    autoComplete="off"
+                    placeholder="https://…"
+                    value={sImage}
+                    onChange={(e) => setSImage(e.target.value)}
                   />
                 </Field>
                 <Field>

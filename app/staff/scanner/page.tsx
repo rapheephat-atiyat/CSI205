@@ -9,13 +9,16 @@ import { cn } from "@/lib/utils";
 import { formatTokens, type ScanOutcome } from "@/lib/staff-mock";
 import { api } from "@/lib/api-client";
 import { useStaff } from "@/components/staff/staff-context";
+import { calculateTopUpBaht } from "@/lib/token-pricing";
 
 type Mode = "in" | "out" | "topup";
 
 type TopUpDisplay =
-  | { type: "success"; name: string; ticketId: string; amount: number; newBalance: number }
+  | { type: "success"; name: string; ticketCode: string | null; amount: number; newBalance: number; bahtAmount: string }
   | { type: "overQuota"; message: string }
   | { type: "error"; message: string };
+
+const baht = new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB" });
 
 export default function ScannerPage() {
   const { attendees, checkInOrOut, addScan, topUpTokens, quota } = useStaff();
@@ -28,9 +31,32 @@ export default function ScannerPage() {
   const [resultName, setResultName] = useState<string | undefined>("ธนกร วงศ์สกุล");
   const [resultTicket, setResultTicket] = useState<string>("TT-000124");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [tokenRate, setTokenRate] = useState<string | null>(null);
+  const [rateError, setRateError] = useState<string | null>(null);
+  const [rateRequest, setRateRequest] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
+  const processing = useRef(false);
+
+  const refreshRate = useCallback(() => {
+    setTokenRate(null);
+    setRateError(null);
+    setRateRequest((request) => request + 1);
+  }, []);
+
+  useEffect(() => {
+    if (mode !== "topup") return;
+    let active = true;
+    void api.staff.tokenRate().then((response) => {
+      if (!active) return;
+      if (response.success) setTokenRate(response.data.bahtPerToken);
+      else setRateError(response.error.message);
+    });
+    return () => { active = false; };
+  }, [mode, rateRequest]);
+
+  const bahtAmount = tokenRate === null ? null : calculateTopUpBaht(topUpAmount, Number(tokenRate));
 
   // Stop camera tracks helper
   const stopCamera = useCallback(() => {
@@ -43,13 +69,15 @@ export default function ScannerPage() {
   // Process code through API or fallback simulation
   const processCode = useCallback(async (rawCode: string) => {
     const cleanCode = rawCode.trim();
-    if (!cleanCode || isProcessing) return;
+    if (!cleanCode || processing.current || (mode === "topup" && (!tokenRate || !bahtAmount || topUpResult?.type === "success"))) return;
 
+    processing.current = true;
     setIsProcessing(true);
     const nowTime = new Date().toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 
     if (mode === "topup") {
       try {
+        if (!tokenRate || !bahtAmount) return;
         if (!Number.isInteger(topUpAmount) || topUpAmount <= 0) {
           setTopUpResult({ type: "error", message: "กรุณาระบุจำนวน Token ที่มากกว่า 0" });
           return;
@@ -63,17 +91,18 @@ export default function ScannerPage() {
           return;
         }
 
-        const res = await topUpTokens(cleanCode, topUpAmount);
-        if (res.success && res.attendee && res.newBalance !== undefined) {
+        const res = await topUpTokens(cleanCode, topUpAmount, tokenRate);
+        if (res.success) {
           setResult(null);
           setTopUpResult({
             type: "success",
-            name: res.attendee.name,
-            ticketId: res.attendee.ticketId,
+            name: res.name,
+            ticketCode: res.ticketCode,
             amount: topUpAmount,
             newBalance: res.newBalance,
+            bahtAmount,
           });
-        } else if (res.error === "invalid") {
+        } else if (res.error === "ATTENDEE_NOT_FOUND") {
           setResult("invalid");
           setResultName(undefined);
           setResultTicket(cleanCode);
@@ -86,12 +115,11 @@ export default function ScannerPage() {
           });
         } else {
           setResult(null);
-          setTopUpResult({
-            type: "error",
-            message: "ไม่สามารถทำรายการได้ กรุณาตรวจสอบข้อมูลบัตร",
-          });
+          setTopUpResult({ type: "error", message: res.message });
+          if (res.error === "TOKEN_RATE_CHANGED") refreshRate();
         }
       } finally {
+        processing.current = false;
         setIsProcessing(false);
       }
       return;
@@ -161,9 +189,10 @@ export default function ScannerPage() {
         });
       }
     } finally {
+      processing.current = false;
       setIsProcessing(false);
     }
-  }, [mode, isProcessing, attendees, checkInOrOut, addScan, topUpAmount, quota.remaining, topUpTokens]);
+  }, [mode, attendees, checkInOrOut, addScan, topUpAmount, quota.remaining, topUpTokens, tokenRate, bahtAmount, topUpResult, refreshRate]);
 
   // Start camera on mount
   useEffect(() => {
@@ -199,7 +228,7 @@ export default function ScannerPage() {
 
   // Barcode detection loop if supported
   useEffect(() => {
-    if (!videoRef.current || result || topUpResult) return;
+    if (!videoRef.current || result || topUpResult || (mode === "topup" && !tokenRate)) return;
 
     let scanTimer: NodeJS.Timeout;
     const BarcodeDetectorClass = typeof window !== "undefined" && "BarcodeDetector" in window
@@ -229,7 +258,7 @@ export default function ScannerPage() {
     return () => {
       if (scanTimer) clearInterval(scanTimer);
     };
-  }, [result, topUpResult, processCode]);
+  }, [mode, tokenRate, result, topUpResult, processCode]);
 
   // Toggle flashlight if camera track supports it
   async function toggleTorch() {
@@ -285,7 +314,9 @@ export default function ScannerPage() {
                 key={value}
                 type="button"
                 aria-pressed={mode === value}
+                disabled={isProcessing}
                 onClick={() => {
+                  if (value === "topup" && mode !== "topup") refreshRate();
                   setMode(value);
                   setResult(null);
                   setTopUpResult(null);
@@ -312,6 +343,7 @@ export default function ScannerPage() {
                     key={n}
                     type="button"
                     aria-pressed={topUpAmount === n}
+                    disabled={isProcessing}
                     onClick={() => {
                       setTopUpAmount(n);
                       setTopUpResult(null);
@@ -326,6 +358,19 @@ export default function ScannerPage() {
                     +{n}
                   </button>
                 ))}
+              </div>
+              <div className="mt-3 border-t pt-3 text-sm" aria-live="polite">
+                {tokenRate !== null && bahtAmount !== null ? (
+                  <div className="flex flex-wrap justify-between gap-x-3 gap-y-1">
+                    <span className="text-muted-foreground">1 Token = {baht.format(Number(tokenRate))}</span>
+                    <span className="font-semibold tabular-nums">ยอดรับ {baht.format(Number(bahtAmount))}</span>
+                  </div>
+                ) : rateError ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-destructive">{rateError}</span>
+                    <Button type="button" variant="outline" size="sm" onClick={refreshRate}>โหลดอัตราอีกครั้ง</Button>
+                  </div>
+                ) : <p className="text-muted-foreground">กำลังโหลดอัตรา Token…</p>}
               </div>
             </div>
           )}
@@ -412,7 +457,8 @@ export default function ScannerPage() {
                     </p>
                     <div className="mt-2 text-sm">
                       <p className="font-medium text-foreground">{topUpResult.name}</p>
-                      <p className="font-mono text-xs text-muted-foreground">{topUpResult.ticketId}</p>
+                      {topUpResult.ticketCode && <p className="font-mono text-xs text-muted-foreground">{topUpResult.ticketCode}</p>}
+                      <p className="mt-1 text-sm">ยอดรับ {baht.format(Number(topUpResult.bahtAmount))}</p>
                       <p className="mt-1 text-sm font-medium text-emerald-800">
                         ยอดคงเหลือใหม่:{" "}
                         <strong className="tabular-nums text-foreground">
@@ -530,7 +576,7 @@ export default function ScannerPage() {
                 autoComplete="off"
                 className="h-9 min-w-0 flex-1 rounded-lg border bg-background px-3 font-mono text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
               />
-              <Button type="submit" size="lg" disabled={isProcessing} className="bg-brand text-on-brand hover:bg-brand-hover">
+              <Button type="submit" size="lg" disabled={isProcessing || (mode === "topup" && (!tokenRate || topUpResult?.type === "success"))} className="bg-brand text-on-brand hover:bg-brand-hover">
                 {mode === "topup" ? `เติม ${formatTokens(topUpAmount)} Token` : "ตรวจสอบ"}
               </Button>
             </form>

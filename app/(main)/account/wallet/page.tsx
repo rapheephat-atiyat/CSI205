@@ -24,18 +24,14 @@ async function WalletContent() {
 }
 
 const currency = new Intl.NumberFormat("th-TH", { style: "currency", currency: "THB", maximumFractionDigits: 2 });
+const tokens = new Intl.NumberFormat("th-TH", { maximumFractionDigits: 2 });
 const dateTime = new Intl.DateTimeFormat("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" });
 
 const TX_LABELS: Record<WalletHistoryItem["type"], string> = {
     TOPUP: "เติมโทเคน",
     PURCHASE: "ซื้อสินค้า / บัตร",
     REFUND: "คืนโทเคน",
-};
-
-const TX_SIGN: Record<WalletHistoryItem["type"], "+" | "-"> = {
-    TOPUP: "+",
-    REFUND: "+",
-    PURCHASE: "-",
+    TICKET_REWARD: "รางวัลจากการจองบัตร",
 };
 
 function WalletView({ wallet }: { wallet: WalletDetail }) {
@@ -51,12 +47,11 @@ function WalletView({ wallet }: { wallet: WalletDetail }) {
             <BookCard title="ยอดคงเหลือ">
                 <div className="flex items-baseline gap-2">
                     <span className="text-5xl font-extrabold tabular-nums tracking-tight text-brand">
-                        {currency.format(balance)}
+                        {tokens.format(balance)}
                     </span>
+                    <span className="text-sm font-medium text-muted-foreground">Token</span>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                    ใช้โทเคนซื้อบัตร ของที่ระลึก หรือสินค้าในงาน
-                </p>
+                <p className="text-xs text-muted-foreground">ใช้ Token ซื้อสินค้าในงาน</p>
             </BookCard>
 
             {/* History */}
@@ -66,17 +61,21 @@ function WalletView({ wallet }: { wallet: WalletDetail }) {
                 ) : (
                     <ul className="divide-y">
                         {wallet.histories.map((tx) => {
-                            const sign = TX_SIGN[tx.type];
-                            const isPositive = sign === "+";
+                            const isPositive = Number(tx.after) >= Number(tx.before);
                             return (
                                 <li key={tx.id} className="flex items-center justify-between gap-4 py-3">
                                     <div className="min-w-0 space-y-0.5">
                                         <p className="text-sm font-medium">{TX_LABELS[tx.type]}</p>
                                         <p className="text-xs text-muted-foreground">{dateTime.format(new Date(tx.createdAt))}</p>
                                         {tx.note && <p className="text-xs text-muted-foreground wrap-anywhere">{tx.note}</p>}
+                                        {tx.bahtAmount !== null && tx.bahtPerToken !== null && (
+                                            <p className="text-xs text-muted-foreground">
+                                                {currency.format(Number(tx.bahtAmount))} · {currency.format(Number(tx.bahtPerToken))} ต่อ Token
+                                            </p>
+                                        )}
                                     </div>
                                     <span className={`shrink-0 font-mono text-sm font-semibold tabular-nums ${isPositive ? "text-emerald-600" : "text-destructive"}`}>
-                                        {sign}{currency.format(Number(tx.amount))}
+                                        {isPositive ? "+" : "-"}{tokens.format(Number(tx.amount))} Token
                                     </span>
                                 </li>
                             );

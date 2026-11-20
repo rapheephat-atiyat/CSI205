@@ -10,6 +10,7 @@ export const TRANSACTION_TYPES = {
     TOPUP: "TOPUP",
     PURCHASE: "PURCHASE",
     REFUND: "REFUND",
+    TICKET_REWARD: "TICKET_REWARD",
 } as const;
 export type TransactionType = (typeof TRANSACTION_TYPES)[keyof typeof TRANSACTION_TYPES];
 

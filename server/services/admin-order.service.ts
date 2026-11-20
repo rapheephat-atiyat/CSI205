@@ -8,6 +8,7 @@ import { readText, readUuid } from "@/server/http/validation";
 import { cancelPendingOrders, releaseExpiredOrderHolds, toOrderDetail } from "./order.service";
 import { validatePaymentSlip } from "./order-validation";
 import { recordAdminActivity } from "./admin-activity";
+import { awardTicketTokens } from "./wallet.service";
 
 export async function listAdminOrders(eventId: string, filters: AdminOrderFilters): Promise<Paginated<AdminOrderSummary>> {
     if (filters.status && !Object.values(ORDER_STATUSES).includes(filters.status)) throw new ApiError("VALIDATION_ERROR", "สถานะไม่ถูกต้อง", 422);
@@ -67,12 +68,16 @@ export async function reviewAdminOrder(eventId: string, orderId: string, actorId
         if (order.reviewDecision === input.decision) return;
         if (order.status !== ORDER_STATUSES.PENDING || order.reviewDecision) throw new ApiError("ORDER_STATUS_CHANGED", "คำสั่งซื้อนี้ถูกตรวจหรือยกเลิกแล้ว", 409);
         if (!order.paymentSlip) throw new ApiError("PAYMENT_PROOF_REQUIRED", "ยังไม่มีหลักฐานให้ตรวจสอบ", 409);
-        const pendingTickets = await manager.countBy(Ticket, { orderId, status: TICKET_STATUSES.PENDING });
-        if (!pendingTickets) throw new ApiError("ORDER_NOT_REVIEWABLE", "ไม่มีบัตรรออนุมัติในคำสั่งซื้อ", 409);
+        const pendingTickets = await manager.find(Ticket, {
+            where: { orderId, status: TICKET_STATUSES.PENDING },
+            select: { tokenReward: true },
+        });
+        if (!pendingTickets.length) throw new ApiError("ORDER_NOT_REVIEWABLE", "ไม่มีบัตรรออนุมัติในคำสั่งซื้อ", 409);
         if (input.decision === "APPROVE") {
             await manager.update(Ticket, { orderId, status: TICKET_STATUSES.PENDING }, { status: TICKET_STATUSES.ACTIVE });
             order.status = ORDER_STATUSES.PAID;
             order.paidAt = new Date();
+            await awardTicketTokens(manager, order.userId, order.id, pendingTickets);
         } else {
             await cancelPendingOrders(manager, [orderId]);
             order.status = ORDER_STATUSES.CANCELLED;

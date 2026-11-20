@@ -9,6 +9,7 @@ import { invalidOrder, priceSouvenirs, validateAttendee, validatePaymentSlip, va
 import { hasCheckoutPromptPay } from "@/server/services/checkout-payment";
 import { getEventSouvenirs } from "./event-souvenirs";
 import { toTicketItem } from "./ticket.service";
+import { awardTicketTokens } from "./wallet.service";
 
 const uuidPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
 const orderRelations = { shipping: true, tickets: { eventTicket: true } } as const;
@@ -44,7 +45,7 @@ export async function createOrder(userId: string, input: CreateOrderInput): Prom
 
     const orderId = await db.transaction(async (manager) => {
         // ถ้ากดส่งซ้ำด้วยรหัสเดิม ให้เปิดออเดอร์ที่สร้างไว้แล้ว
-        await manager.findOne(User, { where: { id: userId }, lock: { mode: "pessimistic_write" } });
+        await manager.findOne(User, { where: { id: userId }, lock: { mode: "for_no_key_update" } });
         const existingOrder = await manager.findOneBy(Order, { id: requestId, userId });
         if (existingOrder) return existingOrder.id;
 
@@ -145,6 +146,7 @@ export async function createOrder(userId: string, input: CreateOrderInput): Prom
                     eventTicketId: ticketType.id,
                     userId,
                     unitPrice: ticketType.price,
+                    tokenReward: ticketType.tokenReward,
                     ticketCode: `TKT-${crypto.randomUUID().toUpperCase()}`,
                     qrToken: crypto.randomUUID(),
                     status: isFree ? TICKET_STATUSES.ACTIVE : TICKET_STATUSES.PENDING,
@@ -153,6 +155,7 @@ export async function createOrder(userId: string, input: CreateOrderInput): Prom
         }
         await manager.save(ticketTypes);
         await manager.save(tickets);
+        if (isFree) await awardTicketTokens(manager, userId, order.id, tickets);
         return order.id;
     });
 

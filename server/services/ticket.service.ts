@@ -2,6 +2,7 @@ import "server-only";
 import { getDatabase } from "@/server/database/database.souce";
 import { Events, EventTicket, Ticket, type User } from "@/server/database/entities";
 import type { EventTicketInput, EventTicketItem, TicketItem } from "@/lib/api-types";
+import { MAX_TICKET_TOKEN_REWARD } from "@/lib/token-pricing";
 import { PERMISSIONS } from "@/lib/permissions";
 import { hasPermission } from "@/server/auth/permission";
 import { ATTENDEE_FIELDS, TICKET_STATUSES } from "@/server/database/enums/domain.enum";
@@ -43,6 +44,7 @@ export async function createEventTicket(eventId: string, input: EventTicketInput
         name,
         description: input.description ?? null,
         price: input.price,
+        tokenReward: input.tokenReward === undefined ? 0 : input.tokenReward,
         quota: input.quota,
         sold: 0,
         minTicketQTY: input.minTicketQTY ?? 1,
@@ -75,6 +77,7 @@ export async function updateEventTicket(eventId: string, ticketId: string, input
             name: typeof input.name === "string" ? input.name.trim() : input.name,
             description: input.description,
             price: input.price,
+            tokenReward: input.tokenReward,
             quota: input.quota,
             minTicketQTY: input.minTicketQTY,
             maxTicketQTY: input.maxTicketQTY,
@@ -108,6 +111,9 @@ export async function deleteEventTicket(eventId: string, ticketId: string, actor
 }
 
 function validateTicketType(ticketType: EventTicket) {
+    if (!Number.isInteger(ticketType.tokenReward) || ticketType.tokenReward < 0 || ticketType.tokenReward > MAX_TICKET_TOKEN_REWARD) {
+        throw new ApiError("VALIDATION_ERROR", "Token ต่อใบต้องเป็นจำนวนเต็มระหว่าง 0 ถึง 99,999,999", 422);
+    }
     if (typeof ticketType.isActive !== "boolean" || !Number.isSafeInteger(ticketType.sortOrder) || ticketType.sortOrder < 0 || (ticketType.description !== null && (typeof ticketType.description !== "string" || ticketType.description.length > 5000))) throw new ApiError("VALIDATION_ERROR", "การตั้งค่าประเภทบัตรไม่ถูกต้อง", 422);
     if (typeof ticketType.name !== "string" || !ticketType.name || ticketType.name.length > 255) {
         throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่อบัตรไม่เกิน 255 ตัวอักษร", 422);
@@ -172,6 +178,7 @@ export function toEventTicketItem(ticketType: EventTicket): EventTicketItem {
         name: ticketType.name,
         description: ticketType.description,
         price: ticketType.price,
+        tokenReward: ticketType.tokenReward,
         quota: ticketType.quota,
         sold: ticketType.sold,
         minTicketQTY: ticketType.minTicketQTY,
@@ -194,6 +201,7 @@ export function toTicketItem(ticket: Ticket): TicketItem {
         ticketTypeName: ticket.eventTicket?.name,
         userId: ticket.userId,
         unitPrice: ticket.unitPrice,
+        tokenReward: ticket.tokenReward,
         ticketCode: ticket.ticketCode,
         qrToken: canShowQr ? ticket.qrToken : "",
         status: ticket.status,

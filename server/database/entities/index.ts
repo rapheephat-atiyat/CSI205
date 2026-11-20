@@ -39,6 +39,7 @@ import { WalletHistory } from "@/server/database/entities/WalletHistory";
 import { FaqCategory } from "@/server/database/entities/FaqCategory";
 import { FaqQuestion } from "@/server/database/entities/FaqQuestion";
 import { AdminActivity } from "./AdminActivity";
+import { TokenPricing } from "./TokenPricing";
 
 export const databaseEntities = [
     User,
@@ -59,6 +60,7 @@ export const databaseEntities = [
     Product,
     Wallet,
     WalletHistory,
+    TokenPricing,
     FaqCategory,
     FaqQuestion,
     AdminActivity,

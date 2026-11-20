@@ -41,7 +41,7 @@ export function WalletOverview({
               <span className="font-mono text-[11px] text-zinc-400">User Wallet</span>
             </div>
             <div className="text-2xl font-bold font-mono tracking-tight text-zinc-900">
-              ฿{formattedUserBalance}
+              {formattedUserBalance} Token
             </div>
           </div>
 
@@ -69,7 +69,7 @@ export function WalletOverview({
                 </span>
               </div>
               <div className="text-2xl font-bold font-mono tracking-tight text-zinc-900">
-                ฿{formattedStoreBalance}
+                {formattedStoreBalance} Token
               </div>
             </div>
 
