@@ -34,13 +34,41 @@ export function toStoreDetail(s: Store): StoreDetail {
     };
 }
 
-export async function createStore(input: StoreInput, actorId?: string): Promise<StoreDetail> {
+export async function createStore(
+    input: StoreInput,
+    actorId?: string,
+    productInput?: Pick<ProductInput, "title" | "price" | "images">,
+): Promise<StoreDetail> {
     readUuid(input.eventId, "รหัสงาน");
     if (input.description != null && (typeof input.description !== "string" || input.description.length > 5000)) throw new ApiError("VALIDATION_ERROR", "รายละเอียดร้านค้าไม่ถูกต้อง", 422);
     const name = typeof input.name === "string" ? input.name.trim() : "";
     if (!name || name.length > 255 || typeof input.eventId !== "string" || !input.eventId) {
         throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่องานและชื่อร้านค้า", 422);
     }
+    let product: { title: string; price: string; images: string[] } | undefined;
+    if (productInput !== undefined) {
+        if (!productInput || typeof productInput !== "object") {
+            throw new ApiError("VALIDATION_ERROR", "ข้อมูลอาหารไม่ถูกต้อง", 422);
+        }
+        const title = typeof productInput.title === "string" ? productInput.title.trim() : "";
+        if (!title || title.length > 255) {
+            throw new ApiError("VALIDATION_ERROR", "กรุณาระบุชื่ออาหารให้ถูกต้อง", 422);
+        }
+        const images = productInput.images ?? [];
+        if (
+            !Array.isArray(images) ||
+            images.length > 1 ||
+            images.some((image) =>
+                typeof image !== "string" ||
+                image.length > 2_800_000 ||
+                !/^data:image\/(?:png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/.test(image)
+            )
+        ) {
+            throw new ApiError("VALIDATION_ERROR", "รูปอาหารไม่ถูกต้อง (รองรับ PNG หรือ JPEG ไม่เกิน 2 MB)", 422);
+        }
+        product = { title, price: readMoney(productInput.price, true).toFixed(2), images };
+    }
+
     const db = await getDatabase();
     return db.transaction(async (manager) => {
         if (!await manager.existsBy(Events, { id: input.eventId })) {
@@ -55,6 +83,15 @@ export async function createStore(input: StoreInput, actorId?: string): Promise<
         });
         const savedStore = await manager.save(store);
         savedStore.wallet = await manager.save(Wallet, { storeId: savedStore.id, total: "0.00" });
+        if (product) {
+            savedStore.product = await manager.save(Product, {
+                storeId: savedStore.id,
+                title: product.title,
+                description: "",
+                price: product.price,
+                images: product.images,
+            });
+        }
         await recordAdminActivity(manager, actorId, input.eventId, "store.create", savedStore.id);
         return toStoreDetail(savedStore);
     });

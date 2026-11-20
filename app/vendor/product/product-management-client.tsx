@@ -17,7 +17,7 @@ export function ProductManagementClient() {
 
   const name = product?.title ?? "กาแฟอเมริกาโน่เย็น";
   const price = Number(product?.price ?? 65);
-  const productImage = selectedStore?.image;
+  const productImage = selectedStore?.productImage;
   const productSubtitle =
     product?.description ||
     (product ? `รหัสสินค้า · ${product.id.slice(0, 6).toUpperCase()}` : "P-001 · Iced Americano");

@@ -55,7 +55,7 @@ export function AppSidebar() {
                             </SidebarMenuItem>
                             <SidebarMenuItem>
                                 <SidebarMenuButton asChild className={isActive("/vendor/product") ? "hover:bg-brand bg-brand  text-on-brand hover:text-on-brand " : "hover:border hover:border-brand-hover"}>
-                                    <Link href="/vendor/product"><Package />จัดการสินค้า</Link>
+                                    <Link href="/vendor/product"><Package />รายละเอียดร้านค้า</Link>
                                 </SidebarMenuButton>
                             </SidebarMenuItem>
                             <SidebarMenuItem>

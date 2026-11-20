@@ -1,6 +1,6 @@
 import type {
     AdminActivityItem, AdminExportReport, AdminOrderDetail, AdminOrderFilters, AdminOrderSummary,
-    AdminStore, AdminUser, EventOverviewReport, OrderReviewInput, OrderShippingUpdate, Paginated,
+    AdminStore, AdminStoreCreateInput, AdminUser, EventOverviewReport, OrderReviewInput, OrderShippingUpdate, Paginated,
     ApiResponse,
     AssignUserRoleInput,
     CreateOrderInput,
@@ -389,7 +389,7 @@ export const api = {
         },
         stores: {
             list: (eventId: string) => request<AdminStore[]>(`${eventPath(eventId)}/stores`),
-            create: (eventId: string, input: Omit<StoreInput, "eventId">) => request<StoreDetail>(`${eventPath(eventId)}/stores`, "POST", input),
+            create: (eventId: string, input: AdminStoreCreateInput) => request<StoreDetail>(`${eventPath(eventId)}/stores`, "POST", input),
             update: (eventId: string, storeId: string, input: Partial<StoreInput>) => request<AdminStore>(`${eventPath(eventId)}/stores/${encodeURIComponent(storeId)}`, "PATCH", input),
             delete: (eventId: string, storeId: string) => request<{ id: string }>(`${eventPath(eventId)}/stores/${encodeURIComponent(storeId)}`, "DELETE"),
         },

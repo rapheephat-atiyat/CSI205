@@ -15,6 +15,7 @@ export interface VendorStore {
   category: string;
   location: string;
   image?: string;
+  productImage?: string;
   banner?: string | null;
   status: "เปิดให้บริการ" | "ปิดชั่วคราว";
   walletBalance: string;
@@ -33,6 +34,7 @@ function mapStoreDetailToVendorStore(store: StoreDetail): VendorStore {
     category: store.product?.title || "ร้านค้าในงาน",
     location: store.description || "พื้นที่จัดงาน",
     image: store.thumbnail || store.banner || undefined,
+    productImage: store.product?.images[0] || undefined,
     banner: store.banner,
     status: "เปิดให้บริการ",
     walletBalance: store.walletBalance,
@@ -152,37 +154,44 @@ function StoreSelectionGate({
         ) : (
           /* ตารางการ์ดร้านค้า 3 คอลัมน์ */
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-10 md:gap-12 pt-2">
-            {stores.map((store) => (
-              <button
-                key={store.id}
-                type="button"
-                onClick={() => onSelect(store)}
-                className="group flex flex-col items-center gap-4 focus:outline-none cursor-pointer"
-              >
-                {/* กล่องรูปภาพร้านค้า */}
-                <div className="w-full aspect-[4/3] bg-[#d9d9d9] group-hover:bg-slate-300 group-hover:ring-2 group-hover:ring-brand/60 transition-all rounded-sm flex flex-col items-center justify-center relative overflow-hidden">
-                  {store.image ? (
-                    <img
-                      src={store.image}
-                      alt={store.name}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <Store className="size-10 text-slate-400/70 group-hover:scale-110 transition-transform" />
-                  )}
-                </div>
+            {stores.map((store) => {
+              const image = store.productImage ?? store.image;
+              const imageAlt = store.productImage
+                ? store.product?.title ?? store.name
+                : store.name;
 
-                {/* ชื่อร้านค้าตรงกลางด้านล่าง */}
-                <div className="text-center">
-                  <div className="text-base font-bold text-slate-900 group-hover:text-brand transition-colors">
-                    {store.name}
+              return (
+                <button
+                  key={store.id}
+                  type="button"
+                  onClick={() => onSelect(store)}
+                  className="group flex flex-col items-center gap-4 focus:outline-none cursor-pointer"
+                >
+                  {/* กล่องรูปอาหารหรือรูปหน้าร้าน */}
+                  <div className="w-full aspect-[4/3] bg-[#d9d9d9] group-hover:bg-slate-300 group-hover:ring-2 group-hover:ring-brand/60 transition-all rounded-sm flex flex-col items-center justify-center relative overflow-hidden">
+                    {image ? (
+                      <img
+                        src={image}
+                        alt={imageAlt}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <Store className="size-10 text-slate-400/70 group-hover:scale-110 transition-transform" />
+                    )}
                   </div>
-                  <div className="text-xs text-slate-400 mt-0.5">
-                    {store.code} · {store.location}
+
+                  {/* ชื่อร้านค้าตรงกลางด้านล่าง */}
+                  <div className="text-center">
+                    <div className="text-base font-bold text-slate-900 group-hover:text-brand transition-colors">
+                      {store.name}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">
+                      {store.code} · {store.location}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
         )}
       </main>

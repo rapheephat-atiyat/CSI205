@@ -8,6 +8,7 @@ import {
   type ChartConfig,
 } from "@/components/ui/chart";
 import { useVendorStore } from "@/components/vendor/vendor-store-context";
+import Image from "next/image";
 import {
   ChartNoAxesCombined,
   Coffee,
@@ -195,16 +196,24 @@ export function VendorDashboardClient() {
 
         {/* กล่องยอดขายสินค้า */}
         <div className="w-full lg:w-1/3 min-w-0 border border-black/10 rounded-xl p-6">
-          <div className="text-xl font-bold">ยอดขายสินค้า</div>
-          <div className="text-gray-500 text-xs mb-5">
-            {selectedStore?.product?.title ?? "ลาเต้เย็น"} · {selectedStore?.product?.price ?? 70} T ต่อแก้ว
-          </div>
+          <div className="text-xl font-bold mb-2">ยอดขายสินค้า</div>
 
           <div className="w-full flex flex-col gap-2">
             <div className="flex justify-between items-center text-sm">
               <span className="font-medium flex items-center gap-2">
                 <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-50 text-brand">
-                  <Coffee size={18} strokeWidth={2} />
+                  {selectedStore?.productImage ? (
+                    <Image
+                      src={selectedStore.productImage}
+                      alt={selectedStore.product?.title ?? "รูปอาหารของร้าน"}
+                      width={32}
+                      height={32}
+                      unoptimized
+                      className="size-8 rounded-lg object-cover"
+                    />
+                  ) : (
+                    <Coffee size={18} strokeWidth={2} />
+                  )}
                 </span>
                 {selectedStore?.product?.title ?? "อเมริกาโน่เย็น"}
               </span>
@@ -213,9 +222,9 @@ export function VendorDashboardClient() {
               </span>
             </div>
 
-            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+            {/* <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
               <div className="h-full w-[60%] bg-[#e0313f] rounded-full" />
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
